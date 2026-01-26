@@ -16,12 +16,17 @@ class ToolPaths(BaseModel):
     ghostscript: str = Field(default="gs", description="Ghostscript executable path")
     decktape: str = Field(default="decktape", description="Decktape executable path")
 
-    @field_validator("python", "pandoc", "minify", "ghostscript", "decktape", mode="after")
-    @classmethod
-    def resolve_tool_path(cls, v: str) -> str:
-        """Resolve command to absolute path if possible."""
-        resolved = shutil.which(v)
-        return resolved if resolved else v
+    @model_validator(mode="after")
+    def resolve_tool_paths(self) -> "ToolPaths":
+        """Resolve all tool paths to absolute paths if possible."""
+        tools = ["python", "pandoc", "minify", "ghostscript", "decktape"]
+        for tool in tools:
+            current = getattr(self, tool)
+            if current:
+                resolved = shutil.which(current)
+                if resolved:
+                    setattr(self, tool, resolved)
+        return self
 
 
 class OutputConfig(BaseModel):
