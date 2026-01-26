@@ -120,50 +120,51 @@ def get_recursive_yaml_deps(
     yaml_path: Path, visited: set[Path] | None = None, stack: list[Path] | None = None
 ) -> list[Path]:
     """
-    Recursively scans YAML files for 'defaults' keys to build dependency lists.
+    Recursively scans YAML files for 'defaults' keys to build dependency lists for Ninja.
+
+    Args:
+        yaml_path: Path to the root YAML file
+        visited: Already processed files
+        stack: Current recursion stack for cycle detection
+
+    Returns:
+        Deduplicated list of absolute Paths
     """
     if visited is None:
         visited = set()
     if stack is None:
         stack = []
 
+    # Path should be absolute for reliable visiting/stack checks
+    yaml_path = yaml_path.resolve()
+
     # Circular dependency detection
     if yaml_path in stack:
-        cycle = " → ".join(str(p) for p in [*stack, yaml_path])
+        cycle = " -> ".join(str(p) for p in [*stack, yaml_path])
         raise ValueError(f"Circular dependency detected: {cycle}")
 
-    # Already processed
     if yaml_path in visited:
         return []
-
-    # File doesn't exist check is handled in helper, but good to have early exit or let helper handle it
-    # We rely on helper returning empty list if not exist
 
     deps: list[Path] = []
     visited.add(yaml_path)
     stack.append(yaml_path)
 
     try:
-        # Get defaults from cached helper
-        # Note: We pass the path object, but lru_cache requires hashable args. Path is hashable.
         raw_defaults = _get_direct_defaults(yaml_path)
 
         for default_ref in raw_defaults:
-            dep_path = Path(default_ref)
-            # We don't check existence here, we let the recursion/helper handle it,
-            # BUT the original code only extended deps if dep_path.exists().
-            # So checking existing here preserves behavior.
+            dep_path = Path(default_ref).resolve()
             if dep_path.exists():
                 deps.append(dep_path)
-                # Recurse with updated stack
                 deps.extend(get_recursive_yaml_deps(dep_path, visited, stack[:]))
+            else:
+                logger.warning(f"Default file referenced in {yaml_path} not found: {dep_path}")
 
-    except ValueError:
-        raise
     finally:
         stack.pop()
 
-    return deps
+    return sorted(list(set(deps)))
 
 
 def parse_frontmatter_type(md_path: Path, default_type: str) -> str:

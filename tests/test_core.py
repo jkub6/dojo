@@ -35,7 +35,7 @@ def test_header_generation(basic_config):
 
     generator.emit_header()
 
-    content = "\n".join(generator.buffer)
+    content = generator._buffer.getvalue()
     assert "ninja_required_version" in content
     assert "rule regenerate" in content
     assert "rule compile" in content

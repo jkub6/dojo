@@ -18,14 +18,16 @@ class ToolPaths(BaseModel):
 
     @model_validator(mode="after")
     def resolve_tool_paths(self) -> "ToolPaths":
-        """Resolve all tool paths to absolute paths if possible."""
-        tools = ["python", "pandoc", "minify", "ghostscript", "decktape"]
-        for tool in tools:
+        """Resolve all tool paths to absolute paths and verify existence."""
+        essential_tools = ["python", "pandoc"]
+        for tool in ["python", "pandoc", "minify", "ghostscript", "decktape"]:
             current = getattr(self, tool)
             if current:
                 resolved = shutil.which(current)
                 if resolved:
                     setattr(self, tool, resolved)
+                elif tool in essential_tools:
+                    raise ValueError(f"Essential tool '{tool}' not found: {current}")
         return self
 
 
@@ -50,7 +52,7 @@ class OutputConfig(BaseModel):
         """Validate that defaults file(s) exist."""
         if v is None:
             return None
-        
+
         paths = [v] if isinstance(v, str) else v
         for p in paths:
             path = Path(p)
@@ -63,9 +65,9 @@ class OutputConfig(BaseModel):
         """Validate that derived outputs have required fields."""
         if self.source is not None and self.tool is None:
             raise ValueError("Outputs with 'source' must also specify 'tool'")
-        
+
         if self.source is None and self.defaults is None:
-             raise ValueError("Outputs without 'source' must specify 'defaults'")
+            raise ValueError("Outputs without 'source' must specify 'defaults'")
 
         return self
 
@@ -84,7 +86,7 @@ class TypeConfig(BaseModel):
         """Validate that defaults file(s) exist."""
         if v is None:
             return None
-        
+
         paths = [v] if isinstance(v, str) else v
         for p in paths:
             path = Path(p)
@@ -123,7 +125,7 @@ class Config(BaseModel):
     plugins: list[str] = Field(default_factory=list, description="Plugin script paths")
     exclude: list[str] = Field(default_factory=list, description="Glob patterns to exclude")
     include: list[str] = Field(default_factory=list, description="Glob patterns to include")
-    
+
     defaults: str | list[str] | None = Field(
         default=None, description="Global default render settings"
     )
@@ -134,7 +136,7 @@ class Config(BaseModel):
         """Validate that defaults file(s) exist."""
         if v is None:
             return None
-        
+
         paths = [v] if isinstance(v, str) else v
         for p in paths:
             path = Path(p)
@@ -161,10 +163,44 @@ class Config(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def validate_default_type(self) -> "Config":
-        """Validate default_type exists in types."""
+    def validate_config(self) -> "Config":
+        """Perform complex cross-field validations."""
+        # 1. Validate default_type exists
         if self.default_type not in self.types:
             raise ValueError(f"default_type '{self.default_type}' not found in types")
+
+        # 2. Check for overlapping directories
+        dirs = {
+            "src_dir": Path(self.src_dir).resolve(),
+            "output_dir": Path(self.output_dir).resolve(),
+            "build_dir": Path(self.build_dir).resolve(),
+        }
+        for name1, path1 in dirs.items():
+            for name2, path2 in dirs.items():
+                if name1 == name2:
+                    continue
+                
+                # Check for equality
+                if path1 == path2:
+                    raise ValueError(f"Directory conflict: {name1} and {name2} are the same ({path1})")
+                
+                # Check if one is a parent of another
+                try:
+                    path1.relative_to(path2)
+                except ValueError:
+                    # Not a subpath, this is fine
+                    pass
+                else:
+                    # If relative_to succeeds, path1 is a subpath of path2 (or same)
+                    raise ValueError(f"Directory conflict: {name1} ({path1}) is inside {name2} ({path2})")
+
+        # 3. Check for duplicate output IDs in each type
+        for type_name, type_conf in self.types.items():
+            ids = [o.id for o in type_conf.outputs if o.id]
+            if len(ids) != len(set(ids)):
+                duplicates = set([x for x in ids if ids.count(x) > 1])
+                raise ValueError(f"Duplicate output IDs in type '{type_name}': {duplicates}")
+
         return self
 
 

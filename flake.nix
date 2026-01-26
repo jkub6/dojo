@@ -43,7 +43,7 @@
         # ---------------------------------------------------------------------
         # Shared Dependencies
         # ---------------------------------------------------------------------
-        
+
         # Tools required for the build pipeline (runtime)
         commonTools = with pkgs; [
           decktape
@@ -64,11 +64,26 @@
         devTools = with pkgs; [
           alejandra
           just
-          mypy
           ruff
           statix
           typos
         ];
+        
+        # Python environment with ALL dependencies (app + test + dev tools like mypy)
+        pythonEnv = pkgs.python3.withPackages (ps: [
+           # App dependencies
+           ps.pyyaml
+           ps.pydantic
+           ps.tqdm
+           ps.rich
+           
+           # Test dependencies
+           ps.pytest
+           ps.pytest-cov
+           
+           # Type checking (must be in the same env to see packages)
+           ps.mypy
+        ]);
 
       in {
         # Python package definition for Dojo
@@ -88,7 +103,7 @@
           ];
 
           nativeBuildInputs = [pkgs.makeWrapper];
-          
+
           # Wrap the binary with all necessary runtime tools
           postInstall = ''
             wrapProgram $out/bin/dojo \
@@ -100,11 +115,12 @@
 
         # Development Environment
         devShells.default = pkgs.mkShell {
-          inputsFrom = [self'.packages.default];
+          # Inputs from package NOT used to avoid contaminating PYTHONPATH
+          # inputsFrom = [self'.packages.default];
 
-          packages = 
-            commonTools 
-            ++ testDeps 
+          packages =
+            commonTools
+            ++ [pythonEnv]
             ++ devTools;
 
           shellHook = ''
