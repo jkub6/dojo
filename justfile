@@ -6,15 +6,18 @@ set shell := ["bash", "-c"]
 default:
     @just --list
 
+# Apply automatic fixes (formatting and linting)
+fix:
+    alejandra .
+    ruff format .
+    ruff check --fix-only .
+
 # Run all static analysis checks
 check:
     ruff check . && ruff format --check .
     mypy src
-
-# Apply automatic fixes (formatting and linting)
-fix:
-    ruff check --fix .
-    ruff format .
+    typos .
+    statix check flake.nix
 
 # Run tests with coverage
 test:

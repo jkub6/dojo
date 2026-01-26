@@ -6,83 +6,92 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
   };
 
-  outputs = inputs@{ flake-parts, ... }:
-    flake-parts.lib.mkFlake { inherit inputs; } {
-      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin" ];
+  outputs = inputs @ {flake-parts, ...}:
+    flake-parts.lib.mkFlake {inherit inputs;} {
+      systems = ["x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin"];
 
-      perSystem = { config, self', inputs', system, ... }: 
-        let
-          # Apply the Decktape overlay from the user's snippet
-          overlay = final: prev: {
-            decktape = prev.decktape.overrideAttrs (oldAttrs: rec {
-              src = final.fetchFromGitHub {
-                owner = "jkub6";
-                repo = "decktape";
-                rev = "fix-embedded-fonts";
-                hash = "sha256-Vd/HKEh2w8aR6vQgO3t3TylNnJnmiOJIHJQ8Aatcp58=";
-              };
-              npmDepsHash = "sha256-7I4javLw9SG9sds7nhj78UIuOPrnKm6obUPezGtEDS0=";
-              npmDeps = final.fetchNpmDeps {
-                inherit src;
-                hash = npmDepsHash;
-              };
-            });
-          };
-
-          pkgs = import inputs.nixpkgs {
-            inherit system;
-            config.allowUnfree = true;
-            overlays = [ overlay ];
-          };
-          
-        in {
-          # Python package definition for Dojo
-          packages.default = pkgs.python3Packages.buildPythonPackage {
-            pname = "dojo";
-            version = "0.1.0";
-            pyproject = true;
-            src = ./.;
-            
-            build-system = [ pkgs.python3Packages.hatchling ];
-            
-            propagatedBuildInputs = with pkgs.python3Packages; [
-              pyyaml
-              pydantic
-              tqdm
-              rich
-            ];
-
-            nativeCheckInputs = [ 
-              pkgs.python3Packages.pytest 
-              pkgs.python3Packages.pytest-cov
-            ];
-          };
-
-          # Development Environment
-          devShells.default = pkgs.mkShell {
-            inputsFrom = [ self'.packages.default ];
-            
-            packages = with pkgs; [
-              pandoc
-              minify
-              ghostscript
-              decktape
-              ninja
-              ruff
-              mypy
-              just
-            ];
-            
-            shellHook = ''
-              export PYTHONPATH=$PWD/src:$PYTHONPATH
-              alias dojo="python3 -m dojo"
-              echo "🥷 Dojo Environment Loaded"
-              echo "Tools available: dojo, ninja, pandoc, decktape, minify, ghostscript"
-              echo "Development mode: Source code in ./src is added to PYTHONPATH"
-            '';
-          };
-          
-          formatter = pkgs.nixfmt-rfc-style;
+      perSystem = {
+        config,
+        self',
+        inputs',
+        system,
+        ...
+      }: let
+        # Apply the Decktape overlay from the user's snippet
+        overlay = final: prev: {
+          decktape = prev.decktape.overrideAttrs (oldAttrs: rec {
+            src = final.fetchFromGitHub {
+              owner = "jkub6";
+              repo = "decktape";
+              rev = "fix-embedded-fonts";
+              hash = "sha256-Vd/HKEh2w8aR6vQgO3t3TylNnJnmiOJIHJQ8Aatcp58=";
+            };
+            npmDepsHash = "sha256-7I4javLw9SG9sds7nhj78UIuOPrnKm6obUPezGtEDS0=";
+            npmDeps = final.fetchNpmDeps {
+              inherit src;
+              hash = npmDepsHash;
+            };
+          });
         };
+
+        pkgs = import inputs.nixpkgs {
+          inherit system;
+          config.allowUnfree = true;
+          overlays = [overlay];
+        };
+      in {
+        # Python package definition for Dojo
+        packages.default = pkgs.python3Packages.buildPythonPackage {
+          pname = "dojo";
+          version = "0.1.0";
+          pyproject = true;
+          src = ./.;
+
+          build-system = [pkgs.python3Packages.hatchling];
+
+          propagatedBuildInputs = with pkgs.python3Packages; [
+            pyyaml
+            pydantic
+            tqdm
+            rich
+          ];
+
+          nativeCheckInputs = [
+            pkgs.python3Packages.pytest
+            pkgs.python3Packages.pytest-cov
+          ];
+        };
+
+        # Development Environment
+        devShells.default = pkgs.mkShell {
+          inputsFrom = [self'.packages.default];
+
+          packages = with pkgs; [
+            alejandra
+            statix
+            typos
+            pandoc
+            minify
+            ghostscript
+            decktape
+            ninja
+            ruff
+            mypy
+            just
+            python3Packages.pytest
+            python3Packages.pytest-cov
+          ];
+
+          shellHook = ''
+            export PYTHONPATH=$PWD/src:$PYTHONPATH
+            alias dojo="python3 -m dojo"
+            echo "🥷 Dojo Environment Loaded"
+            echo "Tools available: dojo, ninja, pandoc, decktape, minify, ghostscript"
+            echo "Development mode: Source code in ./src is added to PYTHONPATH"
+          '';
+        };
+
+        formatter = pkgs.nixfmt-rfc-style;
+      };
     };
 }

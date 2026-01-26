@@ -10,17 +10,20 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = "MIT"
 authors = [
-  {name = "User", email = "user@example.com"},
+  {name = "Jake", email = "jake@example.com"},
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Build Tools",
     "Topic :: Text Processing :: Markup",
 ]
@@ -51,6 +54,25 @@ dojo = "dojo.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dojo"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "B", "UP", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+python_classes = "Test*"
+addopts = "--cov=src/dojo --cov-report=term-missing"
 
 [tool.mypy]
 python_version = "3.10"

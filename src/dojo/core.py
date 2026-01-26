@@ -15,7 +15,6 @@ from .utils import (
     should_process_file,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -253,9 +252,7 @@ class NinjaGenerator:
         # Filter files based on include/exclude patterns
         filtered_files = []
         for md_file in md_files:
-            if should_process_file(
-                md_file, self.src, self.config.include, self.config.exclude
-            ):
+            if should_process_file(md_file, self.src, self.config.include, self.config.exclude):
                 filtered_files.append(md_file)
             else:
                 logger.debug(f"Skipping excluded file: {md_file}")

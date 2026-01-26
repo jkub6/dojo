@@ -1,4 +1,4 @@
-# Python
+# Python Caches and Build Artifacts
 __pycache__/
 *.py[cod]
 *$py.class
@@ -20,6 +20,17 @@ wheels/
 .installed.cfg
 *.egg
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+# Testing and Coverage
+.coverage
+htmlcov/
+.tox/
+.nox/
+nosetests.xml
+coverage.xml
 
 # Environments
 .env
