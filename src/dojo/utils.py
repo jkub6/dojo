@@ -1,9 +1,44 @@
+import fnmatch
 import logging
 from pathlib import Path
 
 import yaml
 
 logger = logging.getLogger(__name__)
+
+
+def should_process_file(path: Path, src_dir: Path, includes: list[str], excludes: list[str]) -> bool:
+    """
+    Determine if a file should be processed based on include/exclude patterns.
+
+    Args:
+        path: Absolute path to the file
+        src_dir: Absolute path to source directory
+        includes: List of glob patterns to include (if empty, include all)
+        excludes: List of glob patterns to exclude
+
+    Returns:
+        True if file should be processed
+    """
+    try:
+        rel_path = path.relative_to(src_dir)
+    except ValueError:
+        # File not in source directory
+        return False
+
+    rel_str = str(rel_path.as_posix())
+
+    # 1. Exclude Logic (Priority)
+    if any(fnmatch.fnmatch(rel_str, pattern) for pattern in excludes):
+        return False
+
+    # 2. Include Logic
+    if not includes:
+        # Default: include everything not excluded
+        return True
+
+    # Check if matches ANY include pattern
+    return any(fnmatch.fnmatch(rel_str, pattern) for pattern in includes)
 
 
 def ninja_escape(path: Path) -> str:

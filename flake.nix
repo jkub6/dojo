@@ -70,6 +70,7 @@
               ninja
               ruff
               mypy
+              just
             ];
             
             shellHook = ''

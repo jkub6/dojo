@@ -7,7 +7,14 @@ from .config import Config, CustomRule, OutputConfig
 from .constants import PoolName, RuleName
 from .plugins import PluginInterface, load_plugin
 from .rules import get_builtin_rules
-from .utils import get_recursive_yaml_deps, ninja_escape, parse_frontmatter_type, sanitize_path
+from .utils import (
+    get_recursive_yaml_deps,
+    ninja_escape,
+    parse_frontmatter_type,
+    sanitize_path,
+    should_process_file,
+)
+
 
 logger = logging.getLogger(__name__)
 
@@ -242,6 +249,18 @@ class NinjaGenerator:
         self.emit_header()
 
         md_files = sorted(self.src.rglob("*.md"))
+
+        # Filter files based on include/exclude patterns
+        filtered_files = []
+        for md_file in md_files:
+            if should_process_file(
+                md_file, self.src, self.config.include, self.config.exclude
+            ):
+                filtered_files.append(md_file)
+            else:
+                logger.debug(f"Skipping excluded file: {md_file}")
+
+        md_files = filtered_files
 
         if not md_files:
             logger.warning(f"No Markdown files found in {self.src}")

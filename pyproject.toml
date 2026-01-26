@@ -31,6 +31,15 @@ dependencies = [
   "rich>=10.0.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-cov",
+  "ruff",
+  "mypy",
+  "types-PyYAML",
+]
+
 [project.urls]
 Homepage = "https://github.com/example/dojo"
 Documentation = "https://github.com/example/dojo#readme"

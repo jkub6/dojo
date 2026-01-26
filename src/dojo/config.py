@@ -78,6 +78,8 @@ class Config(BaseModel):
     tools: ToolPaths = Field(default_factory=ToolPaths, description="External tool paths")
     custom_rules: list[CustomRule] = Field(default_factory=list, description="Custom Ninja rules")
     plugins: list[str] = Field(default_factory=list, description="Plugin script paths")
+    exclude: list[str] = Field(default_factory=list, description="Glob patterns to exclude")
+    include: list[str] = Field(default_factory=list, description="Glob patterns to include")
 
     @field_validator("custom_rules")
     @classmethod
