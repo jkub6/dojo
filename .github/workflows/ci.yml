@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: uses/nix-action@v2
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+    
+    - name: Check Formatting & Linting
+      run: nix develop --command bash -c "ruff check . && ruff format --check ."
+
+    - name: Type Checking
+      run: nix develop --command bash -c "mypy src"
+
+    - name: Run Tests
+      run: nix develop --command bash -c "pytest"

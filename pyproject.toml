@@ -1,0 +1,72 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dojo"
+version = "0.1.0"
+description = "Professional Ninja Build Generator for Static Site Generation"
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+authors = [
+  {name = "User", email = "user@example.com"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Text Processing :: Markup",
+]
+dependencies = [
+  "pyyaml",
+  "pydantic>=2.0",
+  "tqdm",
+  "rich>=10.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/example/dojo"
+Documentation = "https://github.com/example/dojo#readme"
+Repository = "https://github.com/example/dojo.git"
+Issues = "https://github.com/example/dojo/issues"
+
+[project.scripts]
+dojo = "dojo.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dojo"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["yaml", "tqdm", "rich.*"]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+branch = true
+source = ["src/dojo"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+show_missing = true
+
+
+
