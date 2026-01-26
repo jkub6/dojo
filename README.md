@@ -15,7 +15,7 @@ pip install pytest
 ## Usage
 
 ### 1. Create Configuration
-Create a `config.yaml` file (see `sample_config.yaml` for an example) to define your site structure.
+Create a `config.yaml` file (see `dojo.yaml` for an example) to define your site structure.
 
 ### 2. Run the Builder
 Run `dojo` to generate the Ninja build plan:
