@@ -42,7 +42,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     rules.append(
         CustomRule(
             name=RuleName.COMPILE.value,
-            command=f"{config.tools.pandoc} $in -t json -o $out",
+            command=f"{config.tools.pandoc} $in -d $defaults -t json -o $out",
             description="🧠 COMPILE $in",
         )
     )

@@ -61,6 +61,44 @@ class NinjaGenerator:
         for plugin in self.plugins:
             self.rules.extend(plugin.get_custom_rules())
 
+    def _get_merged_defaults(self, *sources: str | list[str] | None) -> list[Path]:
+        """
+        Merge default files from multiple sources (Global, Type, Output).
+        Returns a deduplicated list of absolute paths.
+        """
+        merged = []
+        for src in sources:
+            if not src:
+                continue
+            if isinstance(src, str):
+                merged.append(Path(src))
+            else:
+                merged.extend(Path(s) for s in src)
+        return merged
+    
+    def _format_defaults_var(self, defaults: list[Path]) -> str:
+        """
+        Format list of defaults into ninja variable string.
+        e.g. "file1.yaml -d file2.yaml"
+        """
+        if not defaults:
+            return ""
+        return " -d ".join(ninja_escape(d) for d in defaults)
+    
+    def _get_dep_string(self, defaults: list[Path]) -> str:
+         """Get dependency string for defaults."""
+         deps = []
+         try:
+             for df in defaults:
+                 deps.append(df)
+                 deps.extend(get_recursive_yaml_deps(df))
+         except ValueError as e:
+             logger.error(f"Dependency resolution failed: {e}")
+             raise
+         
+         dep_paths = sorted(set(deps))
+         return " ".join(ninja_escape(d) for d in dep_paths)
+
     def write(self, line: str = "") -> None:
         """Add a line to the Ninja file buffer."""
         self.buffer.append(line)
@@ -119,17 +157,38 @@ class NinjaGenerator:
         # Stage 1: Compile to JSON
         json_node = sanitize_path(self.build_dir, rel_stem.with_suffix(".json"))
 
-        self.write(f"# Source: {md_path.relative_to(Path.cwd())}")
-        self.write(
-            f"build {ninja_escape(json_node)}: {RuleName.COMPILE.value} {ninja_escape(md_path)}"
-        )
-        self.write()
+        try:
+             src_comment = md_path.relative_to(Path.cwd())
+        except ValueError:
+             src_comment = md_path
 
         # Determine content type from frontmatter
         content_type = parse_frontmatter_type(md_path, self.config.default_type)
         type_config = self.config.types.get(
             content_type, self.config.types[self.config.default_type]
         )
+
+        # Calculate Compile Defaults (Global + Type)
+        compile_defaults = self._get_merged_defaults(
+            self.config.defaults,
+            type_config.defaults
+        )
+        
+        compile_vars = ""
+        compile_deps = ""
+        if compile_defaults:
+            compile_vars = f"  defaults = {self._format_defaults_var(compile_defaults)}"
+            compile_deps = f" | {self._get_dep_string(compile_defaults)}"
+
+        # Write COMPILE rule with derived defaults
+        self.write(f"# Source: {src_comment}")
+        self.write(
+            f"build {ninja_escape(json_node)}: {RuleName.COMPILE.value} {ninja_escape(md_path)}{compile_deps}"
+        )
+        if compile_vars:
+            self.write(compile_vars)
+        self.write()
+
 
         if not type_config.outputs:
             return
@@ -143,7 +202,7 @@ class NinjaGenerator:
             for plugin in self.plugins:
                 out_config = plugin.modify_output_config(out_config, content_type)
 
-            self._process_output(out_config, rel_stem, json_node, local_registry)
+            self._process_output(out_config, rel_stem, json_node, local_registry, type_config)
 
         self.write()
 
@@ -153,6 +212,7 @@ class NinjaGenerator:
         rel_stem: Path,
         json_node: Path,
         local_registry: dict[str, Path],
+        type_config: "TypeConfig | None" = None,
     ) -> None:
         """
         Generate Ninja rules for a single output format.
@@ -171,20 +231,27 @@ class NinjaGenerator:
 
         # Derived Output
         if out_config.source:
-            parent_id = out_config.source
+            # Handle source as list or single string
+            source_ids = out_config.source
+            if isinstance(source_ids, str):
+                source_ids = [source_ids]
+            
             tool = out_config.tool
 
-            # Validate the source output exists
-            if parent_id not in local_registry:
-                logger.error(
-                    f"Output '{out_id}' depends on '{parent_id}' which hasn't been defined"
-                )
-                logger.error(f"File: {rel_stem}")
-                raise ValueError(f"Missing dependency: {parent_id}")
+            source_paths = []
+            for parent_id in source_ids:
+                if parent_id not in local_registry:
+                    logger.error(
+                        f"Output '{out_id}' depends on '{parent_id}' which hasn't been defined"
+                    )
+                    logger.error(f"File: {rel_stem}")
+                    raise ValueError(f"Missing dependency: {parent_id}")
+                source_paths.append(local_registry[parent_id])
+            
+            # Join all source paths
+            src_str = " ".join(ninja_escape(p) for p in source_paths)
 
-            source_file = local_registry[parent_id]
-
-            self.write(f"build {ninja_escape(final_path)}: {tool} {ninja_escape(source_file)}")
+            self.write(f"build {ninja_escape(final_path)}: {tool} {src_str}")
 
             if out_id:
                 local_registry[out_id] = final_path
@@ -207,21 +274,25 @@ class NinjaGenerator:
             render_target = final_path
 
         # Gather dependencies
-        defaults_file = Path(out_config.defaults)
+        # Compute effective defaults (Output Only)
+        output_defaults = out_config.defaults
+
+        all_defaults = self._get_merged_defaults(
+            output_defaults
+        )
 
         try:
-            deps = [defaults_file, *get_recursive_yaml_deps(defaults_file)]
-            dep_paths = sorted(set(deps))
-            dep_str = " ".join(ninja_escape(d) for d in dep_paths)
-        except ValueError as e:
-            logger.error(f"Dependency resolution failed: {e}")
-            raise
+            dep_str = self._get_dep_string(all_defaults)
+            defaults_val = self._format_defaults_var(all_defaults)
+        except ValueError:
+             raise
 
         # Generate render rule
         self.write(
             f"build {ninja_escape(render_target)}: {RuleName.RENDER.value} {ninja_escape(json_node)} | {dep_str}"
         )
-        self.write(f"  defaults = {ninja_escape(defaults_file)}")
+        if defaults_val:
+            self.write(f"  defaults = {defaults_val}")
         self.write()
 
         # Post-Processing
@@ -289,4 +360,9 @@ class NinjaGenerator:
         logger.info(f"Outputs: {len(self.all_outputs)} file(s) will be built")
         logger.info("")
         logger.info("Next steps:")
-        logger.info(f"  ninja -f {self.ninja_file.relative_to(Path.cwd())}")
+        try:
+            rel_ninja = self.ninja_file.relative_to(Path.cwd())
+        except ValueError:
+            rel_ninja = self.ninja_file
+        
+        logger.info(f"  ninja -f {rel_ninja}")

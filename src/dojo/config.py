@@ -34,19 +34,28 @@ class OutputConfig(BaseModel):
 
     id: str | None = Field(default=None, description="Unique identifier for this output")
     extension: str = Field(description="File extension for output")
-    defaults: str = Field(description="Path to Pandoc defaults file")
+    defaults: str | list[str] | None = Field(
+        default=None, description="Path(s) to Pandoc defaults file(s)"
+    )
     suffix: str = Field(default="", description="Suffix to add to filename before extension")
     post_process: str | None = Field(default=None, description="Post-processing tool name")
-    source: str | None = Field(default=None, description="Source output ID for derived outputs")
+    source: str | list[str] | None = Field(
+        default=None, description="Source output ID(s) for derived outputs"
+    )
     tool: str | None = Field(default=None, description="Tool to use for derived outputs")
 
     @field_validator("defaults")
     @classmethod
-    def validate_defaults_path(cls, v: str) -> str:
-        """Validate that defaults file exists."""
-        path = Path(v)
-        if not path.exists():
-            raise ValueError(f"Defaults file not found: {path}")
+    def validate_defaults_path(cls, v: str | list[str] | None) -> str | list[str] | None:
+        """Validate that defaults file(s) exist."""
+        if v is None:
+            return None
+        
+        paths = [v] if isinstance(v, str) else v
+        for p in paths:
+            path = Path(p)
+            if not path.exists():
+                raise ValueError(f"Defaults file not found: {path}")
         return v
 
     @model_validator(mode="after")
@@ -54,6 +63,10 @@ class OutputConfig(BaseModel):
         """Validate that derived outputs have required fields."""
         if self.source is not None and self.tool is None:
             raise ValueError("Outputs with 'source' must also specify 'tool'")
+        
+        if self.source is None and self.defaults is None:
+             raise ValueError("Outputs without 'source' must specify 'defaults'")
+
         return self
 
 
@@ -61,6 +74,23 @@ class TypeConfig(BaseModel):
     """Configuration for a content type."""
 
     outputs: list[OutputConfig] = Field(description="List of output formats")
+    defaults: str | list[str] | None = Field(
+        default=None, description="Default render settings for this type"
+    )
+
+    @field_validator("defaults")
+    @classmethod
+    def validate_defaults_path(cls, v: str | list[str] | None) -> str | list[str] | None:
+        """Validate that defaults file(s) exist."""
+        if v is None:
+            return None
+        
+        paths = [v] if isinstance(v, str) else v
+        for p in paths:
+            path = Path(p)
+            if not path.exists():
+                raise ValueError(f"Defaults file not found: {path}")
+        return v
 
 
 class CustomRule(BaseModel):
@@ -93,6 +123,24 @@ class Config(BaseModel):
     plugins: list[str] = Field(default_factory=list, description="Plugin script paths")
     exclude: list[str] = Field(default_factory=list, description="Glob patterns to exclude")
     include: list[str] = Field(default_factory=list, description="Glob patterns to include")
+    
+    defaults: str | list[str] | None = Field(
+        default=None, description="Global default render settings"
+    )
+
+    @field_validator("defaults")
+    @classmethod
+    def validate_defaults_path(cls, v: str | list[str] | None) -> str | list[str] | None:
+        """Validate that defaults file(s) exist."""
+        if v is None:
+            return None
+        
+        paths = [v] if isinstance(v, str) else v
+        for p in paths:
+            path = Path(p)
+            if not path.exists():
+                raise ValueError(f"Defaults file not found: {path}")
+        return v
 
     @field_validator("custom_rules")
     @classmethod
