@@ -1,4 +1,5 @@
 import fnmatch
+import functools
 import logging
 from pathlib import Path
 
@@ -53,7 +54,7 @@ def ninja_escape(path: Path) -> str:
     - Dollar signs → '$$'
     - Always forward slashes
     """
-    s = str(path.as_posix())
+    s = path.as_posix()
     s = s.replace("$", "$$")
     s = s.replace(" ", "$ ")
     s = s.replace(":", "$:")
@@ -86,25 +87,40 @@ def sanitize_path(base: Path, relative: Path) -> Path:
     return full_path
 
 
+@functools.cache
+def _get_direct_defaults(yaml_path: Path) -> list[str]:
+    """
+    Cached helper to read a YAML file and extract 'defaults'.
+    Returns list of string paths.
+    """
+    if not yaml_path.exists():
+        return []
+
+    try:
+        with open(yaml_path, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        if not data:
+            return []
+
+        raw_defaults = data.get("defaults", [])
+        if isinstance(raw_defaults, str):
+            return [raw_defaults]
+        return list(raw_defaults)
+
+    except yaml.YAMLError as e:
+        logger.warning(f"Could not parse {yaml_path}: {e}")
+        return []
+    except Exception as e:
+        logger.warning(f"Error processing {yaml_path}: {e}")
+        return []
+
+
 def get_recursive_yaml_deps(
     yaml_path: Path, visited: set[Path] | None = None, stack: list[Path] | None = None
 ) -> list[Path]:
     """
     Recursively scans YAML files for 'defaults' keys to build dependency lists.
-
-    This allows Ninja to track implicit dependencies - if a parent template changes,
-    all outputs that use it are automatically rebuilt.
-
-    Args:
-        yaml_path: Path to YAML file to scan
-        visited: Set of already-processed files (prevents infinite loops)
-        stack: Current traversal stack (for circular dependency detection)
-
-    Returns:
-        List of all dependent YAML files
-
-    Raises:
-        ValueError: If a circular dependency is detected
     """
     if visited is None:
         visited = set()
@@ -120,28 +136,23 @@ def get_recursive_yaml_deps(
     if yaml_path in visited:
         return []
 
-    # File doesn't exist
-    if not yaml_path.exists():
-        return []
+    # File doesn't exist check is handled in helper, but good to have early exit or let helper handle it
+    # We rely on helper returning empty list if not exist
 
     deps: list[Path] = []
     visited.add(yaml_path)
     stack.append(yaml_path)
 
     try:
-        with open(yaml_path, encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-
-        if not data:
-            return deps
-
-        # Extract defaults (adjust this logic based on your YAML structure)
-        raw_defaults = data.get("defaults", [])
-        if isinstance(raw_defaults, str):
-            raw_defaults = [raw_defaults]
+        # Get defaults from cached helper
+        # Note: We pass the path object, but lru_cache requires hashable args. Path is hashable.
+        raw_defaults = _get_direct_defaults(yaml_path)
 
         for default_ref in raw_defaults:
             dep_path = Path(default_ref)
+            # We don't check existence here, we let the recursion/helper handle it,
+            # BUT the original code only extended deps if dep_path.exists().
+            # So checking existing here preserves behavior.
             if dep_path.exists():
                 deps.append(dep_path)
                 # Recurse with updated stack
@@ -149,10 +160,6 @@ def get_recursive_yaml_deps(
 
     except ValueError:
         raise
-    except yaml.YAMLError as e:
-        logger.warning(f"Could not parse {yaml_path}: {e}")
-    except Exception as e:
-        logger.warning(f"Error processing {yaml_path}: {e}")
     finally:
         stack.pop()
 
@@ -173,7 +180,12 @@ def parse_frontmatter_type(md_path: Path, default_type: str) -> str:
     try:
         with open(md_path, encoding="utf-8") as f:
             # Check for frontmatter delimiter
-            first_line = f.readline()
+            first_line = ""
+            for line in f:
+                if line.strip():
+                    first_line = line
+                    break
+
             if first_line.strip() != "---":
                 return default_type
 

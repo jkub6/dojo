@@ -2,7 +2,12 @@ from pathlib import Path
 
 import pytest
 
-from dojo.utils import get_recursive_yaml_deps, ninja_escape, sanitize_path
+from dojo.utils import (
+    get_recursive_yaml_deps,
+    ninja_escape,
+    parse_frontmatter_type,
+    sanitize_path,
+)
 
 
 def test_ninja_escape():
@@ -66,3 +71,19 @@ def test_circular_deps(tmp_path):
 
     with pytest.raises(ValueError, match="Circular dependency detected"):
         get_recursive_yaml_deps(a)
+
+
+def test_frontmatter_with_whitespace(tmp_path):
+    """Test that frontmatter is detected even with leading whitespace."""
+    f = tmp_path / "test.md"
+    content = """
+    ---
+    type: slide
+    ---
+    # Content
+    """
+    # Write with leading newline/spaces (simulating user error)
+    with open(f, "w") as file:
+        file.write(content)
+
+    assert parse_frontmatter_type(f, "default") == "slide"
