@@ -39,6 +39,37 @@
           config.allowUnfree = true;
           overlays = [overlay];
         };
+
+        # ---------------------------------------------------------------------
+        # Shared Dependencies
+        # ---------------------------------------------------------------------
+        
+        # Tools required for the build pipeline (runtime)
+        commonTools = with pkgs; [
+          decktape
+          chromium
+          ghostscript
+          minify
+          ninja
+          pandoc
+        ];
+
+        # Tools for testing
+        testDeps = with pkgs.python3Packages; [
+          pytest
+          pytest-cov
+        ];
+
+        # Tools for development only (linters, formatters, utilities)
+        devTools = with pkgs; [
+          alejandra
+          just
+          mypy
+          ruff
+          statix
+          typos
+        ];
+
       in {
         # Python package definition for Dojo
         packages.default = pkgs.python3Packages.buildPythonPackage {
@@ -56,31 +87,25 @@
             rich
           ];
 
-          nativeCheckInputs = [
-            pkgs.python3Packages.pytest
-            pkgs.python3Packages.pytest-cov
-          ];
+          nativeBuildInputs = [pkgs.makeWrapper];
+          
+          # Wrap the binary with all necessary runtime tools
+          postInstall = ''
+            wrapProgram $out/bin/dojo \
+              --prefix PATH : ${pkgs.lib.makeBinPath commonTools}
+          '';
+
+          nativeCheckInputs = testDeps;
         };
 
         # Development Environment
         devShells.default = pkgs.mkShell {
           inputsFrom = [self'.packages.default];
 
-          packages = with pkgs; [
-            alejandra
-            statix
-            typos
-            pandoc
-            minify
-            ghostscript
-            decktape
-            ninja
-            ruff
-            mypy
-            just
-            python3Packages.pytest
-            python3Packages.pytest-cov
-          ];
+          packages = 
+            commonTools 
+            ++ testDeps 
+            ++ devTools;
 
           shellHook = ''
             export PYTHONPATH=$PWD/src:$PYTHONPATH

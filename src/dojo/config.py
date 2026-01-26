@@ -1,3 +1,4 @@
+import shutil
 import sys
 from pathlib import Path
 
@@ -14,6 +15,13 @@ class ToolPaths(BaseModel):
     minify: str = Field(default="minify", description="Minify executable path")
     ghostscript: str = Field(default="gs", description="Ghostscript executable path")
     decktape: str = Field(default="decktape", description="Decktape executable path")
+
+    @field_validator("python", "pandoc", "minify", "ghostscript", "decktape", mode="after")
+    @classmethod
+    def resolve_tool_path(cls, v: str) -> str:
+        """Resolve command to absolute path if possible."""
+        resolved = shutil.which(v)
+        return resolved if resolved else v
 
 
 class OutputConfig(BaseModel):
