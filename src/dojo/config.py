@@ -41,6 +41,9 @@ class OutputConfig(BaseModel):
     )
     suffix: str = Field(default="", description="Suffix to add to filename before extension")
     post_process: str | None = Field(default=None, description="Post-processing tool name")
+    args: list[str] | None = Field(
+        default=None, description="Extra arguments to pass to the tool or post-processor"
+    )
     source: str | list[str] | None = Field(
         default=None, description="Source output ID(s) for derived outputs"
     )
@@ -179,11 +182,13 @@ class Config(BaseModel):
             for name2, path2 in dirs.items():
                 if name1 == name2:
                     continue
-                
+
                 # Check for equality
                 if path1 == path2:
-                    raise ValueError(f"Directory conflict: {name1} and {name2} are the same ({path1})")
-                
+                    raise ValueError(
+                        f"Directory conflict: {name1} and {name2} are the same ({path1})"
+                    )
+
                 # Check if one is a parent of another
                 try:
                     path1.relative_to(path2)
@@ -192,7 +197,9 @@ class Config(BaseModel):
                     pass
                 else:
                     # If relative_to succeeds, path1 is a subpath of path2 (or same)
-                    raise ValueError(f"Directory conflict: {name1} ({path1}) is inside {name2} ({path2})")
+                    raise ValueError(
+                        f"Directory conflict: {name1} ({path1}) is inside {name2} ({path2})"
+                    )
 
         # 3. Check for duplicate output IDs in each type
         for type_name, type_conf in self.types.items():

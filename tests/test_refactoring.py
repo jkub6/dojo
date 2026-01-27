@@ -10,7 +10,7 @@ from dojo.emitter import NinjaEmitter
 def test_directory_conflict(tmp_path):
     src = tmp_path / "src"
     src.mkdir()
-    
+
     # src_dir and build_dir same
     data = {
         "src_dir": str(src),
@@ -32,7 +32,7 @@ def test_directory_conflict(tmp_path):
 def test_duplicate_output_ids(tmp_path):
     src = tmp_path / "src"
     src.mkdir()
-    
+
     data = {
         "src_dir": str(src),
         "default_type": "markdown",
@@ -54,12 +54,12 @@ def test_duplicate_output_ids(tmp_path):
 def test_ninja_emitter_basic():
     buf = io.StringIO()
     emitter = NinjaEmitter(buf)
-    
+
     emitter.comment("Hello")
     emitter.variable("v", "1")
     emitter.rule("r", "cmd $in $out")
     emitter.build(Path("out"), "r", Path("in"), variables={"foo": "bar"})
-    
+
     content = buf.getvalue()
     assert "# Hello" in content
     assert "v = 1" in content
@@ -72,16 +72,16 @@ def test_ninja_emitter_basic():
 def test_ninja_emitter_complex_build():
     buf = io.StringIO()
     emitter = NinjaEmitter(buf)
-    
+
     emitter.build(
         outputs=[Path("out1"), Path("out2")],
         rule="myrule",
         inputs=[Path("in1"), Path("in2")],
         implicit=[Path("imp")],
         order_only=[Path("oo")],
-        variables={"v": "val"}
+        variables={"v": "val"},
     )
-    
+
     content = buf.getvalue()
     assert "build out1 out2: myrule in1 in2 | imp || oo" in content
     assert "  v = val" in content

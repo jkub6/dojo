@@ -116,12 +116,30 @@ def _get_direct_defaults(yaml_path: Path) -> list[str]:
         return []
 
 
+def _extract_paths(data: dict, keys: list[str]) -> list[str]:
+    """Helper to extract a list of paths from a dict for given keys."""
+    paths = []
+    for key in keys:
+        val = data.get(key)
+        if not val:
+            continue
+        if isinstance(val, str):
+            paths.append(val)
+        elif isinstance(val, list):
+            paths.extend(str(v) for v in val)
+    return paths
+
+
 def get_recursive_yaml_deps(
     yaml_path: Path, visited: set[Path] | None = None, stack: list[Path] | None = None
 ) -> list[Path]:
     """
-    Recursively scans YAML files for 'defaults' keys to build dependency lists for Ninja.
-
+    Recursively scans YAML files for dependencies to build dependency lists for Ninja.
+    
+    Tracks:
+    - 'defaults': Recursively scanned
+    - 'css', 'bibliography', 'csl', 'template', 'include-before', 'include-after': Added as assets
+    
     Args:
         yaml_path: Path to the root YAML file
         visited: Already processed files
@@ -151,15 +169,39 @@ def get_recursive_yaml_deps(
     stack.append(yaml_path)
 
     try:
-        raw_defaults = _get_direct_defaults(yaml_path)
+        # We manually load here instead of using _get_direct_defaults to handle multiple keys
+        if not yaml_path.exists():
+            return []
+            
+        try:
+            with open(yaml_path, encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+        except Exception as e:
+            logger.warning(f"Error reading {yaml_path}: {e}")
+            return []
 
-        for default_ref in raw_defaults:
+        if not data or not isinstance(data, dict):
+            return []
+
+        # 1. Handle Recursive Defaults
+        defaults = _extract_paths(data, ["defaults"])
+        for default_ref in defaults:
             dep_path = Path(default_ref).resolve()
             if dep_path.exists():
                 deps.append(dep_path)
                 deps.extend(get_recursive_yaml_deps(dep_path, visited, stack[:]))
             else:
                 logger.warning(f"Default file referenced in {yaml_path} not found: {dep_path}")
+
+        # 2. Handle Leaf Assets (CSS, templates, etc)
+        asset_keys = ["css", "bibliography", "csl", "template", "include-before", "include-after"]
+        assets = _extract_paths(data, asset_keys)
+        for asset_ref in assets:
+            # Pandoc resolves relative to the defaults file
+            asset_path = (yaml_path.parent / asset_ref).resolve()
+            if asset_path.exists():
+                deps.append(asset_path)
+            # We don't warn for missing assets here as they might be generated files
 
     finally:
         stack.pop()

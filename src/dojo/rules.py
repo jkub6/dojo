@@ -39,11 +39,23 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     )
 
     # COMPILE Rule (Markdown -> JSON AST)
+    # We attach the dependencies.lua filter at the end to track all assets
+    resources_dir = Path(__file__).parent / "resources"
+    dep_filter = resources_dir / "dependencies.lua"
+
+    compile_cmd = (
+        f"{config.tools.pandoc} $in $defaults -t json -o $out "
+        f"-M depfile=$out.d -M target=$out "
+        f"--lua-filter {dep_filter}"
+    )
+
     rules.append(
         CustomRule(
             name=RuleName.COMPILE.value,
-            command=f"{config.tools.pandoc} $in -d $defaults -t json -o $out",
+            command=compile_cmd,
             description="🧠 COMPILE $in",
+            depfile="$out.d",
+            deps="gcc",
         )
     )
 
@@ -51,7 +63,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     rules.append(
         CustomRule(
             name=RuleName.RENDER.value,
-            command=f"{config.tools.pandoc} $in -d $defaults -o $out",
+            command=f"{config.tools.pandoc} $in $defaults -o $out",
             description="🎨 RENDER $out",
         )
     )
@@ -60,8 +72,9 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     rules.append(
         CustomRule(
             name=RuleName.MINIFY.value,
-            command=f"{config.tools.minify} -o $out $in",
+            command=f"{config.tools.minify} $args -o $out $in",
             description="⚡ MINIFY $out",
+            variables={"args": ""},
         )
     )
 
@@ -69,9 +82,12 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     rules.append(
         CustomRule(
             name=RuleName.GHOSTSCRIPT.value,
-            command=f"{config.tools.ghostscript} -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET -dBATCH -dSAFER -sOutputFile=$out $in",
+            command=f"{config.tools.ghostscript} $args -sOutputFile=$out $in",
             description="🗜️  COMPRESS $out",
             pool=PoolName.HEAVY_PROCESSING.value,
+            variables={
+                "args": "-sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET -dBATCH -dSAFER"
+            },
         )
     )
 
@@ -79,9 +95,10 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     rules.append(
         CustomRule(
             name=RuleName.DECKTAPE.value,
-            command=f"{config.tools.decktape} reveal $in $out",
+            command=f"{config.tools.decktape} reveal $args $in $out",
             description="📸 DECKTAPE $out",
             pool=PoolName.HEAVY_PROCESSING.value,
+            variables={"args": ""},
         )
     )
 

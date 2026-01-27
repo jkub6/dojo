@@ -80,7 +80,7 @@ class NinjaGenerator:
         """Format list of defaults into ninja variable string."""
         if not defaults:
             return ""
-        return " -d ".join(ninja_escape(d) for d in defaults)
+        return "-d " + " -d ".join(ninja_escape(d) for d in defaults)
 
     def _get_dep_string(self, defaults: list[Path]) -> str:
         """Get dependency string for defaults including recursive dependencies."""
@@ -206,6 +206,9 @@ class NinjaGenerator:
                 raw_deps.extend(get_recursive_yaml_deps(df))
             implicit = sorted(set(raw_deps))
 
+        if out_config.args:
+            variables["args"] = " ".join(out_config.args)
+
         self.emitter.build(
             outputs=render_target,
             rule=RuleName.RENDER.value,
@@ -240,7 +243,16 @@ class NinjaGenerator:
                 raise ValueError(f"Missing dependency: {parent_id}")
             source_paths.append(local_registry[parent_id])
 
-        self.emitter.build(outputs=final_path, rule=out_config.tool, inputs=source_paths)
+        variables = {}
+        if out_config.args:
+            variables["args"] = " ".join(out_config.args)
+
+        self.emitter.build(
+            outputs=final_path,
+            rule=out_config.tool,
+            inputs=source_paths,
+            variables=variables,
+        )
 
         if out_config.id:
             local_registry[out_config.id] = final_path

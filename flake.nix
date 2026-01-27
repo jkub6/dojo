@@ -68,23 +68,22 @@
           statix
           typos
         ];
-        
+
         # Python environment with ALL dependencies (app + test + dev tools like mypy)
         pythonEnv = pkgs.python3.withPackages (ps: [
-           # App dependencies
-           ps.pyyaml
-           ps.pydantic
-           ps.tqdm
-           ps.rich
-           
-           # Test dependencies
-           ps.pytest
-           ps.pytest-cov
-           
-           # Type checking (must be in the same env to see packages)
-           ps.mypy
-        ]);
+          # App dependencies
+          ps.pyyaml
+          ps.pydantic
+          ps.tqdm
+          ps.rich
 
+          # Test dependencies
+          ps.pytest
+          ps.pytest-cov
+
+          # Type checking (must be in the same env to see packages)
+          ps.mypy
+        ]);
       in {
         # Python package definition for Dojo
         packages.default = pkgs.python3Packages.buildPythonPackage {

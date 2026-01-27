@@ -53,5 +53,3 @@ build.ninja
 # Project Artifacts
 _site/
 _build/
-dojo.yaml
-config.yaml

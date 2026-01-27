@@ -34,6 +34,7 @@ class NinjaEmitter:
         depfile: str | None = None,
         deps: str | None = None,
         generator: bool = False,
+        variables: dict[str, str] | None = None,
     ) -> None:
         """Write a rule definition."""
         self.fp.write(f"rule {name}\n")
@@ -48,6 +49,9 @@ class NinjaEmitter:
             self.variable("deps", deps, indent=1)
         if generator:
             self.variable("generator", "1", indent=1)
+        if variables:
+            for key, value in variables.items():
+                self.variable(key, value, indent=1)
         self.newline()
 
     def build(

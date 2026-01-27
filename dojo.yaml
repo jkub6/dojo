@@ -1,0 +1,27 @@
+src_dir: "content"
+output_dir: "_site"
+build_dir: "_build"
+default_type: "page"
+
+tools:
+  python: "python3"
+  pandoc: "pandoc"
+  minify: "minify"
+
+types:
+  page:
+    outputs:
+      - id: "html"
+        extension: "html"
+        defaults: "defaults/page.yaml"
+
+  slide:
+    outputs:
+      - id: "html"
+        extension: "html"
+        defaults: "defaults/slide.yaml"
+      - id: "pdf"
+        extension: "pdf"
+        defaults: "defaults/slide.yaml"
+        source: "html"
+        tool: "decktape"
