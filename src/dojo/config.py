@@ -1,8 +1,7 @@
 import shutil
-import sys
 from pathlib import Path
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator  # type: ignore
 
 from .constants import RuleName
 
@@ -10,8 +9,8 @@ from .constants import RuleName
 class ToolPaths(BaseModel):
     """Configurable paths to external tools."""
 
-    python: str = Field(default=sys.executable, description="Python interpreter path")
     pandoc: str = Field(default="pandoc", description="Pandoc executable path")
+    python: str = Field(default="python3", description="Python interpreter path")
     minify: str = Field(default="minify", description="Minify executable path")
     ghostscript: str = Field(default="gs", description="Ghostscript executable path")
     decktape: str = Field(default="decktape", description="Decktape executable path")
@@ -109,6 +108,9 @@ class CustomRule(BaseModel):
     deps: str | None = Field(default=None, description="Dependency style (gcc or msvc)")
     generator: bool = Field(
         default=False, description="Whether this is a generator rule (re-scans deps)"
+    )
+    variables: dict[str, str] | None = Field(
+        default=None, description="Rule-level variable defaults"
     )
 
     # Validation moved to Config to allow internal use of built-in names

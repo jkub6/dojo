@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 from typing import TextIO
 
@@ -65,7 +66,7 @@ class NinjaEmitter:
     ) -> None:
         """Write a build edge."""
 
-        def to_list(x):
+        def to_list(x: Path | list[Path] | str | None) -> Sequence[Path | str]:
             if x is None:
                 return []
             return [x] if isinstance(x, (str, Path)) else x

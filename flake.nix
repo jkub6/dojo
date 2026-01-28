@@ -4,6 +4,17 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
+    pyproject-nix.url = "github:pyproject-nix/pyproject.nix";
+    pyproject-build-systems = {
+      url = "github:pyproject-nix/build-system-pkgs";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.pyproject-nix.follows = "pyproject-nix";
+    };
+    uv2nix = {
+      url = "github:pyproject-nix/uv2nix";
+      inputs.pyproject-nix.follows = "pyproject-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = inputs @ {flake-parts, ...}:
@@ -41,6 +52,35 @@
         };
 
         # ---------------------------------------------------------------------
+        # uv2nix Logic
+        # ---------------------------------------------------------------------
+
+        # Load workspace from pyproject.toml/uv.lock
+        workspace = inputs.uv2nix.lib.workspace.loadWorkspace {workspaceRoot = ./.;};
+
+        # Create a Python package set
+        pythonSet = pkgs.callPackage inputs.pyproject-nix.build.packages {
+          python = pkgs.python311;
+        };
+
+        # Overlay that provides build systems (like hatchling)
+        # and the project itself
+        pkgs-overlay = workspace.mkPyprojectOverlay {
+          sourcePreference = "wheel";
+        };
+
+        # Base overlay for common build systems
+        base-overlay = inputs.pyproject-build-systems.overlays.default;
+
+        # The final Python set with our overlays
+        python = pythonSet.overrideScope (
+          pkgs.lib.composeManyExtensions [
+            base-overlay
+            pkgs-overlay
+          ]
+        );
+
+        # ---------------------------------------------------------------------
         # Shared Dependencies
         # ---------------------------------------------------------------------
 
@@ -54,80 +94,55 @@
           pandoc
         ];
 
-        # Tools for testing
-        testDeps = with pkgs.python3Packages; [
-          pytest
-          pytest-cov
-        ];
-
         # Tools for development only (linters, formatters, utilities)
         devTools = with pkgs; [
           alejandra
           just
+          uv
           ruff
           statix
           typos
         ];
-
-        # Python environment with ALL dependencies (app + test + dev tools like mypy)
-        pythonEnv = pkgs.python3.withPackages (ps: [
-          # App dependencies
-          ps.pyyaml
-          ps.pydantic
-          ps.tqdm
-          ps.rich
-
-          # Test dependencies
-          ps.pytest
-          ps.pytest-cov
-
-          # Type checking (must be in the same env to see packages)
-          ps.mypy
-        ]);
       in {
         # Python package definition for Dojo
-        packages.default = pkgs.python3Packages.buildPythonPackage {
-          pname = "dojo";
-          version = "0.1.0";
-          pyproject = true;
-          src = ./.;
+        packages.default = let
+          # Create a virtualenv containing the project and its runtime dependencies
+          venv = python.mkVirtualEnv "dojo-venv" workspace.deps.default;
+        in
+          pkgs.stdenvNoCC.mkDerivation {
+            pname = "dojo";
+            version = "0.1.0";
+            src = ./.;
 
-          build-system = [pkgs.python3Packages.hatchling];
+            nativeBuildInputs = [pkgs.makeWrapper];
 
-          propagatedBuildInputs = with pkgs.python3Packages; [
-            pyyaml
-            pydantic
-            tqdm
-            rich
-          ];
-
-          nativeBuildInputs = [pkgs.makeWrapper];
-
-          # Wrap the binary with all necessary runtime tools
-          postInstall = ''
-            wrapProgram $out/bin/dojo \
-              --prefix PATH : ${pkgs.lib.makeBinPath commonTools}
-          '';
-
-          nativeCheckInputs = testDeps;
-        };
+            installPhase = ''
+              mkdir -p $out/bin
+              makeWrapper ${venv}/bin/dojo $out/bin/dojo \
+                --prefix PATH : ${pkgs.lib.makeBinPath commonTools}
+            '';
+          };
 
         # Development Environment
         devShells.default = pkgs.mkShell {
-          # Inputs from package NOT used to avoid contaminating PYTHONPATH
-          # inputsFrom = [self'.packages.default];
-
           packages =
             commonTools
-            ++ [pythonEnv]
-            ++ devTools;
+            ++ devTools
+            ++ [
+              (python.mkVirtualEnv "dojo-dev-env" workspace.deps.all)
+            ];
+
+          env = {
+            # Required for many python wheels to link correctly on NixOS
+            LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
+          };
 
           shellHook = ''
-            export PYTHONPATH=$PWD/src:$PYTHONPATH
-            alias dojo="python3 -m dojo"
-            echo "🥷 Dojo Environment Loaded"
-            echo "Tools available: dojo, ninja, pandoc, decktape, minify, ghostscript"
-            echo "Development mode: Source code in ./src is added to PYTHONPATH"
+            echo "🥷 Dojo Environment Loaded (uv2nix Enabled)"
+            echo "Project dependencies are managed by pyproject.toml and uv.lock"
+
+            # Unset PYTHONPATH so it doesn't conflict with our virtualenv
+            unset PYTHONPATH
           '';
         };
 

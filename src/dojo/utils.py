@@ -1,5 +1,4 @@
 import fnmatch
-import functools
 import logging
 from pathlib import Path
 
@@ -44,7 +43,7 @@ def should_process_file(
     return any(fnmatch.fnmatch(rel_str, pattern) for pattern in includes)
 
 
-def ninja_escape(path: Path) -> str:
+def ninja_escape(path: Path | str) -> str:
     """
     Escape a path for Ninja build files.
 
@@ -54,7 +53,7 @@ def ninja_escape(path: Path) -> str:
     - Dollar signs → '$$'
     - Always forward slashes
     """
-    s = path.as_posix()
+    s = path.as_posix() if isinstance(path, Path) else path
     s = s.replace("$", "$$")
     s = s.replace(" ", "$ ")
     s = s.replace(":", "$:")
@@ -87,35 +86,6 @@ def sanitize_path(base: Path, relative: Path) -> Path:
     return full_path
 
 
-@functools.cache
-def _get_direct_defaults(yaml_path: Path) -> list[str]:
-    """
-    Cached helper to read a YAML file and extract 'defaults'.
-    Returns list of string paths.
-    """
-    if not yaml_path.exists():
-        return []
-
-    try:
-        with open(yaml_path, encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-
-        if not data:
-            return []
-
-        raw_defaults = data.get("defaults", [])
-        if isinstance(raw_defaults, str):
-            return [raw_defaults]
-        return list(raw_defaults)
-
-    except yaml.YAMLError as e:
-        logger.warning(f"Could not parse {yaml_path}: {e}")
-        return []
-    except Exception as e:
-        logger.warning(f"Error processing {yaml_path}: {e}")
-        return []
-
-
 def _extract_paths(data: dict, keys: list[str]) -> list[str]:
     """Helper to extract a list of paths from a dict for given keys."""
     paths = []
@@ -135,11 +105,11 @@ def get_recursive_yaml_deps(
 ) -> list[Path]:
     """
     Recursively scans YAML files for dependencies to build dependency lists for Ninja.
-    
+
     Tracks:
     - 'defaults': Recursively scanned
     - 'css', 'bibliography', 'csl', 'template', 'include-before', 'include-after': Added as assets
-    
+
     Args:
         yaml_path: Path to the root YAML file
         visited: Already processed files
@@ -172,7 +142,7 @@ def get_recursive_yaml_deps(
         # We manually load here instead of using _get_direct_defaults to handle multiple keys
         if not yaml_path.exists():
             return []
-            
+
         try:
             with open(yaml_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)

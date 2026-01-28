@@ -8,24 +8,29 @@ default:
 
 # Apply automatic fixes (formatting and linting)
 fix:
-    alejandra .
     ruff format .
     ruff check --fix-only .
+    alejandra .
+    statix fix
 
 # Run all static analysis checks
 check:
-    ruff check . && ruff format --check .
-    mypy src
+    ruff check .
+    ruff format --check .
+    uv run mypy src
+    uv run vulture
     typos .
-    statix check flake.nix
+    statix check
+    # nix flake check --all-systems
+    nix flake check
 
 # Run tests with coverage
 test:
-    pytest --cov=src
+    uv run pytest --cov=src
 
 # Build the project (requires config file)
 build config="dojo.yaml":
-    python3 -m dojo build -c {{config}} && ninja -f _build/build.ninja
+    uv run python3 -m dojo build -c {{config}} && ninja -f _build/build.ninja
 
 # Clean build artifacts
 clean:

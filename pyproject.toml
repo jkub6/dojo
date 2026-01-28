@@ -34,13 +34,13 @@ dependencies = [
   "rich>=10.0.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
   "pytest",
   "pytest-cov",
-  "ruff",
   "mypy",
   "types-PyYAML",
+  "vulture",
 ]
 
 [project.urls]
@@ -62,6 +62,7 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "B", "UP", "SIM", "RUF"]
 ignore = ["E501"]
+
 
 [tool.ruff.format]
 quote-style = "double"
@@ -99,5 +100,17 @@ exclude_lines = [
 ]
 show_missing = true
 
+[tool.vulture]
+min_confidence = 80
+paths = ["src"]
+ignore_names = [
+    "cls",
+    "resolve_tool_paths",
+    "validate_defaults_path",
+    "validate_derived_output",
+    "validate_custom_rules",
+    "validate_src_dir",
+    "validate_config",
+]
 
 
