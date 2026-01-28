@@ -53,3 +53,11 @@ build.ninja
 # Project Artifacts
 _site/
 _build/
+result
+
+# Editor Configs
+.idea/
+.vscode/
+
+# System
+.DS_Store

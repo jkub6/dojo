@@ -21,8 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class NinjaGenerator:
-    """
-    Generates Ninja build files for a static site pipeline.
+    """Generates Ninja build files for a static site pipeline.
 
     The build process has these stages:
     1. Compile: Markdown → JSON (Pandoc AST)
@@ -32,6 +31,7 @@ class NinjaGenerator:
     """
 
     def __init__(self, config: Config, config_path: Path, quiet: bool = False):
+        """Initialize the NinjaBuilder."""
         self.config = config
         self.config_path = config_path.resolve()
         self.quiet = quiet
@@ -121,7 +121,7 @@ class NinjaGenerator:
                 self.emitter.newline()
 
     def _compile_stage(self, md_path: Path, rel_stem: Path, type_config: TypeConfig) -> Path:
-        """Markdown -> JSON (Pandoc AST)"""
+        """Convert Markdown to JSON (Pandoc AST)."""
         json_node = sanitize_path(self.build_dir, rel_stem.with_suffix(".json"))
 
         compile_defaults = self._get_merged_defaults(self.config.defaults, type_config.defaults)
@@ -156,7 +156,7 @@ class NinjaGenerator:
         rel_stem: Path,
         local_registry: dict[str, Path],
     ) -> None:
-        """JSON -> Output format or Derived Output"""
+        """Convert JSON to Output format or Derived Output."""
         if out_config.source:
             self._derive_output(out_config, rel_stem, local_registry)
         else:
@@ -169,7 +169,7 @@ class NinjaGenerator:
         json_node: Path,
         local_registry: dict[str, Path],
     ) -> None:
-        """Standard Pandoc render with optional post-processing."""
+        """Render standard Pandoc with optional post-processing."""
         filename = f"{rel_stem.name}{out_config.suffix}.{out_config.extension}"
         final_path = sanitize_path(self.out_dir, rel_stem.parent / filename)
 
@@ -216,12 +216,14 @@ class NinjaGenerator:
     def _derive_output(
         self, out_config: OutputConfig, rel_stem: Path, local_registry: dict[str, Path]
     ) -> None:
-        """Derived output from other build products (e.g. HTML -> PDF)."""
+        """Derive output from other build products (e.g. HTML -> PDF)."""
         filename = f"{rel_stem.name}{out_config.suffix}.{out_config.extension}"
         final_path = sanitize_path(self.out_dir, rel_stem.parent / filename)
 
         raw_source = out_config.source
-        assert raw_source is not None
+        if out_config.source is None:
+            raise ValueError("Output source cannot be None")
+        raw_source = out_config.source
 
         source_ids_list: list[str] = [raw_source] if isinstance(raw_source, str) else raw_source
 
@@ -236,7 +238,8 @@ class NinjaGenerator:
         if out_config.args:
             variables["args"] = " ".join(out_config.args)
 
-        assert out_config.tool is not None
+        if out_config.tool is None:
+            raise ValueError("Output tool cannot be None")
 
         self.emitter.build(
             outputs=final_path,
@@ -291,7 +294,7 @@ class NinjaGenerator:
         self.emitter.newline()
 
     def generate(self) -> None:
-        """Main execution: scan source files and generate build.ninja."""
+        """Scan source files and generate build.ninja."""
         logger.info(f"Scanning source directory: {self.src}")
 
         self.emit_header()

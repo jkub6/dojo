@@ -209,15 +209,16 @@ class Config(BaseModel):
         for type_name, type_conf in self.types.items():
             ids = [o.id for o in type_conf.outputs if o.id]
             if len(ids) != len(set(ids)):
-                duplicates = set([x for x in ids if ids.count(x) > 1])
+                duplicates = {x for x in ids if ids.count(x) > 1}
                 raise ValueError(f"Duplicate output IDs in type '{type_name}': {duplicates}")
 
         return self
 
 
 def load_config(config_path: str | None = None) -> tuple[Config, Path]:
-    """
-    Load configuration from multiple sources with priority:
+    """Load configuration from multiple sources with priority.
+
+    Sources:
     1. Explicit CLI argument
     2. Environment variable DOJO_CONFIG
     3. Local config.yaml / dojo.yaml
@@ -225,6 +226,7 @@ def load_config(config_path: str | None = None) -> tuple[Config, Path]:
 
     Returns:
         Tuple containing (Config object, Path to loaded file)
+
     """
     import os
 

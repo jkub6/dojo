@@ -6,11 +6,10 @@ from .utils import ninja_escape
 
 
 class NinjaEmitter:
-    """
-    Handles the low-level emission of Ninja build file syntax.
-    """
+    """Handles the low-level emission of Ninja build file syntax."""
 
     def __init__(self, fp: TextIO):
+        """Initialize the NinjaEmitter."""
         self.fp = fp
 
     def comment(self, text: str) -> None:

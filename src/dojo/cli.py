@@ -21,7 +21,7 @@ def get_version() -> str:
 
 
 def setup_cli_logging(verbose: bool, quiet: bool) -> None:
-    """Setup logging configuration."""
+    """Set up logging configuration."""
     if quiet:
         level = logging.ERROR
     elif verbose:
@@ -85,7 +85,7 @@ def cmd_check(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
-def cmd_init(args: argparse.Namespace) -> None:
+def cmd_init(_args: argparse.Namespace) -> None:
     """Handle the init command."""
     target = Path("dojo.yaml")
     if target.exists():
@@ -116,7 +116,7 @@ types:
     console.print(f"[bold green]{msg}[/bold green]")
 
 
-def cmd_version(args: argparse.Namespace) -> None:
+def cmd_version(_args: argparse.Namespace) -> None:
     """Handle the version command."""
     v = get_version()
     console.print(f"[bold]dojo[/bold] version [cyan]{v}[/cyan]")

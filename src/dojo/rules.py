@@ -6,8 +6,7 @@ from .constants import PoolName, RuleName
 
 
 def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
-    """
-    Generate the standard built-in Ninja rules based on configuration.
+    """Generate the standard built-in Ninja rules based on configuration.
 
     Args:
         config: The parsed configuration object
@@ -15,6 +14,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
 
     Returns:
         List of CustomRule objects defining the standard build rules
+
     """
     rules = []
 

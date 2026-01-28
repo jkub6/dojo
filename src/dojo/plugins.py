@@ -8,8 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class PluginInterface:
-    """
-    Base interface for plugins.
+    """Base interface for plugins.
 
     Plugins can modify the build process by:
     - Adding custom Ninja rules
@@ -18,17 +17,16 @@ class PluginInterface:
     """
 
     def get_custom_rules(self) -> list[CustomRule]:
-        """
-        Return custom Ninja rules to add.
+        """Return custom Ninja rules to add.
 
         Returns:
             List of CustomRule objects
+
         """
         return []
 
-    def modify_output_config(self, output_config: OutputConfig, content_type: str) -> OutputConfig:
-        """
-        Modify output configuration before processing.
+    def modify_output_config(self, output_config: OutputConfig, _content_type: str) -> OutputConfig:
+        """Modify output configuration before processing.
 
         Args:
             output_config: Original output configuration
@@ -36,31 +34,32 @@ class PluginInterface:
 
         Returns:
             Modified output configuration
+
         """
         return output_config
 
     def post_process_ninja(self, ninja_content: str) -> str:
-        """
-        Post-process the generated Ninja file content.
+        """Post-process the generated Ninja file content.
 
         Args:
             ninja_content: Original Ninja file content
 
         Returns:
             Modified Ninja file content
+
         """
         return ninja_content
 
 
 def load_plugin(plugin_path: str) -> PluginInterface | None:
-    """
-    Dynamically load a plugin from a Python file.
+    """Dynamically load a plugin from a Python file.
 
     Args:
         plugin_path: Path to plugin Python file
 
     Returns:
         Plugin instance or None if loading fails
+
     """
     try:
         path = Path(plugin_path).resolve()

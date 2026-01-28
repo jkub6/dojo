@@ -12,7 +12,8 @@ from dojo.utils import get_recursive_yaml_deps
 
 
 def test_get_recursive_yaml_deps_resolves_relative_paths(tmp_path):
-    """
+    """Verify asset resolution in defaults file.
+
     Verify that assets (css, bibliography) referenced in a defaults file
     are resolved relative to *that* defaults file, not the CWD.
     """
@@ -46,7 +47,8 @@ def test_get_recursive_yaml_deps_resolves_relative_paths(tmp_path):
 
 
 def test_lua_dependencies_filter(tmp_path):
-    """
+    """Verify dependencies.lua filter.
+
     Run pandoc with the dependencies.lua filter to verify it produces
     the correct depfile content for images and folder inputs.
     """

@@ -10,8 +10,7 @@ logger = logging.getLogger(__name__)
 def should_process_file(
     path: Path, src_dir: Path, includes: list[str], excludes: list[str]
 ) -> bool:
-    """
-    Determine if a file should be processed based on include/exclude patterns.
+    """Determine if a file should be processed based on include/exclude patterns.
 
     Args:
         path: Absolute path to the file
@@ -21,6 +20,7 @@ def should_process_file(
 
     Returns:
         True if file should be processed
+
     """
     try:
         rel_path = path.relative_to(src_dir)
@@ -44,8 +44,7 @@ def should_process_file(
 
 
 def ninja_escape(path: Path | str) -> str:
-    """
-    Escape a path for Ninja build files.
+    """Escape a path for Ninja build files.
 
     Ninja requires:
     - Spaces → '$ '
@@ -61,8 +60,7 @@ def ninja_escape(path: Path | str) -> str:
 
 
 def sanitize_path(base: Path, relative: Path) -> Path:
-    """
-    Sanitize a path to prevent traversal attacks.
+    """Sanitize a path to prevent traversal attacks.
 
     Args:
         base: Base directory that paths should remain within
@@ -73,6 +71,7 @@ def sanitize_path(base: Path, relative: Path) -> Path:
 
     Raises:
         ValueError: If path traversal is detected
+
     """
     # Resolve to absolute path
     full_path = (base / relative).resolve()
@@ -87,7 +86,7 @@ def sanitize_path(base: Path, relative: Path) -> Path:
 
 
 def _extract_paths(data: dict, keys: list[str]) -> list[str]:
-    """Helper to extract a list of paths from a dict for given keys."""
+    """Extract a list of paths from a dict for given keys."""
     paths = []
     for key in keys:
         val = data.get(key)
@@ -103,8 +102,7 @@ def _extract_paths(data: dict, keys: list[str]) -> list[str]:
 def get_recursive_yaml_deps(
     yaml_path: Path, visited: set[Path] | None = None, stack: list[Path] | None = None
 ) -> list[Path]:
-    """
-    Recursively scans YAML files for dependencies to build dependency lists for Ninja.
+    """Recursively scans YAML files for dependencies to build dependency lists for Ninja.
 
     Tracks:
     - 'defaults': Recursively scanned
@@ -117,6 +115,7 @@ def get_recursive_yaml_deps(
 
     Returns:
         Deduplicated list of absolute Paths
+
     """
     if visited is None:
         visited = set()
@@ -176,12 +175,11 @@ def get_recursive_yaml_deps(
     finally:
         stack.pop()
 
-    return sorted(list(set(deps)))
+    return sorted(set(deps))
 
 
 def parse_frontmatter_type(md_path: Path, default_type: str) -> str:
-    """
-    Extracts the 'type' field from YAML frontmatter.
+    """Extract the 'type' field from YAML frontmatter.
 
     Returns default_type if:
     - No frontmatter exists
