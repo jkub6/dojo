@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 from dojo.plugins import PluginInterface, load_plugin
 
 
@@ -28,13 +26,15 @@ class MyPlugin(PluginInterface):
 
     # We need to make sure dojo is in path for the plugin to import it
     # pytest should handle this if dojo is installed or in PYTHONPATH
+    # But just in case, we can't easily modify sys.path for the subprocess import
+    # importlib.util.spec_from_file_location used in plugins.py handles file paths directly.
 
     plugin = load_plugin(str(plugin_file))
     assert plugin is not None
     assert isinstance(plugin, PluginInterface)
 
 
-def test_load_plugin_no_interface(tmp_path):
+def test_load_plugin_no_interface(tmp_path, caplog):
     """Test loading a plugin that doesn't implement PluginInterface."""
     plugin_file = tmp_path / "bad_plugin.py"
     content = """
@@ -44,13 +44,12 @@ class BadPlugin:
     plugin_file.write_text(content)
 
     # It should log a warning and return None
-    with patch("dojo.plugins.logger") as mock_logger:
-        plugin = load_plugin(str(plugin_file))
-        assert plugin is None
-        mock_logger.warning.assert_called()
+    plugin = load_plugin(str(plugin_file))
+    assert plugin is None
+    assert "No PluginInterface implementation found in" in caplog.text
 
 
-def test_load_plugin_import_error(tmp_path):
+def test_load_plugin_import_error(tmp_path, caplog):
     """Test loading a plugin that raises an error on import."""
     plugin_file = tmp_path / "error_plugin.py"
     content = """
@@ -58,10 +57,10 @@ raise ValueError("Boom!")
 """
     plugin_file.write_text(content)
 
-    with patch("dojo.plugins.logger") as mock_logger:
-        plugin = load_plugin(str(plugin_file))
-        assert plugin is None
-        mock_logger.error.assert_called()
+    plugin = load_plugin(str(plugin_file))
+    assert plugin is None
+    assert "Failed to load plugin" in caplog.text
+    assert "Boom!" in caplog.text
 
 
 def test_interface_methods():

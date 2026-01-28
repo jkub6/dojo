@@ -50,7 +50,7 @@ def cmd_build(
         if HAS_RICH and not args.quiet:
             console.print(f"[bold green]Using configuration:[/bold green] {config_path}")
 
-        generator = NinjaGenerator(config, config_path)
+        generator = NinjaGenerator(config, config_path, quiet=args.quiet)
 
         generator.generate()
 

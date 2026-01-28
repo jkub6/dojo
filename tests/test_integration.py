@@ -1,25 +1,14 @@
 import os
+import subprocess
 import sys
-from unittest.mock import patch
 
 import pytest
 
-from dojo.cli import main
-
 
 @pytest.fixture
-def clean_cwd(tmp_path):
-    """Run test in a clean directory."""
-    old_cwd = os.getcwd()
-    os.chdir(tmp_path)
-    yield tmp_path
-    os.chdir(old_cwd)
-
-
-@pytest.fixture
-def temp_project(clean_cwd):
+def temp_project(tmp_path):
     """Create a temporary project structure for integration testing."""
-    project_dir = clean_cwd
+    project_dir = tmp_path
 
     content_dir = project_dir / "content"
     content_dir.mkdir()
@@ -32,8 +21,7 @@ def temp_project(clean_cwd):
     defaults_file = defaults_dir / "page.yaml"
     defaults_file.write_text("standalone: true\n")
 
-    # Use absolute paths so dojo can find them regardless of CWD
-    # We reference the defaults file we just created.
+    # Use absolute paths in config
     config_content = f"""
 src_dir: "{content_dir}"
 output_dir: "{output_dir}"
@@ -51,46 +39,78 @@ types:
 
     (content_dir / "index.md").write_text("# Hello World\n\nThis is a test.")
 
-    return config_path
+    return project_dir, config_path
 
 
-def test_build_command(temp_project, capsys):
-    """Test the full build command execution."""
-    config_path = str(temp_project)
-    with patch.object(sys, "argv", ["dojo", "build", "-c", config_path]):
-        # Mocking sys.exit to prevent test exit if it calls it (it shouldn't on success?)
-        # cli.py cmd_build doesn't explicitly exit 0 on success, it just ends.
-        # But failure exits 1.
-        try:
-            main()
-        except SystemExit as e:
-            # If it exits with 0, that's fine (though current impl doesn't).
-            # If it exits with 1, it failed.
-            assert e.code == 0
+def test_build_command_subprocess(temp_project):
+    """Test the full build command execution via subprocess (Integration)."""
+    project_dir, config_path = temp_project
 
-    # logic in cmd_build:
-    # generator.generate()
-    # console.print("Build configuration generated successfully!")
-    # No sys.exit(0) at the end.
+    # Run dojo build
+    # We use sys.executable to ensure we use the same python interpreter
+    # We assume 'dojo' package is in PYTHONPATH (e.g. src)
+    env = os.environ.copy()
+    # Add src to PYTHONPATH if not already potentially set by test runner
+    src_path = os.path.abspath("src")
+    if "PYTHONPATH" in env:
+        env["PYTHONPATH"] = f"{src_path}:{env['PYTHONPATH']}"
+    else:
+        env["PYTHONPATH"] = src_path
 
-    captured = capsys.readouterr()
-    assert "Build configuration generated successfully" in captured.out
+    result = subprocess.run(
+        [sys.executable, "-m", "dojo", "build", "-c", str(config_path)],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(project_dir),
+    )
+
+    assert result.returncode == 0, f"Build failed: {result.stderr}"
+    assert (
+        "Build configuration generated successfully" in result.stdout
+        or "Build configuration generated successfully" in result.stderr
+    )
+
+    # Check if build.ninja was created
+    build_ninja = project_dir / "_build" / "build.ninja"
+    assert build_ninja.exists()
+    assert "rule compile" in build_ninja.read_text()
 
 
-def test_cli_version(capsys):
-    """Test that the version flag works."""
-    with patch.object(sys, "argv", ["dojo", "--version"]):
-        # main() calls cmd_version() then returns.
-        main()
-        captured = capsys.readouterr()
-        assert "dojo" in captured.out or "dojo" in captured.err
+def test_cli_version_subprocess():
+    """Test version command via subprocess."""
+    env = os.environ.copy()
+    src_path = os.path.abspath("src")
+    if "PYTHONPATH" in env:
+        env["PYTHONPATH"] = f"{src_path}:{env['PYTHONPATH']}"
+    else:
+        env["PYTHONPATH"] = src_path
+
+    result = subprocess.run(
+        [sys.executable, "-m", "dojo", "--version"], capture_output=True, text=True, env=env
+    )
+
+    assert result.returncode == 0
+    assert "dojo" in result.stdout or "dojo" in result.stderr
 
 
-def test_build_no_config(clean_cwd, capsys):
-    """Test behavior when no config is found."""
-    # clean_cwd ensures we are in a temp dir with no dojo.yaml
+def test_build_no_config_subprocess(tmp_path):
+    """Test failure when no config found via subprocess."""
+    env = os.environ.copy()
+    src_path = os.path.abspath("src")
+    if "PYTHONPATH" in env:
+        env["PYTHONPATH"] = f"{src_path}:{env['PYTHONPATH']}"
+    else:
+        env["PYTHONPATH"] = src_path
 
-    with patch.object(sys, "argv", ["dojo", "build", "-c", "non_existent.yaml"]):
-        with pytest.raises(SystemExit) as cm:
-            main()
-        assert cm.value.code == 1
+    # Run in empty temp dir
+    result = subprocess.run(
+        [sys.executable, "-m", "dojo", "build"],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(tmp_path),
+    )
+
+    assert result.returncode != 0
+    assert "Error" in result.stdout or "Error" in result.stderr

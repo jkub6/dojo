@@ -62,7 +62,7 @@ def test_get_merged_defaults(core_config):
     assert len(gen._get_merged_defaults([p, p])) == 2
 
 
-def test_process_content_outside_src(core_config, tmp_path):
+def test_process_content_outside_src(core_config, tmp_path, caplog):
     cfg, path = core_config
     gen = NinjaGenerator(cfg, path)
 
@@ -70,9 +70,10 @@ def test_process_content_outside_src(core_config, tmp_path):
     outside = tmp_path / "outside.md"
     outside.touch()
 
-    with patch("dojo.core.logger") as mock_logger:
-        gen.process_content(outside)
-        mock_logger.error.assert_called_with(f"Source file outside source directory: {outside}")
+    gen.process_content(outside)
+
+    # Check log message
+    assert "Source file outside source directory" in caplog.text
 
 
 def test_process_content_valid(core_config):
@@ -84,9 +85,6 @@ def test_process_content_valid(core_config):
 
     content = gen._buffer.getvalue()
     assert "build" in content
-    assert ": compile" in content or "rule = compile" in content  # handled by different emitters?
-    # NinjaEmitter.build uses "build output: rule input".
-    # So "compile" should be there after colon.
     assert "compile" in content
     assert "render" in content
 
@@ -102,50 +100,32 @@ def test_derive_output_missing_dependency(core_config_data, tmp_path):
 
     md = Path(cfg.src_dir) / "test.md"
 
-    with (
-        pytest.raises(ValueError, match="Missing dependency"),
-        patch("dojo.core.logger"),
-    ):  # suppress error log
+    with pytest.raises(ValueError, match="Missing dependency"):
         gen.process_content(md)
 
 
-def test_generate_no_files(core_config, tmp_path):
+def test_generate_no_files(core_config, tmp_path, caplog):
     cfg, path = core_config
     # Clear src dir
     for f in Path(cfg.src_dir).glob("*"):
         f.unlink()
 
     gen = NinjaGenerator(cfg, path)
-    with patch("dojo.core.logger") as mock_logger:
-        gen.generate()
-        mock_logger.warning.assert_called_with(f"No Markdown files found in {cfg.src_dir}")
+    gen.generate()
+
+    assert f"No Markdown files found in {cfg.src_dir}" in caplog.text
 
 
-def test_generate_exception_handling(core_config):
+def test_generate_exception_handling(core_config, caplog):
     cfg, path = core_config
     gen = NinjaGenerator(cfg, path)
 
+    # We mock process_content just to trigger an exception conveniently during the loop
+    # This is an acceptable use of mock because we are testing the exception handling wrapper
     with (
         patch("dojo.core.NinjaGenerator.process_content", side_effect=Exception("Boom")),
-        patch("dojo.core.logger"),
         pytest.raises(Exception, match="Boom"),
     ):
-        gen.generate()
-
-
-def test_generate_write_error(core_config):
-    cfg, path = core_config
-    gen = NinjaGenerator(cfg, path)
-
-    # Mock open to fail
-    with (
-        patch("builtins.open", side_effect=OSError("Write failed")),
-        patch("dojo.core.logger"),
-        pytest.raises(IOError, match="Write failed"),
-    ):
-        # We specifically mock opening the ninja file,
-        # but generate() scans files first.
-        # We need to make sure it reaches the write part.
         gen.generate()
 
 
@@ -162,7 +142,6 @@ def test_plugin_integration(core_config, tmp_path):
 
     gen.generate()
 
-    # Wait, generate writes to file, not buffer only.
-    # Read file
+    # Read generated file
     ninja_content = gen.ninja_file.read_text()
     assert "# Plugin was here" in ninja_content

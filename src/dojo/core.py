@@ -31,9 +31,10 @@ class NinjaGenerator:
     4. Derive: Output → Derived format (HTML → PDF via Decktape)
     """
 
-    def __init__(self, config: Config, config_path: Path):
+    def __init__(self, config: Config, config_path: Path, quiet: bool = False):
         self.config = config
         self.config_path = config_path.resolve()
+        self.quiet = quiet
 
         # Configure paths
         self.src = Path(self.config.src_dir).resolve()
@@ -309,7 +310,7 @@ class NinjaGenerator:
         else:
             logger.info(f"Found {len(filtered_files)} Markdown file(s)")
 
-        for md_file in tqdm(filtered_files, desc="Processing", unit="file"):
+        for md_file in tqdm(filtered_files, desc="Processing", unit="file", disable=self.quiet):
             try:
                 self.process_content(md_file)
             except Exception as e:
