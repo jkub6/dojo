@@ -46,6 +46,7 @@
         chromium
         decktape
         ghostscript
+        typst
         minify
         ninja
         pandoc
