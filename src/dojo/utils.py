@@ -59,6 +59,17 @@ def ninja_escape(path: Path | str) -> str:
     return s
 
 
+def shell_quote(path: Path | str) -> str:
+    """Quote a path for use in shell commands.
+
+    Uses shlex.quote to safely escape the path for POSIX shells.
+    """
+    import shlex
+
+    s = path.as_posix() if isinstance(path, Path) else path
+    return shlex.quote(s)
+
+
 def sanitize_path(base: Path, relative: Path) -> Path:
     """Sanitize a path to prevent traversal attacks.
 

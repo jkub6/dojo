@@ -14,6 +14,7 @@ from .utils import (
     ninja_escape,
     parse_frontmatter_type,
     sanitize_path,
+    shell_quote,
     should_process_file,
 )
 
@@ -125,7 +126,11 @@ class NinjaGenerator:
         json_node = sanitize_path(self.build_dir, rel_stem.with_suffix(".json"))
 
         compile_defaults = self._get_merged_defaults(self.config.defaults, type_config.defaults)
-        variables = {}
+        compile_defaults = self._get_merged_defaults(self.config.defaults, type_config.defaults)
+        variables = {
+            "in_shell": shell_quote(md_path),
+            "out_shell": shell_quote(json_node),
+        }
         implicit = []
 
         if compile_defaults:
@@ -194,6 +199,9 @@ class NinjaGenerator:
                 raw_deps.extend(get_recursive_yaml_deps(df))
             implicit = sorted(set(raw_deps))
 
+        variables["in_shell"] = shell_quote(json_node)
+        variables["out_shell"] = shell_quote(render_target)
+
         if out_config.args:
             variables["args"] = " ".join(out_config.args)
 
@@ -206,7 +214,15 @@ class NinjaGenerator:
         )
 
         if post_tool:
-            self.emitter.build(outputs=final_path, rule=post_tool, inputs=render_target)
+            self.emitter.build(
+                outputs=final_path,
+                rule=post_tool,
+                inputs=render_target,
+                variables={
+                    "in_shell": shell_quote(render_target),
+                    "out_shell": shell_quote(final_path),
+                },
+            )
 
         if out_config.id:
             local_registry[out_config.id] = final_path
@@ -234,7 +250,12 @@ class NinjaGenerator:
                 raise ValueError(f"Missing dependency: {parent_id}")
             source_paths.append(local_registry[parent_id])
 
-        variables = {}
+            source_paths.append(local_registry[parent_id])
+
+        variables = {
+            "in_shell": " ".join(shell_quote(p) for p in source_paths),
+            "out_shell": shell_quote(final_path),
+        }
         if out_config.args:
             variables["args"] = " ".join(out_config.args)
 
