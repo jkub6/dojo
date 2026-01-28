@@ -21,12 +21,18 @@ def test_directory_conflict(tmp_path):
     with pytest.raises(ValueError, match="Directory conflict"):
         Config(**data)
 
-    # one inside another
+    with pytest.raises(ValueError, match="Directory conflict"):
+        Config(**data)
+
+    # one inside another - now allowed if child is output/build
     build = src / "build"
     build.mkdir()
     data["build_dir"] = str(build)
-    with pytest.raises(ValueError, match="Directory conflict"):
-        Config(**data)
+
+    # Validation should succeed now
+    cfg = Config(**data)
+    # And build dir should be excluded
+    assert "build" in cfg.exclude
 
 
 def test_duplicate_output_ids(tmp_path):

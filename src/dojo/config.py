@@ -169,6 +169,18 @@ class Config(BaseModel):
             raise ValueError(f"Source directory not found: {path}")
         return v
 
+    def _auto_exclude(self, child: Path, parent: Path) -> None:
+        """Automatically exclude child directory from parent scanning."""
+        try:
+            rel = child.relative_to(parent)
+            # Add implicit exclude pattern for the directory and its contents
+            patterns = [str(rel), f"{rel}/*"]
+            for pattern in patterns:
+                if pattern not in self.exclude:
+                    self.exclude.append(pattern)
+        except ValueError:
+            pass
+
     @model_validator(mode="after")
     def validate_config(self) -> Config:
         """Perform complex cross-field validations."""
@@ -200,7 +212,18 @@ class Config(BaseModel):
                     # Not a subpath, this is fine
                     pass
                 else:
-                    # If relative_to succeeds, path1 is a subpath of path2 (or same)
+                    # If relative_to succeeds, path1 is a subpath of path2
+
+                    # ALLOW: output_dir inside src_dir
+                    if name1 == "output_dir" and name2 == "src_dir":
+                        self._auto_exclude(path1, path2)
+                        continue
+
+                    # ALLOW: build_dir inside src_dir
+                    if name1 == "build_dir" and name2 == "src_dir":
+                        self._auto_exclude(path1, path2)
+                        continue
+
                     raise ValueError(
                         f"Directory conflict: {name1} ({path1}) is inside {name2} ({path2})"
                     )
@@ -270,6 +293,21 @@ def load_config(config_path: str | None = None) -> tuple[Config, Path]:
             raise ValueError(f"Error parsing configuration file {selected_path}: {e}") from e
 
     try:
-        return Config(**data), selected_path
+        config = Config(**data)
+
+        # Auto-exclude configuration file if it's inside src_dir
+        # This prevents the config file itself from being treated as content
+        src_path = Path(config.src_dir).resolve()
+        try:
+            rel_config = selected_path.relative_to(src_path)
+            # Add implicit exclude pattern for the config file
+            pattern = str(rel_config)
+            if pattern not in config.exclude:
+                config.exclude.append(pattern)
+        except ValueError:
+            # Config file is not in src_dir
+            pass
+
+        return config, selected_path
     except Exception as e:
         raise ValueError(f"Invalid configuration in {selected_path}: {e}") from e

@@ -110,9 +110,39 @@ def test_config_dir_conflict_equality(valid_config_data):
 
 
 def test_config_dir_conflict_nesting(valid_config_data):
-    valid_config_data["output_dir"] = str(Path(valid_config_data["src_dir"]) / "site")
+    # Test src_dir inside output_dir (still forbidden)
+    nested_src = Path(valid_config_data["output_dir"]) / "src"
+    nested_src.mkdir(parents=True, exist_ok=True)
+    valid_config_data["src_dir"] = str(nested_src)
     with pytest.raises(ValueError, match="is inside"):
         Config(**valid_config_data)
+
+
+def test_config_nested_output_allowed(valid_config_data):
+    # Test output_dir inside src_dir (now allowed)
+    src = Path(valid_config_data["src_dir"])
+    out = src / "site"
+    valid_config_data["output_dir"] = str(out)
+
+    cfg = Config(**valid_config_data)
+
+    # Check that it didn't raise and added excludes
+    # relative path is "site"
+    assert "site" in cfg.exclude
+    assert "site/*" in cfg.exclude
+
+
+def test_config_nested_build_allowed(valid_config_data):
+    # Test build_dir inside src_dir (now allowed)
+    src = Path(valid_config_data["src_dir"])
+    bld = src / "build_output"
+    valid_config_data["build_dir"] = str(bld)
+
+    cfg = Config(**valid_config_data)
+
+    # Check that it didn't raise and added excludes
+    assert "build_output" in cfg.exclude
+    assert "build_output/*" in cfg.exclude
 
 
 def test_config_duplicate_output_ids(valid_config_data):
@@ -139,6 +169,31 @@ def test_validate_defaults_missing(valid_config_data):
     valid_config_data["defaults"] = "missing.yaml"
     with pytest.raises(ValueError, match="Defaults file not found"):
         Config(**valid_config_data)
+
+
+def test_load_config_auto_excludes_self(tmp_path):
+    # Setup: config file inside src directory
+    src = tmp_path
+    c = src / "dojo.yaml"
+
+    # Create config that points to its own directory as src
+    c.write_text(
+        yaml.dump(
+            {
+                "src_dir": str(src),
+                "default_type": "page",
+                "types": {"page": {"outputs": []}},
+                "exclude": ["existing_pattern"],
+            }
+        )
+    )
+
+    cfg, _ = load_config(str(c))
+
+    # Verify dojo.yaml is added to excludes
+    assert "dojo.yaml" in cfg.exclude
+    # Verify existing excludes are preserved
+    assert "existing_pattern" in cfg.exclude
 
 
 # --- load_config Tests ---
