@@ -221,8 +221,7 @@ class NinjaGenerator:
         final_path = sanitize_path(self.out_dir, rel_stem.parent / filename)
 
         raw_source = out_config.source
-        if raw_source is None:
-            raise ValueError("Source cannot be None for derived output")
+        assert raw_source is not None
 
         source_ids_list: list[str] = [raw_source] if isinstance(raw_source, str) else raw_source
 
@@ -237,8 +236,7 @@ class NinjaGenerator:
         if out_config.args:
             variables["args"] = " ".join(out_config.args)
 
-        if out_config.tool is None:
-            raise ValueError("Tool cannot be None for derived output")
+        assert out_config.tool is not None
 
         self.emitter.build(
             outputs=final_path,

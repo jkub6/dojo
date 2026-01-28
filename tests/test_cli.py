@@ -1,4 +1,3 @@
-import sys
 from unittest.mock import patch
 
 import pytest
@@ -8,10 +7,9 @@ from dojo.cli import entry_point, main
 
 def test_cli_help(capsys):
     """Test that the CLI can be invoked and prints help."""
-    with patch.object(sys, "argv", ["dojo", "--help"]):
-        with pytest.raises(SystemExit) as cm:
-            main()
-        assert cm.value.code == 0
+    with pytest.raises(SystemExit) as cm:
+        main(["--help"])
+    assert cm.value.code == 0
 
     captured = capsys.readouterr()
     assert "usage: dojo" in captured.out
@@ -19,10 +17,10 @@ def test_cli_help(capsys):
 
 def test_cli_no_args(capsys):
     """Test behavior when no args provided (prints help and exit 0)."""
-    with patch.object(sys, "argv", ["dojo"]):
-        with pytest.raises(SystemExit) as cm:
-            main()
-        assert cm.value.code == 0
+    # main([]) equates to no arguments passed to argparse
+    with pytest.raises(SystemExit) as cm:
+        main([])
+    assert cm.value.code == 0
 
     captured = capsys.readouterr()
     assert "usage: dojo" in captured.out
@@ -30,28 +28,25 @@ def test_cli_no_args(capsys):
 
 def test_cli_version(capsys):
     """Test version command."""
-    with patch.object(sys, "argv", ["dojo", "--version"]):
-        main()
-        captured = capsys.readouterr()
-        # Rich might print to stderr or stdout depending on config, checking both safe
-        output = captured.out + captured.err
-        assert "dojo" in output
+    main(["--version"])
+    captured = capsys.readouterr()
+    # Rich might print to stderr or stdout depending on config, checking both safe
+    output = captured.out + captured.err
+    assert "dojo" in output
 
 
 def test_cli_version_subcommand(capsys):
     """Test version subcommand."""
-    with patch.object(sys, "argv", ["dojo", "version"]):
-        main()
-        captured = capsys.readouterr()
-        # Rich console prints to stdout by default
-        assert "dojo" in captured.out
+    main(["version"])
+    captured = capsys.readouterr()
+    # Rich console prints to stdout by default
+    assert "dojo" in captured.out
 
 
 def test_init_creates_file(tmp_path, monkeypatch, capsys):
     """Test init command creates dojo.yaml."""
     monkeypatch.chdir(tmp_path)
-    with patch.object(sys, "argv", ["dojo", "init"]):
-        main()
+    main(["init"])
 
     assert (tmp_path / "dojo.yaml").exists()
     captured = capsys.readouterr()
@@ -63,10 +58,9 @@ def test_init_existing_file(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "dojo.yaml").touch()
 
-    with patch.object(sys, "argv", ["dojo", "init"]):
-        with pytest.raises(SystemExit) as cm:
-            main()
-        assert cm.value.code == 1
+    with pytest.raises(SystemExit) as cm:
+        main(["init"])
+    assert cm.value.code == 1
 
     captured = capsys.readouterr()
     assert "already exists" in captured.out
@@ -87,8 +81,7 @@ types:
 """)
     (tmp_path / "content").mkdir()
 
-    with patch.object(sys, "argv", ["dojo", "check", "-c", "dojo.yaml"]):
-        main()
+    main(["check", "-c", "dojo.yaml"])
 
     captured = capsys.readouterr()
     assert "Configuration valid" in captured.out
@@ -100,10 +93,9 @@ def test_check_invalid_config(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "dojo.yaml").write_text("invalid: yaml: [")
 
-    with patch.object(sys, "argv", ["dojo", "check", "-c", "dojo.yaml"]):
-        with pytest.raises(SystemExit) as cm:
-            main()
-        assert cm.value.code == 1
+    with pytest.raises(SystemExit) as cm:
+        main(["check", "-c", "dojo.yaml"])
+    assert cm.value.code == 1
 
     captured = capsys.readouterr()
     assert "Configuration invalid" in captured.out
@@ -123,8 +115,7 @@ types:
 """)
     (tmp_path / "content").mkdir()
 
-    with patch.object(sys, "argv", ["dojo", "build", "-c", "dojo.yaml"]):
-        main()
+    main(["build", "-c", "dojo.yaml"])
 
     # build.ninja should exist (NinjaGenerator works)
     assert (tmp_path / "_build" / "build.ninja").exists()
@@ -146,8 +137,7 @@ types:
 """)
     (tmp_path / "content").mkdir()
 
-    with patch.object(sys, "argv", ["dojo", "--quiet", "build", "-c", "dojo.yaml"]):
-        main()
+    main(["--quiet", "build", "-c", "dojo.yaml"])
 
     captured = capsys.readouterr()
     assert "Build configuration generated successfully" not in captured.out
@@ -159,10 +149,9 @@ def test_build_file_not_found(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     # No dojo.yaml
 
-    with patch.object(sys, "argv", ["dojo", "build"]):
-        with pytest.raises(SystemExit) as cm:
-            main()
-        assert cm.value.code == 1
+    with pytest.raises(SystemExit) as cm:
+        main(["build"])
+    assert cm.value.code == 1
 
     captured = capsys.readouterr()
     assert "Error" in captured.out
@@ -178,3 +167,18 @@ def test_keyboard_interrupt(capsys):
 
     captured = capsys.readouterr()
     assert "Interrupted by user" in captured.err
+
+
+def test_build_verbose_exception(capsys):
+    """Test that verbose flag prints tracebacks on error."""
+    # Patch load_config to raise an exception
+    with (
+        patch("dojo.cli.load_config", side_effect=ValueError("Test Error")),
+    ):
+        with pytest.raises(SystemExit) as cm:
+            main(["--verbose", "build"])
+        assert cm.value.code == 1
+
+    captured = capsys.readouterr()
+    assert "Test Error" in captured.out
+    assert "Traceback" in captured.out

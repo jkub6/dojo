@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -87,3 +88,48 @@ def test_frontmatter_with_whitespace(tmp_path):
         file.write(content)
 
     assert parse_frontmatter_type(f, "default") == "slide"
+
+
+def test_recursive_yaml_deps_missing_file(tmp_path):
+    a = tmp_path / "missing.yaml"
+    deps = get_recursive_yaml_deps(a)
+    assert deps == []
+
+
+def test_recursive_yaml_deps_invalid_yaml(tmp_path, caplog):
+    a = tmp_path / "invalid.yaml"
+    a.write_text("invalid: [")
+
+    deps = get_recursive_yaml_deps(a)
+    assert deps == []
+    assert "Error reading" in caplog.text
+
+
+def test_recursive_yaml_deps_missing_ref(tmp_path, caplog):
+    a = tmp_path / "a.yaml"
+    a.write_text("defaults: [missing.yaml]")
+
+    deps = get_recursive_yaml_deps(a)
+    # Should warn but not fail
+    assert deps == []
+    assert "Default file referenced" in caplog.text
+
+
+def test_parse_frontmatter_exception(tmp_path, caplog):
+    f = tmp_path / "test.md"
+    f.touch()
+
+    # Create a situation where yaml loading fails violently or file read fails in a way caught by generic exception
+    # Mocking open might be easiest but we are inside a context manager in implementation
+    with patch("builtins.open", side_effect=Exception("Read failed")):
+        t = parse_frontmatter_type(f, "default")
+        assert t == "default"
+        assert "Could not parse frontmatter" in caplog.text
+
+
+def test_sanitize_path_traversal_subdir(tmp_path):
+    base = tmp_path / "base"
+    base.mkdir()
+
+    with pytest.raises(ValueError, match="Path traversal detected"):
+        sanitize_path(base, Path("subdir/../../outside.txt"))

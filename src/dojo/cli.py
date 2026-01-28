@@ -10,7 +10,6 @@ from .config import load_config
 from .core import NinjaGenerator
 
 console = Console()
-HAS_RICH = True
 
 logger = logging.getLogger("dojo")
 
@@ -30,13 +29,12 @@ def setup_cli_logging(verbose: bool, quiet: bool) -> None:
     else:
         level = logging.INFO
 
-    if HAS_RICH:
-        logging.basicConfig(
-            level=level,
-            format="%(message)s",
-            datefmt="[%X]",
-            handlers=[RichHandler(rich_tracebacks=True, show_path=False)],
-        )
+    logging.basicConfig(
+        level=level,
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[RichHandler(rich_tracebacks=True, show_path=False)],
+    )
 
 
 def cmd_build(
@@ -47,14 +45,14 @@ def cmd_build(
     """Handle the build command."""
     try:
         config, config_path = load_config(args.config)
-        if HAS_RICH and not args.quiet:
+        if not args.quiet:
             console.print(f"[bold green]Using configuration:[/bold green] {config_path}")
 
         generator = NinjaGenerator(config, config_path, quiet=args.quiet)
 
         generator.generate()
 
-        if HAS_RICH and not args.quiet:
+        if not args.quiet:
             console.print("[bold green]✨ Build configuration generated successfully![/bold green]")
 
     except FileNotFoundError as e:
@@ -78,18 +76,12 @@ def cmd_check(args: argparse.Namespace) -> None:
     """Handle the check command."""
     try:
         config, config_path = load_config(args.config)
-        if HAS_RICH:
-            console.print(f"[bold green]✓ Configuration valid:[/bold green] {config_path}")
-            console.print(f"  Src: {config.src_dir}")
-            console.print(f"  Dst: {config.output_dir}")
-            console.print(f"  Types: {', '.join(config.types.keys())}")
-        else:
-            print("Configuration valid.")
+        console.print(f"[bold green]✓ Configuration valid:[/bold green] {config_path}")
+        console.print(f"  Src: {config.src_dir}")
+        console.print(f"  Dst: {config.output_dir}")
+        console.print(f"  Types: {', '.join(config.types.keys())}")
     except Exception as e:
-        if HAS_RICH:
-            console.print(f"[bold red]Configuration invalid:[/bold red] {e}")
-        else:
-            print(f"Configuration invalid: {e}")
+        console.print(f"[bold red]Configuration invalid:[/bold red] {e}")
         sys.exit(1)
 
 
@@ -98,10 +90,7 @@ def cmd_init(args: argparse.Namespace) -> None:
     target = Path("dojo.yaml")
     if target.exists():
         msg = f"Configuration file {target} already exists."
-        if HAS_RICH:
-            console.print(f"[bold red]{msg}[/bold red]")
-        else:
-            print(msg)
+        console.print(f"[bold red]{msg}[/bold red]")
         sys.exit(1)
 
     # Create a simple default config
@@ -124,24 +113,19 @@ types:
         f.write(content)
 
     msg = f"Created sample configuration at {target}"
-    if HAS_RICH:
-        console.print(f"[bold green]{msg}[/bold green]")
-    else:
-        print(msg)
+    console.print(f"[bold green]{msg}[/bold green]")
 
 
 def cmd_version(args: argparse.Namespace) -> None:
     """Handle the version command."""
     v = get_version()
-    if HAS_RICH:
-        console.print(f"[bold]dojo[/bold] version [cyan]{v}[/cyan]")
-    else:
-        print(f"dojo version {v}")
+    console.print(f"[bold]dojo[/bold] version [cyan]{v}[/cyan]")
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     """CLI entry point for dojo."""
     parser = argparse.ArgumentParser(
+        prog="dojo",
         description="Professional Ninja Build Generator (Dojo)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -171,7 +155,7 @@ def main() -> None:
     # Version command (as subcommand)
     subparsers.add_parser("version", help="Show version info")
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     setup_cli_logging(args.verbose, args.quiet)
 
@@ -184,7 +168,7 @@ def main() -> None:
         parser.print_help()
         sys.exit(0)
     elif args.command == "build":
-        cmd_build(args)
+        cmd_build(args, parser=parser)
     elif args.command == "check":
         cmd_check(args)
     elif args.command == "init":
