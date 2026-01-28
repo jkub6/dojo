@@ -194,9 +194,13 @@ def main() -> None:
         sys.exit(1)
 
 
-if __name__ == "__main__":
+def entry_point() -> None:
     try:
         main()
     except KeyboardInterrupt:
         sys.stderr.write("\nInterrupted by user\n")
         sys.exit(130)
+
+
+if __name__ == "__main__":
+    entry_point()

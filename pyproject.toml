@@ -51,7 +51,7 @@ Repository = "https://github.com/example/dojo.git"
 Issues = "https://github.com/example/dojo/issues"
 
 [project.scripts]
-dojo = "dojo.cli:main"
+dojo = "dojo.cli:entry_point"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dojo"]

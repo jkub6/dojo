@@ -13,4 +13,5 @@ def setup_logging(level: int = logging.INFO) -> logging.Logger:
 
 
 # Initialize with default
-logger = setup_logging()
+# Remove global side-effect
+# logger = setup_logging()

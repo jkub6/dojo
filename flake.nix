@@ -89,6 +89,8 @@
         just
         uv
         ruff
+        statix
+        typos
       ];
     in {
       default = pkgs.mkShell {
