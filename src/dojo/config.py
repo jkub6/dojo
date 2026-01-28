@@ -16,12 +16,13 @@ class ToolPaths(BaseModel):
     minify: str = Field(default="minify", description="Minify executable path")
     ghostscript: str = Field(default="gs", description="Ghostscript executable path")
     decktape: str = Field(default="decktape", description="Decktape executable path")
+    typst: str = Field(default="typst", description="Typst executable path")
 
     @model_validator(mode="after")
     def resolve_tool_paths(self) -> ToolPaths:
         """Resolve all tool paths to absolute paths and verify existence."""
         essential_tools = ["python", "pandoc"]
-        for tool in ["python", "pandoc", "minify", "ghostscript", "decktape"]:
+        for tool in ["python", "pandoc", "minify", "ghostscript", "decktape", "typst"]:
             current = getattr(self, tool)
             if current:
                 resolved = shutil.which(current)
