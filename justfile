@@ -22,7 +22,7 @@ check:
     typos .
     statix check
     # nix flake check --all-systems
-    nix flake check
+    nix flake check --all-systems
 
 # Run tests with coverage
 test:
