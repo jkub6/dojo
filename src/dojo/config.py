@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import shutil
 from pathlib import Path
 
@@ -16,7 +18,7 @@ class ToolPaths(BaseModel):
     decktape: str = Field(default="decktape", description="Decktape executable path")
 
     @model_validator(mode="after")
-    def resolve_tool_paths(self) -> "ToolPaths":
+    def resolve_tool_paths(self) -> ToolPaths:
         """Resolve all tool paths to absolute paths and verify existence."""
         essential_tools = ["python", "pandoc"]
         for tool in ["python", "pandoc", "minify", "ghostscript", "decktape"]:
@@ -63,7 +65,7 @@ class OutputConfig(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def validate_derived_output(self) -> "OutputConfig":
+    def validate_derived_output(self) -> OutputConfig:
         """Validate that derived outputs have required fields."""
         if self.source is not None and self.tool is None:
             raise ValueError("Outputs with 'source' must also specify 'tool'")
@@ -168,7 +170,7 @@ class Config(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def validate_config(self) -> "Config":
+    def validate_config(self) -> Config:
         """Perform complex cross-field validations."""
         # 1. Validate default_type exists
         if self.default_type not in self.types:
@@ -213,7 +215,7 @@ class Config(BaseModel):
         return self
 
 
-def load_config(config_path: str | None = None) -> "tuple[Config, Path]":
+def load_config(config_path: str | None = None) -> tuple[Config, Path]:
     """
     Load configuration from multiple sources with priority:
     1. Explicit CLI argument
