@@ -7,10 +7,10 @@ name = "dojo"
 version = "0.1.0"
 description = "Professional Ninja Build Generator for Static Site Generation"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.14"
 license = "MIT"
 authors = [
-  {name = "Jake", email = "jake@example.com"},
+  {name = "Jake", email = "jkub66@gmail.com"},
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -57,7 +57,7 @@ packages = ["src/dojo"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "B", "UP", "SIM", "RUF"]
@@ -76,7 +76,7 @@ python_classes = "Test*"
 addopts = "--cov=src/dojo --cov-report=term-missing"
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.14"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

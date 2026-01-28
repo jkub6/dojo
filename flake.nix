@@ -34,7 +34,7 @@
     workspace = uv2nix.lib.workspace.loadWorkspace {workspaceRoot = ./.;};
 
     mkPythonSet = pkgs:
-      (pkgs.callPackage pyproject-nix.build.packages {python = pkgs.python311;}).overrideScope (
+      (pkgs.callPackage pyproject-nix.build.packages {python = pkgs.python314;}).overrideScope (
         pkgs.lib.composeManyExtensions [
           pyproject-build-systems.overlays.default
           (workspace.mkPyprojectOverlay {sourcePreference = "wheel";})
