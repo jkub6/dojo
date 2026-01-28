@@ -1,6 +1,7 @@
 # Justfile for Dojo
 
 set shell := ["bash", "-c"]
+export PYTHONPATH := "src"
 
 # List available recipes
 default:
@@ -17,8 +18,8 @@ fix:
 check:
     ruff check .
     ruff format --check .
-    uv run mypy src
-    uv run vulture
+    mypy src
+    vulture
     typos .
     statix check
     # nix flake check --all-systems
@@ -26,11 +27,11 @@ check:
 
 # Run tests with coverage
 test:
-    uv run pytest --cov=src
+    pytest --cov=src
 
 # Build the project (requires config file)
 build config="dojo.yaml":
-    uv run python3 -m dojo build -c {{config}} && ninja -f _build/build.ninja
+    python -m dojo build -c {{config}} && ninja -f _build/build.ninja
 
 # Clean build artifacts
 clean:
