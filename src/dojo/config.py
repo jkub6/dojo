@@ -9,6 +9,29 @@ from .constants import RuleName
 from .resources import find_resource
 
 
+def _resolve_defaults(
+    v: str | list[str] | None, data_dir: str | None = None
+) -> str | list[str] | None:
+    """Resolve default files using optional data-dir."""
+    if v is None:
+        return None
+
+    paths = [v] if isinstance(v, str) else v
+    resolved_paths = []
+    extra_dirs = [Path(data_dir).resolve()] if data_dir else None
+    for p in paths:
+        found = find_resource(
+            "defaults", p, root_contexts=[Path.cwd()], extra_data_dirs=extra_dirs
+        )
+        if found:
+            resolved_paths.append(str(found))
+        else:
+            raise ValueError(
+                f"Defaults file not found: {p} (checked exact, project, and data dirs)"
+            )
+
+    return resolved_paths[0] if isinstance(v, str) else resolved_paths
+
 class ToolPaths(BaseModel):
     """Configurable paths to external tools."""
 
@@ -52,29 +75,6 @@ class OutputConfig(BaseModel):
     )
     tool: str | None = Field(default=None, description="Tool to use for derived outputs")
 
-    @field_validator("defaults")
-    @classmethod
-    def validate_defaults_path(cls, v: str | list[str] | None) -> str | list[str] | None:
-        """Validate that defaults file(s) exist using recursive search."""
-        if v is None:
-            return None
-
-        paths = [v] if isinstance(v, str) else v
-        resolved_paths = []
-        for p in paths:
-            # We use CWD as the context for now.
-            # In the future, we might want to pass the config file location
-            # but that requires context passing which is complex in Pydantic v2 without context.
-            # Assuming CWD is usually the project root or where dojo is run.
-            found = find_resource("defaults", p, root_contexts=[Path.cwd()])
-            if found:
-                resolved_paths.append(str(found))
-            else:
-                raise ValueError(
-                    f"Defaults file not found: {p} (checked exact, project, and data dirs)"
-                )
-
-        return resolved_paths[0] if isinstance(v, str) else resolved_paths
 
     @model_validator(mode="after")
     def validate_derived_output(self) -> OutputConfig:
@@ -96,22 +96,6 @@ class TypeConfig(BaseModel):
         default=None, description="Default render settings for this type"
     )
 
-    @field_validator("defaults")
-    @classmethod
-    def validate_defaults_path(cls, v: str | list[str] | None) -> str | list[str] | None:
-        """Validate that defaults file(s) exist using recursive search."""
-        if v is None:
-            return None
-
-        paths = [v] if isinstance(v, str) else v
-        resolved_paths = []
-        for p in paths:
-            found = find_resource("defaults", p, root_contexts=[Path.cwd()])
-            if found:
-                resolved_paths.append(str(found))
-            else:
-                raise ValueError(f"Defaults file not found: {p}")
-        return resolved_paths[0] if isinstance(v, str) else resolved_paths
 
 
 class CustomRule(BaseModel):
@@ -179,22 +163,6 @@ class Config(BaseModel):
             raise ValueError(f"Pandoc data directory is not a directory: {path}")
         return str(path)
 
-    @field_validator("defaults")
-    @classmethod
-    def validate_defaults_path(cls, v: str | list[str] | None) -> str | list[str] | None:
-        """Validate that defaults file(s) exist using recursive search."""
-        if v is None:
-            return None
-
-        paths = [v] if isinstance(v, str) else v
-        resolved_paths = []
-        for p in paths:
-            found = find_resource("defaults", p, root_contexts=[Path.cwd()])
-            if found:
-                resolved_paths.append(str(found))
-            else:
-                raise ValueError(f"Defaults file not found: {p}")
-        return resolved_paths[0] if isinstance(v, str) else resolved_paths
 
     @field_validator("custom_rules")
     @classmethod
@@ -232,6 +200,13 @@ class Config(BaseModel):
         # 1. Validate default_type exists
         if self.default_type not in self.types:
             raise ValueError(f"default_type '{self.default_type}' not found in types")
+
+        # 1.5. Resolve all defaults paths
+        self.defaults = _resolve_defaults(self.defaults, self.pandoc_data_dir)
+        for type_name, type_conf in self.types.items():
+            type_conf.defaults = _resolve_defaults(type_conf.defaults, self.pandoc_data_dir)
+            for out_conf in type_conf.outputs:
+                out_conf.defaults = _resolve_defaults(out_conf.defaults, self.pandoc_data_dir)
 
         # 2. Check for overlapping directories
         dirs = {

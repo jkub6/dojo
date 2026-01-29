@@ -140,9 +140,12 @@ class NinjaGenerator:
             # So I should pass them to implicit.
             # _get_dep_string returns a string, I need paths.
             raw_deps = []
+            data_dir = (
+                Path(self.config.pandoc_data_dir) if self.config.pandoc_data_dir else None
+            )
             for df in compile_defaults:
                 raw_deps.append(df)
-                raw_deps.extend(get_recursive_yaml_deps(df))
+                raw_deps.extend(get_recursive_yaml_deps(df, data_dir_override=data_dir))
             implicit = sorted(set(raw_deps))
 
         self.emitter.build(
@@ -194,9 +197,12 @@ class NinjaGenerator:
         if all_defaults:
             variables["defaults"] = self._format_defaults_var(all_defaults)
             raw_deps = []
+            data_dir = (
+                Path(self.config.pandoc_data_dir) if self.config.pandoc_data_dir else None
+            )
             for df in all_defaults:
                 raw_deps.append(df)
-                raw_deps.extend(get_recursive_yaml_deps(df))
+                raw_deps.extend(get_recursive_yaml_deps(df, data_dir_override=data_dir))
             implicit = sorted(set(raw_deps))
 
         variables["in_shell"] = shell_quote(json_node)

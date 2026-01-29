@@ -111,23 +111,29 @@ def _extract_paths(data: dict, keys: list[str]) -> list[str]:
 
 
 def get_recursive_yaml_deps(
-    yaml_path: Path, visited: set[Path] | None = None, stack: list[Path] | None = None
+    yaml_path: Path,
+    data_dir_override: Path | None = None,
+    visited: set[Path] | None = None,
+    stack: list[Path] | None = None,
 ) -> list[Path]:
     """Recursively scans YAML files for dependencies to build dependency lists for Ninja.
 
     Tracks:
-    - 'defaults': Recursively scanned
-    - 'css', 'bibliography', 'csl', 'template', 'include-before', 'include-after': Added as assets
+    - 'defaults': Recursively scanned. Resolved relative to CWD or via data-dir.
+    - 'css', 'bibliography', 'csl', 'template', 'include-before', 'include-after':
+      Added as assets. Resolved relative to CWD (Pandoc's behavior).
 
     Args:
         yaml_path: Path to the root YAML file
+        data_dir_override: Directory to use as data-dir for this file's direct references
         visited: Already processed files
         stack: Current recursion stack for cycle detection
 
     Returns:
         Deduplicated list of absolute Paths
-
     """
+    from .resources import find_resource
+
     if visited is None:
         visited = set()
     if stack is None:
@@ -149,7 +155,6 @@ def get_recursive_yaml_deps(
     stack.append(yaml_path)
 
     try:
-        # We manually load here instead of using _get_direct_defaults to handle multiple keys
         if not yaml_path.exists():
             return []
 
@@ -163,25 +168,57 @@ def get_recursive_yaml_deps(
         if not data or not isinstance(data, dict):
             return []
 
+        # Determine the data-dir for this file's references
+        # 1. 'data-dir' variable in the file itself (highest priority)
+        # 2. data_dir_override (from Dojo config or parent) - wait, user says:
+        #    "each default file even when 'imported' by another will go back to XDG_DATA_DIR
+        #     unless it has it's own data-dir variable set"
+        # This means we DO NOT inherit data_dir_override for nested search of children.
+        # But we DO use it for resolving refs IN this file if this file doesn't have its own.
+
+        local_data_dir_val = data.get("data-dir")
+        current_data_dirs = []
+        if local_data_dir_val:
+            current_data_dirs = [Path(local_data_dir_val).resolve()]
+        elif data_dir_override:
+            current_data_dirs = [data_dir_override]
+
         # 1. Handle Recursive Defaults
         defaults = _extract_paths(data, ["defaults"])
         for default_ref in defaults:
-            dep_path = Path(default_ref).resolve()
-            if dep_path.exists():
-                deps.append(dep_path)
-                deps.extend(get_recursive_yaml_deps(dep_path, visited, stack[:]))
+            # Resolve the default file
+            # Pandoc behavior: relative paths are relative to CWD.
+            # Shorthand names are searched in data-dir/defaults/.
+            found = find_resource(
+                "defaults",
+                default_ref,
+                root_contexts=[Path.cwd()],
+                extra_data_dirs=current_data_dirs,
+            )
+
+            if found:
+                deps.append(found)
+                # Recurse. Nested files do NOT inherit our data_dir_override.
+                deps.extend(get_recursive_yaml_deps(found, visited=visited, stack=stack[:]))
             else:
-                logger.warning(f"Default file referenced in {yaml_path} not found: {dep_path}")
+                logger.warning(f"Default file referenced in {yaml_path} not found: {default_ref}")
 
         # 2. Handle Leaf Assets (CSS, templates, etc)
+        # Pandoc behavior: relative paths are relative to CWD (executable location).
         asset_keys = ["css", "bibliography", "csl", "template", "include-before", "include-after"]
         assets = _extract_paths(data, asset_keys)
         for asset_ref in assets:
-            # Pandoc resolves relative to the defaults file
-            asset_path = (yaml_path.parent / asset_ref).resolve()
+            asset_path = Path(asset_ref)
+            if not asset_path.is_absolute():
+                asset_path = Path.cwd() / asset_path
+
+            asset_path = asset_path.resolve()
+            # We don't check if it exists here for assets as they might be build products,
+            # but we add them to Ninja deps anyway if they seem to be local files.
+            # However, for robustness, we only add them if they exist or look like they should.
+            # The original code checked .exists().
             if asset_path.exists():
                 deps.append(asset_path)
-            # We don't warn for missing assets here as they might be generated files
 
     finally:
         stack.pop()

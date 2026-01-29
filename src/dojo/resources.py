@@ -24,19 +24,14 @@ def get_pandoc_data_dirs(
     """Get the list of directories where Pandoc looks for data files.
 
     Order is roughly:
-    1. User specified data dirs (if any)
+    1. User specified data dirs (if any) - if specified, these OVERRIDE defaults.
     2. XDG_DATA_HOME/pandoc
-    3. ~/.pandoc (legacy but often supported/used)
-    4. System directories (e.g. /usr/share/pandoc) - We might skip strictly checking /usr/share unless needed.
-
-    For consistency with Pandoc's "User Data Directory":
-    Pandoc checks $XDG_DATA_HOME/pandoc (or ~/.local/share/pandoc)
-    and then $HOME/.pandoc (if on posix and not explicitly using XDG).
+    3. ~/.pandoc (legacy)
     """
-    paths: list[Path] = []
-
     if extra_data_dirs:
-        paths.extend(d.resolve() for d in extra_data_dirs if d.exists())
+        return [d.resolve() for d in extra_data_dirs if d.exists()]
+
+    paths: list[Path] = []
 
     # XDG Data Home
     xdg_home = get_xdg_data_home()
