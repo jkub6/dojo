@@ -63,7 +63,17 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
         f"root_val=$$(realpath -m --relative-to=$$(dirname $in_shell) {shell_quote(config.root_ref_dir)})"
     )
 
-    cd_cmd = f" && cd {shell_quote(config.pandoc_working_dir)}" if config.pandoc_working_dir else ""
+    # Use env to set PANDOC_DATA_DIR if configured
+    data_dir_env = ""
+    if config.pandoc_data_dir:
+        # We ensure it is an absolute path
+        abs_data_dir = Path(config.pandoc_data_dir).resolve()
+        data_dir_env = f"PANDOC_DATA_DIR={shell_quote(abs_data_dir)} "
+
+    # Combine with path prefix
+    # path_prefix already ends with a space if not empty
+    # We prepend data_dir_env to the pandoc command execution
+    pandoc_wrapper = f"{path_prefix}{data_dir_env}{config.tools.pandoc}"
 
     common_flags = "-V root=$$root_val"
     if config.add_resource_path:
@@ -76,8 +86,8 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
 
     # Note: We use $in_abs and $out_abs which are established in the setup_vars
     compile_cmd = (
-        f"{setup_vars}{cd_cmd} && "
-        f"{path_prefix}{config.tools.pandoc} $$in_abs $defaults -t json -o $$out_abs "
+        f"{setup_vars} && "
+        f"{pandoc_wrapper} $$in_abs $defaults -t json -o $$out_abs "
         f"-M depfile=$$out_abs.d -M target=$$out_abs "
         f"{common_flags} "
         f"--lua-filter {dep_filter}"
@@ -94,11 +104,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     )
 
     # RENDER Rule (JSON AST -> Output Format)
-    render_cmd = (
-        f"{setup_vars}{cd_cmd} && "
-        f"{path_prefix}{config.tools.pandoc} $$in_abs $defaults -o $$out_abs "
-        f"{common_flags}"
-    )
+    render_cmd = f"{setup_vars} && {pandoc_wrapper} $$in_abs $defaults -o $$out_abs {common_flags}"
 
     rules.append(
         CustomRule(

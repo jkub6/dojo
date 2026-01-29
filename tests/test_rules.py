@@ -13,7 +13,7 @@ def test_config_defaults():
         types={"page": {"outputs": []}},
     )
     assert c.root_ref_dir == "."
-    assert c.pandoc_working_dir is None
+    assert c.pandoc_data_dir is None
     assert c.add_resource_path is True
 
 
@@ -25,11 +25,11 @@ def test_config_overrides(tmp_path: Path):
         default_type="page",
         types={"page": {"outputs": []}},
         root_ref_dir="..",
-        pandoc_working_dir=str(tmp_path),
+        pandoc_data_dir=str(tmp_path / "data"),
         add_resource_path=False,
     )
     assert c.root_ref_dir == ".."
-    assert c.pandoc_working_dir == str(tmp_path)
+    assert c.pandoc_data_dir == str(tmp_path / "data")
     assert c.add_resource_path is False
 
 
@@ -62,7 +62,7 @@ def test_rule_generation_custom(tmp_path: Path):
         default_type="page",
         types={"page": {"outputs": []}},
         root_ref_dir="root_ref",
-        pandoc_working_dir=str(tmp_path / "work"),
+        pandoc_data_dir=str(tmp_path / "work"),
         add_resource_path=False,
     )
     rules = get_builtin_rules(c, Path("config.yaml"))
@@ -73,5 +73,5 @@ def test_rule_generation_custom(tmp_path: Path):
         "root_val=$$(realpath -m --relative-to=$$(dirname $in_shell) root_ref)"
         in compile_rule.command
     )
-    assert f"cd {tmp_path}/work" in compile_rule.command
+    assert f"PANDOC_DATA_DIR={tmp_path}/work " in compile_rule.command
     assert "--resource-path" not in compile_rule.command

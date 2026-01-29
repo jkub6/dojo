@@ -138,8 +138,8 @@ class Config(BaseModel):
     root_ref_dir: str = Field(
         default=".", description="Directory to calculate root variable relative to"
     )
-    pandoc_working_dir: str | None = Field(
-        default=None, description="Directory to change to before running pandoc"
+    pandoc_data_dir: str | None = Field(
+        default=None, description="Path to set as PANDOC_DATA_DIR environment variable"
     )
     add_resource_path: bool = Field(
         default=True,
