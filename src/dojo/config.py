@@ -53,6 +53,10 @@ class ToolPaths(BaseModel):
                     setattr(self, tool, resolved)
                 elif tool in essential_tools:
                     raise ValueError(f"Essential tool '{tool}' not found: {current}")
+                else:
+                    # Optional tool not found
+                    # We accept this but if it is used later, it will fail at runtime
+                    pass
         return self
 
 
