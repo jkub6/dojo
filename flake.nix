@@ -41,6 +41,32 @@
         ]
       );
 
+    pandoc-bin = pkgs: let
+      version = "3.8.3";
+      inherit (pkgs.stdenv.hostPlatform) system;
+      sources = {
+        "x86_64-linux" = {
+          url = "https://github.com/jgm/pandoc/releases/download/${version}/pandoc-${version}-linux-amd64.tar.gz";
+          hash = "sha256-wiT6uJ+CfTYjOA7LfBB4wWPHachJoUrCfo07+7kUybQ=";
+        };
+        "aarch64-linux" = {
+          url = "https://github.com/jgm/pandoc/releases/download/${version}/pandoc-${version}-linux-arm64.tar.gz";
+          hash = "sha256-FmpaNzh+sQvUxPJCqBCb7vdVrB6NTrA5xrXr0dkY2Nc=";
+        };
+      };
+      source = sources.${system} or (throw "Unsupported system: ${system}");
+    in
+      pkgs.stdenv.mkDerivation {
+        pname = "pandoc-bin";
+        inherit version;
+        src = pkgs.fetchurl source;
+        installPhase = ''
+          mkdir -p $out/bin $out/share/man/man1
+          cp bin/pandoc $out/bin/
+          cp share/man/man1/pandoc.1.gz $out/share/man/man1/
+        '';
+      };
+
     runtimeDeps = pkgs:
       with pkgs; [
         chromium
@@ -49,7 +75,8 @@
         typst
         minify
         ninja
-        pandoc
+        # pandoc
+        (pandoc-bin pkgs)
       ];
   in {
     packages = forAllSystems (system: let
