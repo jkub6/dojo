@@ -43,7 +43,6 @@ venv.bak/
 
 # Nix
 .direnv/
-.envrc
 
 # Ninja
 build.ninja
