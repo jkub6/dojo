@@ -63,12 +63,12 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
         f"root_val=$$(realpath -m --relative-to=$$(dirname $in_shell) {shell_quote(config.root_ref_dir)})"
     )
 
-    # Use env to set PANDOC_DATA_DIR if configured
+    # Use env to set XDG_DATA_HOME if configured
     data_dir_env = ""
-    if config.pandoc_data_dir:
+    if config.xdg_data_home:
         # We ensure it is an absolute path
-        abs_data_dir = Path(config.pandoc_data_dir).resolve()
-        data_dir_env = f"PANDOC_DATA_DIR={shell_quote(abs_data_dir)} "
+        abs_data_dir = Path(config.xdg_data_home).resolve()
+        data_dir_env = f"XDG_DATA_HOME={shell_quote(abs_data_dir)} "
 
     # Combine with path prefix
     # path_prefix already ends with a space if not empty
