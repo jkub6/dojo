@@ -3,6 +3,7 @@ from pathlib import Path
 
 from .config import Config, CustomRule
 from .constants import PoolName, RuleName
+from .utils import shell_quote
 
 
 def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
@@ -23,7 +24,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     for tool_path in config.tools.model_dump().values():
         if tool_path and Path(tool_path).exists():
             tool_dirs.add(str(Path(tool_path).parent))
-    
+
     path_prefix = ""
     if tool_dirs:
         # Sort for determinism
@@ -52,16 +53,33 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
         )
     )
 
+    # Pandoc Command Construction Helpers
+    # We resolve inputs/outputs to absolute paths to support changing working directory
+    # root_val: The path of the root reference directory relative to the input file input directory
+    # Note: We use $$ for shell variables/substitution because Ninja uses $ for its own variables
+    setup_vars = (
+        "in_abs=$$(realpath $in_shell) && "
+        "out_abs=$$(realpath -m $out_shell) && "
+        f"root_val=$$(realpath -m --relative-to=$$(dirname $in_shell) {shell_quote(config.root_ref_dir)})"
+    )
+
+    cd_cmd = f" && cd {shell_quote(config.pandoc_working_dir)}" if config.pandoc_working_dir else ""
+
+    common_flags = "-V root=$$root_val"
+    if config.add_resource_path:
+        common_flags += " --resource-path=.:$$(dirname $$in_abs)"
+
     # COMPILE Rule (Markdown -> JSON AST)
     # We attach the dependencies.lua filter at the end to track all assets
     resources_dir = Path(__file__).parent / "resources"
     dep_filter = resources_dir / "dependencies.lua"
 
-    # Note: We use $in_shell and $out_shell which are safe to use in the shell command
-    # The normal $in and $out are reserved for Ninja containment/dependency tracking
+    # Note: We use $in_abs and $out_abs which are established in the setup_vars
     compile_cmd = (
-        f"{path_prefix}{config.tools.pandoc} $in_shell $defaults -t json -o $out_shell "
-        f"-M depfile=$out_shell.d -M target=$out_shell "
+        f"{setup_vars}{cd_cmd} && "
+        f"{path_prefix}{config.tools.pandoc} $$in_abs $defaults -t json -o $$out_abs "
+        f"-M depfile=$$out_abs.d -M target=$$out_abs "
+        f"{common_flags} "
         f"--lua-filter {dep_filter}"
     )
 
@@ -76,10 +94,16 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     )
 
     # RENDER Rule (JSON AST -> Output Format)
+    render_cmd = (
+        f"{setup_vars}{cd_cmd} && "
+        f"{path_prefix}{config.tools.pandoc} $$in_abs $defaults -o $$out_abs "
+        f"{common_flags}"
+    )
+
     rules.append(
         CustomRule(
             name=RuleName.RENDER.value,
-            command=f"{path_prefix}{config.tools.pandoc} $in_shell $defaults -o $out_shell",
+            command=render_cmd,
             description="🎨 RENDER $out",
         )
     )

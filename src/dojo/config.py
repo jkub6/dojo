@@ -134,6 +134,18 @@ class Config(BaseModel):
     exclude: list[str] = Field(default_factory=list, description="Glob patterns to exclude")
     include: list[str] = Field(default_factory=list, description="Glob patterns to include")
 
+    # New Pandoc Configuration Options
+    root_ref_dir: str = Field(
+        default=".", description="Directory to calculate root variable relative to"
+    )
+    pandoc_working_dir: str | None = Field(
+        default=None, description="Directory to change to before running pandoc"
+    )
+    add_resource_path: bool = Field(
+        default=True,
+        description="Whether to add the input file directory to the resource path",
+    )
+
     defaults: str | list[str] | None = Field(
         default=None, description="Global default render settings"
     )
