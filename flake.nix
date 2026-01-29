@@ -94,6 +94,7 @@
         installPhase = ''
           mkdir -p $out/bin
           makeWrapper ${venv}/bin/dojo $out/bin/dojo \
+            --unset PYTHONPATH \
             --prefix PATH : ${pkgs.lib.makeBinPath (runtimeDeps pkgs)}
         '';
 
