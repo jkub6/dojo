@@ -152,9 +152,7 @@ class Config(BaseModel):
     root_ref_dir: str = Field(
         default=".", description="Directory to calculate root variable relative to"
     )
-    xdg_data_home: str | None = Field(
-        default=None, description="Path to set as XDG_DATA_HOME environment variable"
-    )
+
     add_resource_path: bool = Field(
         default=True,
         description="Whether to add the input file directory to the resource path",
@@ -163,6 +161,23 @@ class Config(BaseModel):
     defaults: str | list[str] | None = Field(
         default=None, description="Global default render settings"
     )
+
+    pandoc_data_dir: str | None = Field(
+        default=None, description="Directory to use as the pandoc data directory"
+    )
+
+    @field_validator("pandoc_data_dir")
+    @classmethod
+    def validate_pandoc_data_dir(cls, v: str | None) -> str | None:
+        """Validate that the pandoc data directory exists."""
+        if v is None:
+            return None
+        path = Path(v).resolve()
+        if not path.exists():
+            raise ValueError(f"Pandoc data directory not found: {path}")
+        if not path.is_dir():
+            raise ValueError(f"Pandoc data directory is not a directory: {path}")
+        return str(path)
 
     @field_validator("defaults")
     @classmethod

@@ -63,21 +63,17 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
         f"root_val=$$(realpath -m --relative-to=$$(dirname $in_shell) {shell_quote(config.root_ref_dir)})"
     )
 
-    # Use env to set XDG_DATA_HOME if configured
-    data_dir_env = ""
-    if config.xdg_data_home:
-        # We ensure it is an absolute path
-        abs_data_dir = Path(config.xdg_data_home).resolve()
-        data_dir_env = f"XDG_DATA_HOME={shell_quote(abs_data_dir)} "
-
     # Combine with path prefix
     # path_prefix already ends with a space if not empty
     # We prepend data_dir_env to the pandoc command execution
-    pandoc_wrapper = f"{path_prefix}{data_dir_env}{config.tools.pandoc}"
+    pandoc_wrapper = f"{path_prefix}{config.tools.pandoc}"
 
     common_flags = "-V root=$$root_val"
     if config.add_resource_path:
         common_flags += " --resource-path=.:$$(dirname $$in_abs)"
+    if config.pandoc_data_dir:
+        # We assume the path is already resolved by the config validator
+        common_flags += f" --data-dir={shell_quote(config.pandoc_data_dir)}"
 
     # COMPILE Rule (Markdown -> JSON AST)
     # We attach the dependencies.lua filter at the end to track all assets

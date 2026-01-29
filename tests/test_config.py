@@ -250,3 +250,29 @@ def test_load_config_invalid_schema(tmp_path):
     c.write_text("src_dir: missing")
     with pytest.raises(ValueError, match="Invalid configuration"):
         load_config(str(c))
+
+
+# --- pandoc_data_dir Tests ---
+
+
+def test_config_pandoc_data_dir_valid(valid_config_data, tmp_path):
+    data_dir = tmp_path / "pandoc_data"
+    data_dir.mkdir()
+    valid_config_data["pandoc_data_dir"] = str(data_dir)
+
+    cfg = Config(**valid_config_data)
+    assert cfg.pandoc_data_dir == str(data_dir.resolve())
+
+
+def test_config_pandoc_data_dir_missing(valid_config_data):
+    valid_config_data["pandoc_data_dir"] = "/nonexistent/data/dir"
+    with pytest.raises(ValueError, match="Pandoc data directory not found"):
+        Config(**valid_config_data)
+
+
+def test_config_pandoc_data_dir_not_dir(valid_config_data, tmp_path):
+    f = tmp_path / "file"
+    f.touch()
+    valid_config_data["pandoc_data_dir"] = str(f)
+    with pytest.raises(ValueError, match="Pandoc data directory is not a directory"):
+        Config(**valid_config_data)
