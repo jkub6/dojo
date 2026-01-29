@@ -6,6 +6,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, field_validator, model_validator  # type: ignore
 
 from .constants import RuleName
+from .resources import find_resource
 
 
 class ToolPaths(BaseModel):
@@ -54,16 +55,26 @@ class OutputConfig(BaseModel):
     @field_validator("defaults")
     @classmethod
     def validate_defaults_path(cls, v: str | list[str] | None) -> str | list[str] | None:
-        """Validate that defaults file(s) exist."""
+        """Validate that defaults file(s) exist using recursive search."""
         if v is None:
             return None
 
         paths = [v] if isinstance(v, str) else v
+        resolved_paths = []
         for p in paths:
-            path = Path(p)
-            if not path.exists():
-                raise ValueError(f"Defaults file not found: {path}")
-        return v
+            # We use CWD as the context for now.
+            # In the future, we might want to pass the config file location
+            # but that requires context passing which is complex in Pydantic v2 without context.
+            # Assuming CWD is usually the project root or where dojo is run.
+            found = find_resource("defaults", p, root_contexts=[Path.cwd()])
+            if found:
+                resolved_paths.append(str(found))
+            else:
+                raise ValueError(
+                    f"Defaults file not found: {p} (checked exact, project, and data dirs)"
+                )
+
+        return resolved_paths[0] if isinstance(v, str) else resolved_paths
 
     @model_validator(mode="after")
     def validate_derived_output(self) -> OutputConfig:
@@ -88,16 +99,19 @@ class TypeConfig(BaseModel):
     @field_validator("defaults")
     @classmethod
     def validate_defaults_path(cls, v: str | list[str] | None) -> str | list[str] | None:
-        """Validate that defaults file(s) exist."""
+        """Validate that defaults file(s) exist using recursive search."""
         if v is None:
             return None
 
         paths = [v] if isinstance(v, str) else v
+        resolved_paths = []
         for p in paths:
-            path = Path(p)
-            if not path.exists():
-                raise ValueError(f"Defaults file not found: {path}")
-        return v
+            found = find_resource("defaults", p, root_contexts=[Path.cwd()])
+            if found:
+                resolved_paths.append(str(found))
+            else:
+                raise ValueError(f"Defaults file not found: {p}")
+        return resolved_paths[0] if isinstance(v, str) else resolved_paths
 
 
 class CustomRule(BaseModel):
@@ -153,16 +167,19 @@ class Config(BaseModel):
     @field_validator("defaults")
     @classmethod
     def validate_defaults_path(cls, v: str | list[str] | None) -> str | list[str] | None:
-        """Validate that defaults file(s) exist."""
+        """Validate that defaults file(s) exist using recursive search."""
         if v is None:
             return None
 
         paths = [v] if isinstance(v, str) else v
+        resolved_paths = []
         for p in paths:
-            path = Path(p)
-            if not path.exists():
-                raise ValueError(f"Defaults file not found: {path}")
-        return v
+            found = find_resource("defaults", p, root_contexts=[Path.cwd()])
+            if found:
+                resolved_paths.append(str(found))
+            else:
+                raise ValueError(f"Defaults file not found: {p}")
+        return resolved_paths[0] if isinstance(v, str) else resolved_paths
 
     @field_validator("custom_rules")
     @classmethod
