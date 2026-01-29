@@ -68,24 +68,28 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     # We prepend data_dir_env to the pandoc command execution
     pandoc_wrapper = f"{path_prefix}{config.tools.pandoc}"
 
-    common_flags = "-V root=$$root_val"
-    if config.add_resource_path:
-        common_flags += " --resource-path=.:$$(dirname $$in_abs)"
+    base_flags = "-V root=$$root_val"
     if config.pandoc_data_dir:
         # We assume the path is already resolved by the config validator
-        common_flags += f" --data-dir={shell_quote(config.pandoc_data_dir)}"
+        base_flags += f" --data-dir={shell_quote(config.pandoc_data_dir)}"
 
     # COMPILE Rule (Markdown -> JSON AST)
     # We attach the dependencies.lua filter at the end to track all assets
     resources_dir = Path(__file__).parent / "resources"
     dep_filter = resources_dir / "dependencies.lua"
 
+    # Compile Flags: Input is source file, so dirname is source dir
+    compile_rp = "."
+    if config.add_resource_path:
+        compile_rp += ":$$(dirname $$in_abs)"
+    compile_flags = f"{base_flags} --resource-path={compile_rp}"
+
     # Note: We use $in_abs and $out_abs which are established in the setup_vars
     compile_cmd = (
         f"{setup_vars} && "
         f"{pandoc_wrapper} $$in_abs $defaults -t json -o $$out_abs "
         f"-M depfile=$$out_abs.d -M target=$$out_abs "
-        f"{common_flags} "
+        f"{compile_flags} "
         f"--lua-filter {dep_filter}"
     )
 
@@ -100,7 +104,18 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     )
 
     # RENDER Rule (JSON AST -> Output Format)
-    render_cmd = f"{setup_vars} && {pandoc_wrapper} $$in_abs $defaults -o $$out_abs {common_flags}"
+    # Render Flags: Input is build file (JSON), need to map back to source dir
+    render_rp = "."
+    if config.add_resource_path:
+        abs_src = Path(config.src_dir).resolve().as_posix()
+        abs_build = Path(config.build_dir).resolve().as_posix()
+        # Calculate source path relative to build path mapping
+        src_dir_val = f"$$(realpath -m {shell_quote(abs_src)}/$$(realpath -m --relative-to={shell_quote(abs_build)} $$(dirname $$in_abs)))"
+        render_rp += f":$$(dirname $$in_abs):{src_dir_val}"
+    
+    render_flags = f"{base_flags} --resource-path={render_rp}"
+
+    render_cmd = f"{setup_vars} && {pandoc_wrapper} $$in_abs $defaults -o $$out_abs {render_flags}"
 
     rules.append(
         CustomRule(
