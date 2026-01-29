@@ -11,28 +11,32 @@ from dojo.utils import get_recursive_yaml_deps
 # -----------------------------------------------------------------------------
 
 
-def test_get_recursive_yaml_deps_resolves_relative_paths(tmp_path):
+def test_get_recursive_yaml_deps_resolves_relative_paths(tmp_path, monkeypatch):
     """Verify asset resolution in defaults file.
 
     Verify that assets (css, bibliography) referenced in a defaults file
-    are resolved relative to *that* defaults file, not the CWD.
+    are resolved relative to the CWD (Pandoc executable location), not the defaults file.
     """
     # Layout:
-    # /root
+    # /work (CWD)
     #   style.css
-    #   defaults/
-    #     page.yaml  --> css: ../style.css
+    #   subdir/
+    #     page.yaml  --> css: style.css (should resolve to /work/style.css)
 
-    defaults_dir = tmp_path / "defaults"
-    defaults_dir.mkdir()
+    monkeypatch.chdir(tmp_path)
 
-    # Create the referenced asset
+    # Create the referenced asset in the base directory (CWD)
     style_css = tmp_path / "style.css"
     style_css.touch()
 
-    # Create the defaults file
+    # Create the defaults file in a subdirectory
+    defaults_dir = tmp_path / "defaults"
+    defaults_dir.mkdir()
     page_yaml = defaults_dir / "page.yaml"
-    page_yaml.write_text("css:\n  - ../style.css", encoding="utf-8")
+
+    # Reference style.css (if it was relative to page.yaml, it would be '../style.css')
+    # But now it's relative to CWD, so it's just 'style.css'
+    page_yaml.write_text("css:\n  - style.css", encoding="utf-8")
 
     # Run the function
     deps = get_recursive_yaml_deps(page_yaml)

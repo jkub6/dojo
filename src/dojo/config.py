@@ -20,9 +20,7 @@ def _resolve_defaults(
     resolved_paths = []
     extra_dirs = [Path(data_dir).resolve()] if data_dir else None
     for p in paths:
-        found = find_resource(
-            "defaults", p, root_contexts=[Path.cwd()], extra_data_dirs=extra_dirs
-        )
+        found = find_resource("defaults", p, root_contexts=[Path.cwd()], extra_data_dirs=extra_dirs)
         if found:
             resolved_paths.append(str(found))
         else:
@@ -31,6 +29,7 @@ def _resolve_defaults(
             )
 
     return resolved_paths[0] if isinstance(v, str) else resolved_paths
+
 
 class ToolPaths(BaseModel):
     """Configurable paths to external tools."""
@@ -75,7 +74,6 @@ class OutputConfig(BaseModel):
     )
     tool: str | None = Field(default=None, description="Tool to use for derived outputs")
 
-
     @model_validator(mode="after")
     def validate_derived_output(self) -> OutputConfig:
         """Validate that derived outputs have required fields."""
@@ -95,7 +93,6 @@ class TypeConfig(BaseModel):
     defaults: str | list[str] | None = Field(
         default=None, description="Default render settings for this type"
     )
-
 
 
 class CustomRule(BaseModel):
@@ -163,7 +160,6 @@ class Config(BaseModel):
             raise ValueError(f"Pandoc data directory is not a directory: {path}")
         return str(path)
 
-
     @field_validator("custom_rules")
     @classmethod
     def validate_custom_rules(cls, v: list[CustomRule]) -> list[CustomRule]:
@@ -203,7 +199,7 @@ class Config(BaseModel):
 
         # 1.5. Resolve all defaults paths
         self.defaults = _resolve_defaults(self.defaults, self.pandoc_data_dir)
-        for type_name, type_conf in self.types.items():
+        for _type_name, type_conf in self.types.items():
             type_conf.defaults = _resolve_defaults(type_conf.defaults, self.pandoc_data_dir)
             for out_conf in type_conf.outputs:
                 out_conf.defaults = _resolve_defaults(out_conf.defaults, self.pandoc_data_dir)

@@ -131,6 +131,7 @@ def get_recursive_yaml_deps(
 
     Returns:
         Deduplicated list of absolute Paths
+
     """
     from .resources import find_resource
 

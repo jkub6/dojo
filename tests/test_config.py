@@ -57,11 +57,6 @@ def test_output_config_validation_defaults_or_source():
         OutputConfig(extension="html", defaults=None, source=None)
 
 
-def test_output_config_defaults_not_found():
-    with pytest.raises(ValueError, match="Defaults file not found"):
-        OutputConfig(extension="html", defaults="nonexistent.yaml")
-
-
 def test_output_config_valid_defaults(tmp_path):
     d = tmp_path / "defaults.yaml"
     d.touch()
@@ -167,7 +162,7 @@ def test_validate_src_dir_missing(valid_config_data):
 
 def test_validate_defaults_missing(valid_config_data):
     valid_config_data["defaults"] = "missing.yaml"
-    with pytest.raises(ValueError, match="Defaults file not found"):
+    with pytest.raises(ValueError, match=r"Defaults file not found: missing.yaml"):
         Config(**valid_config_data)
 
 
@@ -276,3 +271,34 @@ def test_config_pandoc_data_dir_not_dir(valid_config_data, tmp_path):
     valid_config_data["pandoc_data_dir"] = str(f)
     with pytest.raises(ValueError, match="Pandoc data directory is not a directory"):
         Config(**valid_config_data)
+
+
+def test_config_defaults_resolved_with_data_dir(tmp_path, valid_config_data):
+    # Setup data dir and a defaults file inside it
+    data_dir = tmp_path / "custom_data"
+    (data_dir / "defaults").mkdir(parents=True)
+    custom_yaml = data_dir / "defaults" / "my_custom.yaml"
+    custom_yaml.touch()
+
+    valid_config_data["pandoc_data_dir"] = str(data_dir)
+    valid_config_data["defaults"] = "my_custom"  # Shorthand name
+
+    cfg = Config(**valid_config_data)
+    assert cfg.defaults == str(custom_yaml.resolve())
+
+
+def test_config_type_output_defaults_resolved_with_data_dir(tmp_path, valid_config_data):
+    data_dir = tmp_path / "custom_data"
+    (data_dir / "defaults").mkdir(parents=True)
+    type_yaml = data_dir / "defaults" / "type_def.yaml"
+    type_yaml.touch()
+    output_yaml = data_dir / "defaults" / "out_def.yaml"
+    output_yaml.touch()
+
+    valid_config_data["pandoc_data_dir"] = str(data_dir)
+    valid_config_data["types"]["page"]["defaults"] = "type_def"
+    valid_config_data["types"]["page"]["outputs"][0]["defaults"] = "out_def"
+
+    cfg = Config(**valid_config_data)
+    assert cfg.types["page"].defaults == str(type_yaml.resolve())
+    assert cfg.types["page"].outputs[0].defaults == str(output_yaml.resolve())

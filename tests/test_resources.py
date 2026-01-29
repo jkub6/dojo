@@ -103,3 +103,18 @@ def test_get_pandoc_data_dirs(tmp_path, monkeypatch):
     dirs = get_pandoc_data_dirs()
     assert (xdg / "pandoc") in dirs
     assert (mock_home / ".pandoc") in dirs
+
+
+def test_get_pandoc_data_dirs_override(tmp_path, monkeypatch):
+    """Verify that extra_data_dirs OVERRIDES default search paths."""
+    xdg = tmp_path / "xdg"
+    monkeypatch.setenv("XDG_DATA_HOME", str(xdg))
+    (xdg / "pandoc").mkdir(parents=True)
+
+    extra = tmp_path / "extra"
+    extra.mkdir()
+
+    # If extra is provided, it should be the ONLY one returned
+    dirs = get_pandoc_data_dirs(extra_data_dirs=[extra])
+    assert dirs == [extra.resolve()]
+    assert (xdg / "pandoc") not in dirs
