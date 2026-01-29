@@ -66,6 +66,18 @@
           cp share/man/man1/pandoc.1.gz $out/share/man/man1/
         '';
       };
+
+    runtimeDeps = pkgs:
+      with pkgs; [
+        chromium
+        decktape
+        ghostscript
+        typst
+        minify
+        ninja
+        # pandoc
+        (pandoc-bin pkgs)
+      ];
   in {
     packages = forAllSystems (system: let
       pkgs = nixpkgs.legacyPackages.${system};
@@ -81,7 +93,8 @@
 
         installPhase = ''
           mkdir -p $out/bin
-          makeWrapper ${venv}/bin/dojo $out/bin/dojo
+          makeWrapper ${venv}/bin/dojo $out/bin/dojo \
+            --prefix PATH : ${pkgs.lib.makeBinPath (runtimeDeps pkgs)}
         '';
 
         meta = with pkgs.lib; {
@@ -109,7 +122,7 @@
       ];
     in {
       default = pkgs.mkShell {
-      packages = devTools ++ [venv];
+        packages = (runtimeDeps pkgs) ++ devTools ++ [venv];
 
         shellHook = ''
           unset PYTHONPATH
