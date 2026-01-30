@@ -20,7 +20,7 @@ check:
     ruff format --check .
     mypy src
     vulture
-    pip-audit --locked .
+    uv-secure
     typos .
     statix check
     nix flake check --all-systems
@@ -28,6 +28,10 @@ check:
 # Run tests with coverage
 test:
     pytest --cov=src
+
+# Update lockfile safely using Nix python
+lock:
+    uv lock --python $(which python)
 
 # Build the project (requires config file)
 build config="dojo.yaml":

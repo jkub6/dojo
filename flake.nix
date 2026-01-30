@@ -127,6 +127,7 @@
 
         shellHook = ''
           unset PYTHONPATH
+          export UV_PYTHON_DOWNLOADS=never
           echo "🥷 Dojo Development Environment"
         '';
       };
