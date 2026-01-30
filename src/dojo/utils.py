@@ -1,9 +1,12 @@
 import fnmatch
 import logging
+import shlex
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+from .resources import find_resource
 
 logger = logging.getLogger(__name__)
 
@@ -64,8 +67,6 @@ def shell_quote(path: Path | str) -> str:
 
     Uses shlex.quote to safely escape the path for POSIX shells.
     """
-    import shlex
-
     s = path.as_posix() if isinstance(path, Path) else path
     return shlex.quote(s)
 
@@ -133,8 +134,6 @@ def get_recursive_yaml_deps(
         Deduplicated list of absolute Paths
 
     """
-    from .resources import find_resource
-
     if visited is None:
         visited = set()
     if stack is None:
@@ -186,45 +185,62 @@ def get_recursive_yaml_deps(
 
         # 1. Handle Recursive Defaults
         defaults = _extract_paths(data, ["defaults"])
-        for default_ref in defaults:
-            # Resolve the default file
-            # Pandoc behavior: relative paths are relative to CWD.
-            # Shorthand names are searched in data-dir/defaults/.
-            found = find_resource(
-                "defaults",
-                default_ref,
-                root_contexts=[Path.cwd()],
-                extra_data_dirs=current_data_dirs,
-            )
-
-            if found:
-                deps.append(found)
-                # Recurse. Nested files do NOT inherit our data_dir_override.
-                deps.extend(get_recursive_yaml_deps(found, visited=visited, stack=stack[:]))
-            else:
-                logger.warning(f"Default file referenced in {yaml_path} not found: {default_ref}")
+        _resolve_default_deps(defaults, yaml_path, current_data_dirs, deps, visited, stack)
 
         # 2. Handle Leaf Assets (CSS, templates, etc)
         # Pandoc behavior: relative paths are relative to CWD (executable location).
         asset_keys = ["css", "bibliography", "csl", "template", "include-before", "include-after"]
         assets = _extract_paths(data, asset_keys)
-        for asset_ref in assets:
-            asset_path = Path(asset_ref)
-            if not asset_path.is_absolute():
-                asset_path = Path.cwd() / asset_path
-
-            asset_path = asset_path.resolve()
-            # We don't check if it exists here for assets as they might be build products,
-            # but we add them to Ninja deps anyway if they seem to be local files.
-            # However, for robustness, we only add them if they exist or look like they should.
-            # The original code checked .exists().
-            if asset_path.exists():
-                deps.append(asset_path)
+        _resolve_assets(assets, deps)
 
     finally:
         stack.pop()
 
     return sorted(set(deps))
+
+
+def _resolve_default_deps(  # noqa: PLR0913
+    defaults: list[str],
+    yaml_path: Path,
+    current_data_dirs: list[Path],
+    deps: list[Path],
+    visited: set[Path],
+    stack: list[Path],
+) -> None:
+    """Resolve default dependencies."""
+    for default_ref in defaults:
+        # Resolve the default file
+        # Pandoc behavior: relative paths are relative to CWD.
+        # Shorthand names are searched in data-dir/defaults/.
+        found = find_resource(
+            "defaults",
+            default_ref,
+            root_contexts=[Path.cwd()],
+            extra_data_dirs=current_data_dirs,
+        )
+
+        if found:
+            deps.append(found)
+            # Recurse. Nested files do NOT inherit our data_dir_override.
+            deps.extend(get_recursive_yaml_deps(found, visited=visited, stack=stack[:]))
+        else:
+            logger.warning(f"Default file referenced in {yaml_path} not found: {default_ref}")
+
+
+def _resolve_assets(assets: list[str], deps: list[Path]) -> None:
+    """Resolve asset paths."""
+    for asset_ref in assets:
+        asset_path = Path(asset_ref)
+        if not asset_path.is_absolute():
+            asset_path = Path.cwd() / asset_path
+
+        asset_path = asset_path.resolve()
+        # We don't check if it exists here for assets as they might be build products,
+        # but we add them to Ninja deps anyway if they seem to be local files.
+        # However, for robustness, we only add them if they exist or look like they should.
+        # The original code checked .exists().
+        if asset_path.exists():
+            deps.append(asset_path)
 
 
 def parse_frontmatter_type(md_path: Path, default_type: str) -> str:

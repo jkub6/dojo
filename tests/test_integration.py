@@ -63,6 +63,7 @@ def test_build_command_subprocess(temp_project):
         text=True,
         env=env,
         cwd=str(project_dir),
+        check=False,
     )
 
     assert result.returncode == 0, f"Build failed: {result.stderr}"
@@ -87,7 +88,11 @@ def test_cli_version_subprocess():
         env["PYTHONPATH"] = src_path
 
     result = subprocess.run(
-        [sys.executable, "-m", "dojo", "--version"], capture_output=True, text=True, env=env
+        [sys.executable, "-m", "dojo", "--version"],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
     )
 
     assert result.returncode == 0
@@ -110,6 +115,7 @@ def test_build_no_config_subprocess(tmp_path):
         text=True,
         env=env,
         cwd=str(tmp_path),
+        check=False,
     )
 
     assert result.returncode != 0

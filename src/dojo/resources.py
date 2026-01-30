@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Literal
 
 # Standard Pandoc data directory names
 RESOURCE_CATEGORIES = {"defaults", "templates", "filters"}
@@ -71,66 +72,15 @@ def find_resource(
 
     # 1. Exact Path Check
     # If it looks like a path, try it directly first
-    path_obj = Path(name)
-    if path_obj.is_absolute():
-        if path_obj.exists():
-            return path_obj
-        # If absolute but invalid, we don't continue searching for it as a "name"
-        return None
-
-    if len(path_obj.parts) > 1:
-        # Relative path with separators (e.g. "foo/bar.yaml")
-        # Check relative to CWD or root contexts?
-        # Standard behavior: check relative to CWD
-        cwd_path = Path.cwd() / path_obj
-        if cwd_path.exists():
-            return cwd_path.resolve()
-
-        # If provided relative path, we might also want to check it relative to root contexts
-        if root_contexts:
-            for root in root_contexts:
-                rel_path = root / path_obj
-                if rel_path.exists():
-                    return rel_path.resolve()
+    path_check = _check_path_reference(name, root_contexts)
+    if path_check is not False:
+        return path_check  # Returns Path or None (if absolute and missing)
 
     # 2. Resource Name Resolution
-    # Pandoc typically allows omitting extension for templates/defaults
-    potential_names = [name]
-    if "." not in name:
-        if category == "defaults":
-            potential_names.append(f"{name}.yaml")
-        elif category == "templates":
-            # Templates can have many extensions, usually assumed by context,
-            # but user usually supplies name.ext or just name.
-            # We'll just look for 'name' mostly, maybe name.html/tex if we knew format
-            pass
+    potential_names = _get_potential_names(name, category)
 
-    # Search Locations Construction
-    search_roots = []
-
-    # A. Root Contexts (e.g. CWD) - strictly checking the directory itself, not parents
-    # Pandoc typically allows ignoring 'defaults/' prefix if sticking to CWD?
-    # Actually, Pandoc searches:
-    # 1. Working Directory (exact match or implicit handling)
-    # 2. USER_DATA_DIR/category/
-
-    # But does it find `defaults/foo.yaml` if we ask for `foo`?
-    # Our experiments showed `pandoc -d bar` found `defaults/bar.yaml` in CWD.
-    # So we should check `root/category` for each root.
-    if root_contexts:
-        for root in root_contexts:
-            if not root.exists():
-                continue
-            # Pandoc checks the working directory (root) for the file directly
-            # It does NOT check a 'defaults/' subdirectory in the working directory
-            search_roots.append(root)
-
-    # B. XDG / Pandoc Data Dirs
-    data_dirs = get_pandoc_data_dirs(extra_data_dirs)
-    for dd in data_dirs:
-        cat_dir = dd / category
-        if cat_dir.exists():
-            search_roots.append(cat_dir)
+    # 3. Search Locations Construction
+    search_roots = _get_search_roots(root_contexts, category, extra_data_dirs)
 
     # Execute Search
     for root in search_roots:
@@ -140,3 +90,66 @@ def find_resource(
                 return candidate.resolve()
 
     return None
+
+
+def _check_path_reference(
+    name: str, root_contexts: list[Path] | None
+) -> Path | None | Literal[False]:
+    """Check if name is an explicit path reference.
+
+    Returns:
+        Path: Found resource.
+        None: Explicit failure (absolute path not found).
+        False: Not a path reference or not found relative (continue search).
+
+    """
+    path_obj = Path(name)
+    if path_obj.is_absolute():
+        if path_obj.exists():
+            return path_obj
+        return None
+
+    if len(path_obj.parts) > 1:
+        # Relative path with separators (e.g. "foo/bar.yaml")
+        cwd_path = Path.cwd() / path_obj
+        if cwd_path.exists():
+            return cwd_path.resolve()
+
+        if root_contexts:
+            for root in root_contexts:
+                rel_path = root / path_obj
+                if rel_path.exists():
+                    return rel_path.resolve()
+
+    return False
+
+
+def _get_potential_names(name: str, category: str) -> list[str]:
+    """Get list of potential filenames to search for."""
+    potential_names = [name]
+    if "." not in name and category == "defaults":
+        potential_names.append(f"{name}.yaml")
+    return potential_names
+
+
+def _get_search_roots(
+    root_contexts: list[Path] | None, category: str, extra_data_dirs: list[Path] | None
+) -> list[Path]:
+    """Get list of directories to search in."""
+    search_roots = []
+
+    # A. Root Contexts
+    if root_contexts:
+        for root in root_contexts:
+            if not root.exists():
+                continue
+            search_roots.append(root)
+
+    # B. XDG / Pandoc Data Dirs
+    data_dirs = get_pandoc_data_dirs(extra_data_dirs)
+    for dd in data_dirs:
+        cat_dir = dd / category
+        if cat_dir.exists():
+            search_roots.append(cat_dir)
+
+    return search_roots

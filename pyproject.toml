@@ -75,7 +75,7 @@ select = [
     "T20",    # flake8-print (disallow print, prefer logging)
     "RUF",    # Ruff-specific rules
     "ERA",    # eradicate (ban commented out code)
-    # "PL",     # Pylint (static analysis)
+    "PL",     # Pylint (static analysis)
     "S",      # Bandit (Security)
     "UP",     # pyupgrade (Modernize syntax)
     "D",      # pydocstyle (Docstrings)

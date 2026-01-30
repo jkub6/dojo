@@ -57,7 +57,8 @@ def test_get_recursive_yaml_deps(tmp_path):
     deps = get_recursive_yaml_deps(root)
     assert dep1 in deps
     assert dep2 in deps
-    assert len(deps) == 2
+    expected_deps_count = 2
+    assert len(deps) == expected_deps_count
 
 
 def test_circular_deps(tmp_path):

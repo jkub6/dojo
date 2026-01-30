@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
+import yaml
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .constants import RuleName
@@ -202,13 +204,26 @@ class Config(BaseModel):
             raise ValueError(f"default_type '{self.default_type}' not found in types")
 
         # 1.5. Resolve all defaults paths
+        self._resolve_all_defaults()
+
+        # 2. Check for overlapping directories
+        self._validate_directories()
+
+        # 3. Check for duplicate output IDs in each type
+        self._validate_unique_ids()
+
+        return self
+
+    def _resolve_all_defaults(self) -> None:
+        """Resolve all defaults paths."""
         self.defaults = _resolve_defaults(self.defaults, self.pandoc_data_dir)
         for type_conf in self.types.values():
             type_conf.defaults = _resolve_defaults(type_conf.defaults, self.pandoc_data_dir)
             for out_conf in type_conf.outputs:
                 out_conf.defaults = _resolve_defaults(out_conf.defaults, self.pandoc_data_dir)
 
-        # 2. Check for overlapping directories
+    def _validate_directories(self) -> None:
+        """Validate that source/output/build directories do not conflict."""
         dirs = {
             "src_dir": Path(self.src_dir).resolve(),
             "output_dir": Path(self.output_dir).resolve(),
@@ -248,14 +263,13 @@ class Config(BaseModel):
                         f"Directory conflict: {name1} ({path1}) is inside {name2} ({path2})"
                     )
 
-        # 3. Check for duplicate output IDs in each type
+    def _validate_unique_ids(self) -> None:
+        """Validate that output IDs are unique within each type."""
         for type_name, type_conf in self.types.items():
             ids = [o.id for o in type_conf.outputs if o.id]
             if len(ids) != len(set(ids)):
                 duplicates = {x for x in ids if ids.count(x) > 1}
                 raise ValueError(f"Duplicate output IDs in type '{type_name}': {duplicates}")
-
-        return self
 
 
 def load_config(config_path: str | None = None) -> tuple[Config, Path]:
@@ -271,10 +285,6 @@ def load_config(config_path: str | None = None) -> tuple[Config, Path]:
         Tuple containing (Config object, Path to loaded file)
 
     """
-    import os
-
-    import yaml
-
     paths_to_check = []
 
     # 1. CLI Argument

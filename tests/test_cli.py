@@ -163,7 +163,8 @@ def test_keyboard_interrupt(capsys):
     with patch("dojo.cli.main", side_effect=KeyboardInterrupt):
         with pytest.raises(SystemExit) as cm:
             entry_point()
-        assert cm.value.code == 130
+        sigint_exit_code = 130
+        assert cm.value.code == sigint_exit_code
 
     captured = capsys.readouterr()
     assert "Interrupted by user" in captured.err

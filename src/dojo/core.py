@@ -314,10 +314,11 @@ class NinjaGenerator:
         local_registry: dict[str, Path] = {}
         for out_config in type_config.outputs:
             # Plugin Hook: Modify output config
+            current_config = out_config
             for plugin in self.plugins:
-                out_config = plugin.modify_output_config(out_config, content_type)
+                current_config = plugin.modify_output_config(current_config, content_type)
 
-            self._render_stage(out_config, json_node, rel_stem, local_registry)
+            self._render_stage(current_config, json_node, rel_stem, local_registry)
 
         self.emitter.newline()
 

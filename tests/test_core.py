@@ -61,7 +61,8 @@ def test_get_merged_defaults(core_config):
     p = str(Path("a").resolve())
     assert gen._get_merged_defaults(p)[0] == Path("a").resolve()
     # Test list
-    assert len(gen._get_merged_defaults([p, p])) == 2
+    expected_count = 2
+    assert len(gen._get_merged_defaults([p, p])) == expected_count
 
 
 def test_process_content_outside_src(core_config, tmp_path, caplog):

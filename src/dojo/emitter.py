@@ -29,7 +29,7 @@ class NinjaEmitter:
         padding = "  " * indent
         self.fp.write(f"{padding}{name} = {value}\n")
 
-    def rule(
+    def rule(  # noqa: PLR0913
         self,
         name: str,
         command: str,
@@ -58,7 +58,7 @@ class NinjaEmitter:
                 self.variable(key, value, indent=1)
         self.newline()
 
-    def build(
+    def build(  # noqa: PLR0913
         self,
         outputs: Path | list[Path],
         rule: str,

@@ -99,7 +99,7 @@ def test_lua_dependencies_filter(tmp_path):
         str(filter_path),
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=tmp_path)
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=tmp_path, check=False)
     assert result.returncode == 0, f"Pandoc failed: {result.stderr}"
 
     # Check depfile content
