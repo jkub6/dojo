@@ -48,7 +48,7 @@ def test_rule_generation_defaults():
     assert "root_val=$$(realpath -m --relative-to=$$(dirname $in_shell) .)" in compile_rule.command
 
     # Check for defaults
-    assert "cd " not in compile_rule.command
+    assert "cd " in compile_rule.command
     assert "--resource-path=.:$$(dirname $$in_abs)" in compile_rule.command
     assert "-V root=$$root_val" in compile_rule.command
 

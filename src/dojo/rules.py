@@ -67,6 +67,12 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
         f"root_val=$$(realpath -m --relative-to=$$(dirname $in_shell) {shell_quote(config.root_ref_dir)})"
     )
 
+    # Resolve build directory to absolute path
+    abs_build_dir = Path(config.build_dir).resolve().as_posix()
+    # Command prefix to run inside build directory
+    # We use mkdir -p to ensure it exists (though NinjaGenerator also creates it)
+    build_dir_cmd = f"mkdir -p {shell_quote(abs_build_dir)} && cd {shell_quote(abs_build_dir)}"
+
     # Combine with path prefix
     # path_prefix already ends with a space if not empty
     # We prepend data_dir_env to the pandoc command execution
@@ -89,8 +95,9 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
         compile_flags += f" --resource-path={compile_rp}"
 
     # Note: We use $in_abs and $out_abs which are established in the setup_vars
+    # We change directory to build_dir BEFORE executing pandoc
     compile_cmd = (
-        f"{setup_vars} && "
+        f"{setup_vars} && {build_dir_cmd} && "
         f"{pandoc_wrapper} $$in_abs $defaults -t json -o $$out_abs "
         f"-M depfile=$$out_abs.d -M target=$$out_abs "
         f"{compile_flags} "
@@ -119,7 +126,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
         render_rp += f":$$(dirname $$in_abs):{src_dir_val}"
         render_flags += f" --resource-path={render_rp}"
 
-    render_cmd = f"{setup_vars} && {pandoc_wrapper} $$in_abs $defaults -o $$out_abs {render_flags}"
+    render_cmd = f"{setup_vars} && {build_dir_cmd} && {pandoc_wrapper} $$in_abs $defaults -o $$out_abs {render_flags}"
 
     rules.append(
         CustomRule(
