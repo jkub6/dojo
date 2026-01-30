@@ -5,6 +5,7 @@ import pytest
 
 from dojo.config import Config
 from dojo.emitter import NinjaEmitter
+from dojo.exceptions import DirectoryConflictError, DuplicateOutputIdError
 
 
 def test_directory_conflict(tmp_path):
@@ -18,10 +19,10 @@ def test_directory_conflict(tmp_path):
         "default_type": "markdown",
         "types": {"markdown": {"outputs": []}},
     }
-    with pytest.raises(ValueError, match="Directory conflict"):
+    with pytest.raises(DirectoryConflictError, match="Directory conflict"):
         Config(**data)
 
-    with pytest.raises(ValueError, match="Directory conflict"):
+    with pytest.raises(DirectoryConflictError, match="Directory conflict"):
         Config(**data)
 
     # one inside another - now allowed if child is output/build
@@ -53,7 +54,7 @@ def test_duplicate_output_ids(tmp_path):
     }
     # Wait, the second one depends on 'foo', but its own id is 'foo'.
     # This should trigger duplicate ID validation.
-    with pytest.raises(ValueError, match="Duplicate output IDs"):
+    with pytest.raises(DuplicateOutputIdError, match="Duplicate output IDs"):
         Config(**data)
 
 

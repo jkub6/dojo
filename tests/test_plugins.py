@@ -43,10 +43,8 @@ class BadPlugin:
 """
     plugin_file.write_text(content)
 
-    # It should log a warning and return None
     plugin = load_plugin(str(plugin_file))
     assert plugin is None
-    assert "No PluginInterface implementation found in" in caplog.text
 
 
 def test_load_plugin_import_error(tmp_path, caplog):

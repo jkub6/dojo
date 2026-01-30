@@ -8,6 +8,21 @@ import yaml
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .constants import RuleName
+from .exceptions import (
+    ConfigFileNotFoundError,
+    ConfigInvalidError,
+    ConfigParseError,
+    CustomRuleConflictError,
+    DefaultsNotFoundError,
+    DefaultsRequiredError,
+    DefaultTypeNotFoundError,
+    DirectoryConflictError,
+    DuplicateOutputIdError,
+    EssentialToolNotFoundError,
+    PandocDataDirError,
+    SourceDirNotFoundError,
+    SourceRequiresToolError,
+)
 from .resources import find_resource
 
 
@@ -26,9 +41,7 @@ def _resolve_defaults(
         if found:
             resolved_paths.append(str(found))
         else:
-            raise ValueError(
-                f"Defaults file not found: {p} (checked exact, project, and data dirs)"
-            )
+            raise DefaultsNotFoundError(p)
 
     return resolved_paths[0] if isinstance(v, str) else resolved_paths
 
@@ -54,7 +67,7 @@ class ToolPaths(BaseModel):
                 if resolved:
                     setattr(self, tool, resolved)
                 elif tool in essential_tools:
-                    raise ValueError(f"Essential tool '{tool}' not found: {current}")
+                    raise EssentialToolNotFoundError(tool, current)
                 else:
                     # Optional tool not found
                     # We accept this but if it is used later, it will fail at runtime
@@ -84,10 +97,10 @@ class OutputConfig(BaseModel):
     def validate_derived_output(self) -> OutputConfig:
         """Validate that derived outputs have required fields."""
         if self.source is not None and self.tool is None:
-            raise ValueError("Outputs with 'source' must also specify 'tool'")
+            raise SourceRequiresToolError()
 
         if self.source is None and self.defaults is None:
-            raise ValueError("Outputs without 'source' must specify 'defaults'")
+            raise DefaultsRequiredError()
 
         return self
 
@@ -161,9 +174,9 @@ class Config(BaseModel):
             return None
         path = Path(v).resolve()
         if not path.exists():
-            raise ValueError(f"Pandoc data directory not found: {path}")
+            raise PandocDataDirError(path)
         if not path.is_dir():
-            raise ValueError(f"Pandoc data directory is not a directory: {path}")
+            raise PandocDataDirError(path, issue="not directory")
         return str(path)
 
     @field_validator("custom_rules")
@@ -172,7 +185,7 @@ class Config(BaseModel):
         """Validate that custom rules do not conflict with built-in rule names."""
         for rule in v:
             if rule.name in [r.value for r in RuleName]:
-                raise ValueError(f"Custom rule name '{rule.name}' conflicts with built-in rule")
+                raise CustomRuleConflictError(rule.name)
         return v
 
     @field_validator("src_dir")
@@ -181,7 +194,7 @@ class Config(BaseModel):
         """Validate source directory exists."""
         path = Path(v).resolve()
         if not path.exists():
-            raise ValueError(f"Source directory not found: {path}")
+            raise SourceDirNotFoundError(path)
         return v
 
     def _auto_exclude(self, child: Path, parent: Path) -> None:
@@ -201,7 +214,7 @@ class Config(BaseModel):
         """Perform complex cross-field validations."""
         # 1. Validate default_type exists
         if self.default_type not in self.types:
-            raise ValueError(f"default_type '{self.default_type}' not found in types")
+            raise DefaultTypeNotFoundError(self.default_type)
 
         # 1.5. Resolve all defaults paths
         self._resolve_all_defaults()
@@ -236,9 +249,7 @@ class Config(BaseModel):
 
                 # Check for equality
                 if path1 == path2:
-                    raise ValueError(
-                        f"Directory conflict: {name1} and {name2} are the same ({path1})"
-                    )
+                    raise DirectoryConflictError(name1, path1, name2, issue="same")
 
                 # Check if one is a parent of another
                 try:
@@ -259,9 +270,7 @@ class Config(BaseModel):
                         self._auto_exclude(path1, path2)
                         continue
 
-                    raise ValueError(
-                        f"Directory conflict: {name1} ({path1}) is inside {name2} ({path2})"
-                    )
+                    raise DirectoryConflictError(name1, path1, name2, path2, issue="nested")
 
     def _validate_unique_ids(self) -> None:
         """Validate that output IDs are unique within each type."""
@@ -269,7 +278,7 @@ class Config(BaseModel):
             ids = [o.id for o in type_conf.outputs if o.id]
             if len(ids) != len(set(ids)):
                 duplicates = {x for x in ids if ids.count(x) > 1}
-                raise ValueError(f"Duplicate output IDs in type '{type_name}': {duplicates}")
+                raise DuplicateOutputIdError(type_name, duplicates)
 
 
 def _find_config_path(explicit_path: str | None) -> Path:
@@ -299,8 +308,8 @@ def _find_config_path(explicit_path: str | None) -> Path:
             return path.resolve()
 
     if explicit_path:
-        raise FileNotFoundError(f"Configuration file not found: {explicit_path}")
-    raise FileNotFoundError("No configuration file found in search paths")
+        raise ConfigFileNotFoundError(explicit_path)
+    raise ConfigFileNotFoundError()
 
 
 def _apply_config_file_exclusion(config: Config, config_path: Path) -> None:
@@ -336,11 +345,12 @@ def load_config(config_path: str | None = None) -> tuple[Config, Path]:
         try:
             data = yaml.safe_load(f)
         except yaml.YAMLError as e:
-            raise ValueError(f"Error parsing configuration file {selected_path}: {e}") from e
+            raise ConfigParseError(selected_path, e) from e
 
     try:
         config = Config(**data)
         _apply_config_file_exclusion(config, selected_path)
-        return config, selected_path
     except Exception as e:
-        raise ValueError(f"Invalid configuration in {selected_path}: {e}") from e
+        raise ConfigInvalidError(selected_path, e) from e
+    else:
+        return config, selected_path

@@ -90,9 +90,10 @@ def load_plugin(plugin_path: str) -> PluginInterface | None:
                 logger.info(f"Loaded plugin: {item_name} from {path}")
                 return item()
 
-        logger.warning(f"No PluginInterface implementation found in {path}")
-        return None
-
     except Exception:
         logger.exception(f"Failed to load plugin {plugin_path}")
+        return None
+
+    else:
+        logger.error(f"No PluginInterface implementation found in {path}")
         return None

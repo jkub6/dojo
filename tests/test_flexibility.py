@@ -4,6 +4,7 @@ import pytest
 
 from dojo.config import Config
 from dojo.core import NinjaGenerator
+from dojo.exceptions import DefaultsRequiredError
 
 
 @pytest.fixture
@@ -81,7 +82,9 @@ def test_missing_defaults_error(tmp_path):
     src.mkdir()
 
     # Invalid: non-derived output MUST have defaults
-    with pytest.raises(ValueError, match="must specify 'defaults'"):
+    with pytest.raises(
+        DefaultsRequiredError, match="Outputs without 'source' must specify 'defaults'"
+    ):
         Config(
             src_dir=str(src), default_type="md", types={"md": {"outputs": [{"extension": "html"}]}}
         )

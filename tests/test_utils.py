@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
+from dojo.exceptions import CircularDependencyError, SecurityError
 from dojo.utils import (
     get_recursive_yaml_deps,
     ninja_escape,
@@ -31,10 +32,10 @@ def test_sanitize_path(tmp_path):
     assert sanitize_path(base, Path("subdir/file.txt")) == base / "subdir" / "file.txt"
 
     # Traversal attempts
-    with pytest.raises(ValueError, match="Path traversal detected"):
+    with pytest.raises(SecurityError, match="Path traversal detected"):
         sanitize_path(base, Path("../outside.txt"))
 
-    with pytest.raises(ValueError, match="Path traversal detected"):
+    with pytest.raises(SecurityError, match="Path traversal detected"):
         sanitize_path(base, Path("subdir/../../outside.txt"))
 
 
@@ -71,7 +72,7 @@ def test_circular_deps(tmp_path):
     with open(b, "w") as f:
         f.write(f"defaults: {a}")
 
-    with pytest.raises(ValueError, match="Circular dependency detected"):
+    with pytest.raises(CircularDependencyError, match="Circular dependency detected"):
         get_recursive_yaml_deps(a)
 
 
@@ -132,5 +133,5 @@ def test_sanitize_path_traversal_subdir(tmp_path):
     base = tmp_path / "base"
     base.mkdir()
 
-    with pytest.raises(ValueError, match="Path traversal detected"):
+    with pytest.raises(SecurityError, match="Path traversal detected"):
         sanitize_path(base, Path("subdir/../../outside.txt"))

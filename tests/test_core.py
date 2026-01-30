@@ -2,11 +2,11 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from pydantic import ValidationError
 
 from dojo.config import Config, OutputConfig
 from dojo.constants import RuleName
 from dojo.core import NinjaGenerator
+from dojo.exceptions import DefaultsRequiredError, DependencyError, SourceRequiresToolError
 
 
 @pytest.fixture
@@ -103,7 +103,7 @@ def test_derive_output_missing_dependency(core_config_data, tmp_path):
 
     md = Path(cfg.src_dir) / "test.md"
 
-    with pytest.raises(ValueError, match="Missing dependency"):
+    with pytest.raises(DependencyError, match="Missing dependency"):
         gen.process_content(md)
 
 
@@ -158,14 +158,16 @@ def test_format_defaults_var_empty(core_config):
 
 def test_derive_output_none_source():
     # Pydantic validation now catches this
-    with pytest.raises(ValidationError):
+    # Pydantic validation now catches this
+    with pytest.raises(DefaultsRequiredError):
         OutputConfig(id="pdf", extension="pdf", source=None, tool="decktape")
 
 
 def test_derive_output_none_tool():
     # Source is "html" which is in registry
     # Pydantic validation catches this
-    with pytest.raises(ValidationError):
+    # Pydantic validation catches this
+    with pytest.raises(SourceRequiresToolError):
         OutputConfig(id="pdf", extension="pdf", source="html", tool=None)
 
 

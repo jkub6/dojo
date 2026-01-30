@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from dojo.exceptions import UnknownResourceCategoryError
 from dojo.resources import find_resource, get_pandoc_data_dirs
 
 
@@ -76,7 +77,7 @@ def test_find_resource_not_found(tmp_path):
 
 
 def test_find_resource_invalid_category():
-    with pytest.raises(ValueError):
+    with pytest.raises(UnknownResourceCategoryError):
         find_resource("invalid_cat", "something")
 
 

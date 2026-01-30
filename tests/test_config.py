@@ -5,6 +5,19 @@ import pytest
 import yaml
 
 from dojo.config import Config, OutputConfig, ToolPaths, load_config
+from dojo.exceptions import (
+    ConfigError,
+    CustomRuleConflictError,
+    DefaultsNotFoundError,
+    DefaultsRequiredError,
+    DefaultTypeNotFoundError,
+    DirectoryConflictError,
+    DuplicateOutputIdError,
+    EssentialToolNotFoundError,
+    PandocDataDirError,
+    SourceDirNotFoundError,
+    SourceRequiresToolError,
+)
 
 # --- ToolPaths Tests ---
 
@@ -26,7 +39,7 @@ def test_tool_paths_resolution(mock_which):
 def test_tool_paths_missing_essential(mock_which):
     mock_which.return_value = None
     # Pydantic wraps validation errors
-    with pytest.raises(Exception) as excinfo:
+    with pytest.raises(EssentialToolNotFoundError) as excinfo:
         ToolPaths(pandoc="missing_pandoc")
     assert "Essential tool 'python' not found" in str(excinfo.value)
 
@@ -48,12 +61,16 @@ def test_tool_paths_missing_optional():
 
 
 def test_output_config_validation_source_tool():
-    with pytest.raises(ValueError, match="Outputs with 'source' must also specify 'tool'"):
+    with pytest.raises(
+        SourceRequiresToolError, match="Outputs with 'source' must also specify 'tool'"
+    ):
         OutputConfig(extension="pdf", source="html")
 
 
 def test_output_config_validation_defaults_or_source():
-    with pytest.raises(ValueError, match="Outputs without 'source' must specify 'defaults'"):
+    with pytest.raises(
+        DefaultsRequiredError, match="Outputs without 'source' must specify 'defaults'"
+    ):
         OutputConfig(extension="html", defaults=None, source=None)
 
 
@@ -94,13 +111,13 @@ def test_config_valid(valid_config_data):
 
 def test_config_invalid_default_type(valid_config_data):
     valid_config_data["default_type"] = "post"
-    with pytest.raises(ValueError, match="default_type 'post' not found"):
+    with pytest.raises(DefaultTypeNotFoundError, match="default_type 'post' not found"):
         Config(**valid_config_data)
 
 
 def test_config_dir_conflict_equality(valid_config_data):
     valid_config_data["output_dir"] = valid_config_data["src_dir"]
-    with pytest.raises(ValueError, match="Directory conflict"):
+    with pytest.raises(DirectoryConflictError, match="Directory conflict"):
         Config(**valid_config_data)
 
 
@@ -109,7 +126,7 @@ def test_config_dir_conflict_nesting(valid_config_data):
     nested_src = Path(valid_config_data["output_dir"]) / "src"
     nested_src.mkdir(parents=True, exist_ok=True)
     valid_config_data["src_dir"] = str(nested_src)
-    with pytest.raises(ValueError, match="is inside"):
+    with pytest.raises(DirectoryConflictError, match="is inside"):
         Config(**valid_config_data)
 
 
@@ -144,25 +161,25 @@ def test_config_duplicate_output_ids(valid_config_data):
     valid_config_data["types"]["page"]["outputs"].append(
         {"id": "html", "extension": "htm", "defaults": valid_config_data["defaults"]}
     )
-    with pytest.raises(ValueError, match="Duplicate output IDs"):
+    with pytest.raises(DuplicateOutputIdError, match="Duplicate output IDs"):
         Config(**valid_config_data)
 
 
 def test_config_custom_rule_conflict(valid_config_data):
     valid_config_data["custom_rules"] = [{"name": "compile", "command": "echo"}]
-    with pytest.raises(ValueError, match="conflicts with built-in rule"):
+    with pytest.raises(CustomRuleConflictError, match="conflicts with built-in rule"):
         Config(**valid_config_data)
 
 
 def test_validate_src_dir_missing(valid_config_data):
     valid_config_data["src_dir"] = "nonexistent_src"
-    with pytest.raises(ValueError, match="Source directory not found"):
+    with pytest.raises(SourceDirNotFoundError, match="Source directory not found"):
         Config(**valid_config_data)
 
 
 def test_validate_defaults_missing(valid_config_data):
     valid_config_data["defaults"] = "missing.yaml"
-    with pytest.raises(ValueError, match=r"Defaults file not found: missing.yaml"):
+    with pytest.raises(DefaultsNotFoundError, match=r"Defaults file not found: missing.yaml"):
         Config(**valid_config_data)
 
 
@@ -223,27 +240,27 @@ def test_load_config_env_var(tmp_path, monkeypatch):
 
 def test_load_config_not_found(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    with pytest.raises(FileNotFoundError, match="No configuration file found"):
+    with pytest.raises(ConfigError, match="No configuration file found"):
         load_config()
 
 
 def test_load_config_explicit_not_found(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    with pytest.raises(FileNotFoundError, match="Configuration file not found"):
+    with pytest.raises(ConfigError, match="Configuration file not found"):
         load_config("missing.yaml")
 
 
 def test_load_config_invalid_yaml(tmp_path):
     c = tmp_path / "bad.yaml"
     c.write_text("invalid: [")
-    with pytest.raises(ValueError, match="Error parsing configuration file"):
+    with pytest.raises(ConfigError, match="Error parsing configuration file"):
         load_config(str(c))
 
 
 def test_load_config_invalid_schema(tmp_path):
     c = tmp_path / "bad_schema.yaml"
     c.write_text("src_dir: missing")
-    with pytest.raises(ValueError, match="Invalid configuration"):
+    with pytest.raises(ConfigError, match="Invalid configuration"):
         load_config(str(c))
 
 
@@ -261,7 +278,7 @@ def test_config_pandoc_data_dir_valid(valid_config_data, tmp_path):
 
 def test_config_pandoc_data_dir_missing(valid_config_data):
     valid_config_data["pandoc_data_dir"] = "/nonexistent/data/dir"
-    with pytest.raises(ValueError, match="Pandoc data directory not found"):
+    with pytest.raises(PandocDataDirError, match="Pandoc data directory not found"):
         Config(**valid_config_data)
 
 
@@ -269,7 +286,7 @@ def test_config_pandoc_data_dir_not_dir(valid_config_data, tmp_path):
     f = tmp_path / "file"
     f.touch()
     valid_config_data["pandoc_data_dir"] = str(f)
-    with pytest.raises(ValueError, match="Pandoc data directory is not a directory"):
+    with pytest.raises(PandocDataDirError, match="Pandoc data directory is not a directory"):
         Config(**valid_config_data)
 
 

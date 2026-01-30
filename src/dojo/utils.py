@@ -6,6 +6,7 @@ from typing import Any
 
 import yaml
 
+from .exceptions import CircularDependencyError, SecurityError
 from .resources import find_resource
 
 logger = logging.getLogger(__name__)
@@ -92,7 +93,7 @@ def sanitize_path(base: Path, relative: Path) -> Path:
     try:
         full_path.relative_to(base.resolve())
     except ValueError:
-        raise ValueError(f"Path traversal detected: {relative} escapes {base}") from None
+        raise SecurityError(relative, base) from None
 
     return full_path
 
@@ -145,7 +146,7 @@ def get_recursive_yaml_deps(
     # Circular dependency detection
     if yaml_path in stack:
         cycle = " -> ".join(str(p) for p in [*stack, yaml_path])
-        raise ValueError(f"Circular dependency detected: {cycle}")
+        raise CircularDependencyError(cycle)
 
     if yaml_path in visited:
         return []

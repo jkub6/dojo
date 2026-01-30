@@ -12,6 +12,7 @@ from .emitter import NinjaEmitter
 
 if TYPE_CHECKING:
     from .config import Config, CustomRule, OutputConfig, TypeConfig
+from .exceptions import DependencyError, OutputSourceMissingError, OutputToolMissingError
 from .plugins import PluginInterface, load_plugin
 from .rules import get_builtin_rules
 from .utils import (
@@ -245,7 +246,7 @@ class NinjaGenerator:
 
         raw_source = out_config.source
         if out_config.source is None:
-            raise ValueError("Output source cannot be None")
+            raise OutputSourceMissingError()
         raw_source = out_config.source
 
         source_ids_list: list[str] = [raw_source] if isinstance(raw_source, str) else raw_source
@@ -254,7 +255,7 @@ class NinjaGenerator:
         for parent_id in source_ids_list:
             if parent_id not in local_registry:
                 logger.error(f"Missing dependency '{parent_id}' for output '{out_config.id}'")
-                raise ValueError(f"Missing dependency: {parent_id}")
+                raise DependencyError(parent_id)
             source_paths.append(local_registry[parent_id])
 
             source_paths.append(local_registry[parent_id])
@@ -267,7 +268,7 @@ class NinjaGenerator:
             variables["args"] = " ".join(out_config.args)
 
         if out_config.tool is None:
-            raise ValueError("Output tool cannot be None")
+            raise OutputToolMissingError()
 
         self.emitter.build(
             outputs=final_path,
@@ -286,7 +287,7 @@ class NinjaGenerator:
         try:
             rel_path = md_path.relative_to(self.src)
         except ValueError:
-            logger.error(f"Source file outside source directory: {md_path}")
+            logger.warning(f"Source file outside source directory: {md_path}")
             return
 
         rel_stem = rel_path.with_suffix("")
@@ -343,8 +344,8 @@ class NinjaGenerator:
         for md_file in tqdm(filtered_files, desc="Processing", unit="file", disable=self.quiet):
             try:
                 self.process_content(md_file)
-            except Exception as e:
-                logger.error(f"Failed to process {md_file}: {e}")
+            except Exception:
+                logger.exception(f"Failed to process {md_file}")
                 raise
 
         ninja_content = self._buffer.getvalue()
@@ -356,8 +357,8 @@ class NinjaGenerator:
         try:
             with open(self.ninja_file, "w", encoding="utf-8") as f:
                 f.write(ninja_content)
-        except Exception as e:
-            logger.error(f"Failed to write {self.ninja_file}: {e}")
+        except Exception:
+            logger.exception(f"Failed to write {self.ninja_file}")
             raise
 
         logger.info(f"Generated: {self.ninja_file}")

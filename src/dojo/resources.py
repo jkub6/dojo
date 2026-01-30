@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 from typing import Literal
 
+from .exceptions import UnknownResourceCategoryError
+
 # Standard Pandoc data directory names
 RESOURCE_CATEGORIES = {"defaults", "templates", "filters"}
 
@@ -68,7 +70,7 @@ def find_resource(
 
     """
     if category not in RESOURCE_CATEGORIES:
-        raise ValueError(f"Unknown resource category: {category}")
+        raise UnknownResourceCategoryError(category)
 
     # 1. Exact Path Check
     # If it looks like a path, try it directly first
