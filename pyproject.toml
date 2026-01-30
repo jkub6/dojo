@@ -83,11 +83,11 @@ select = [
     # "C90",    # McCabe (Complexity check)
     # "ANN",    # Enforce Type Hints (Strict!)
     # "TRY",    # Exception handling anti-patterns
-    # "BLE",    # Ban blind exceptions (except Exception:)
+    "BLE",    # Ban blind exceptions (except Exception:)
     "PERF",   # Performance anti-patterns
     "LOG",    # Logging best practices
     "RET",    # Return value consistency
-    # "TCH",    # Type-checking blocks (Move imports under IF TYPE_CHECKING)
+    "TCH",    # Type-checking blocks (Move imports under IF TYPE_CHECKING)
     "ARG",    # Unused arguments (strict)
     "TID",    # flake8-tidy-imports
 ]

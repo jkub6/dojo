@@ -34,6 +34,7 @@ def setup_cli_logging(verbose: bool, quiet: bool) -> None:
         format="%(message)s",
         datefmt="[%X]",
         handlers=[RichHandler(rich_tracebacks=True, show_path=False)],
+        force=True,
     )
 
 
@@ -66,9 +67,10 @@ def cmd_build(
         sys.exit(1)
 
     except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
         if args.verbose:
-            console.print_exception()
+            logger.exception("Unexpected error during build")
+        else:
+            console.print(f"[bold red]Error:[/bold red] {e}")
         sys.exit(1)
 
 
@@ -81,7 +83,10 @@ def cmd_check(args: argparse.Namespace) -> None:
         console.print(f"  Dst: {config.output_dir}")
         console.print(f"  Types: {', '.join(config.types.keys())}")
     except Exception as e:
-        console.print(f"[bold red]Configuration invalid:[/bold red] {e}")
+        if args.verbose:
+            logger.exception("Unexpected error during configuration check")
+        else:
+            console.print(f"[bold red]Configuration invalid:[/bold red] {e}")
         sys.exit(1)
 
 

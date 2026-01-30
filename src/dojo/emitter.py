@@ -1,6 +1,10 @@
-from collections.abc import Sequence
+from __future__ import annotations
+
 from pathlib import Path
-from typing import TextIO
+from typing import TYPE_CHECKING, TextIO
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 from .utils import ninja_escape
 

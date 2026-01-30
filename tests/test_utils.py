@@ -121,7 +121,7 @@ def test_parse_frontmatter_exception(tmp_path, caplog):
 
     # Create a situation where yaml loading fails violently or file read fails in a way caught by generic exception
     # Mocking open might be easiest but we are inside a context manager in implementation
-    with patch("builtins.open", side_effect=Exception("Read failed")):
+    with patch("builtins.open", side_effect=OSError("Read failed")):
         t = parse_frontmatter_type(f, "default")
         assert t == "default"
         assert "Could not parse frontmatter" in caplog.text

@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import importlib.util
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from .config import CustomRule, OutputConfig
+if TYPE_CHECKING:
+    from .config import CustomRule, OutputConfig
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +93,6 @@ def load_plugin(plugin_path: str) -> PluginInterface | None:
         logger.warning(f"No PluginInterface implementation found in {path}")
         return None
 
-    except Exception as e:
-        logger.error(f"Failed to load plugin {plugin_path}: {e}")
+    except Exception:
+        logger.exception(f"Failed to load plugin {plugin_path}")
         return None

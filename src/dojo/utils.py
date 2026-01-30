@@ -162,7 +162,7 @@ def get_recursive_yaml_deps(
         try:
             with open(yaml_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
-        except Exception as e:
+        except (OSError, yaml.YAMLError) as e:
             logger.warning(f"Error reading {yaml_path}: {e}")
             return []
 
@@ -263,7 +263,7 @@ def parse_frontmatter_type(md_path: Path, default_type: str) -> str:
             if frontmatter and "type" in frontmatter:
                 return str(frontmatter["type"]).strip()
 
-    except Exception as e:
+    except (OSError, yaml.YAMLError) as e:
         logger.warning(f"Could not parse frontmatter in {md_path}: {e}")
         logger.debug(f"Using default type: {default_type}")
 

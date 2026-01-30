@@ -180,5 +180,6 @@ def test_build_verbose_exception(capsys):
         assert cm.value.code == 1
 
     captured = capsys.readouterr()
-    assert "Test Error" in captured.out
-    assert "Traceback" in captured.out
+    output = captured.out + captured.err
+    assert "Test Error" in output
+    assert "ValueError" in output

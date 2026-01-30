@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 import io
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from tqdm import tqdm
 
-from .config import Config, CustomRule, OutputConfig, TypeConfig
 from .constants import PoolName, RuleName
 from .emitter import NinjaEmitter
+
+if TYPE_CHECKING:
+    from .config import Config, CustomRule, OutputConfig, TypeConfig
 from .plugins import PluginInterface, load_plugin
 from .rules import get_builtin_rules
 from .utils import (
