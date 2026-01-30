@@ -62,15 +62,34 @@ target-version = "py314"
 
 [tool.ruff.lint]
 select = [
-    "E", "F", "I", "N", "W", "B", "UP", "SIM", "RUF",
-    "A",    # flake8-builtins
-    "C4",   # flake8-comprehensions
-    "DTZ",  # flake8-datetime
-    "ARG",  # flake8-unused-arguments
-    "PT",   # flake8-pytest-style
-    "TID",  # flake8-tidy-imports
-    "S",    # flake8-bandit (Security)
-    "D",    # pydocstyle (Documentation)
+    "F",      # Pyflakes (logic errors)
+    "E",      # pycodestyle (style)
+    "W",      # pycodestyle (warnings)
+    "I",      # isort (imports)
+    "N",      # pep8-naming (class/function names)
+    "B",      # flake8-bugbear (likely bugs/design problems)
+    "A",      # flake8-builtins (shadowing builtins)
+    "C4",     # flake8-comprehensions (better list/dict comps)
+    "DTZ",    # flake8-datetimez (require timezone-aware dates)
+    "SIM",    # flake8-simplify (suggestions for simpler code)
+    "T20",    # flake8-print (disallow print, prefer logging)
+    "RUF",    # Ruff-specific rules
+    "ERA",    # eradicate (ban commented out code)
+    # "PL",     # Pylint (static analysis)
+    "S",      # Bandit (Security)
+    "UP",     # pyupgrade (Modernize syntax)
+    "D",      # pydocstyle (Docstrings)
+    "PT",     # flake8-pytest-style (Test best practices)
+    # "C90",    # McCabe (Complexity check)
+    # "ANN",    # Enforce Type Hints (Strict!)
+    # "TRY",    # Exception handling anti-patterns
+    # "BLE",    # Ban blind exceptions (except Exception:)
+    "PERF",   # Performance anti-patterns
+    "LOG",    # Logging best practices
+    "RET",    # Return value consistency
+    # "TCH",    # Type-checking blocks (Move imports under IF TYPE_CHECKING)
+    "ARG",    # Unused arguments (strict)
+    "TID",    # flake8-tidy-imports
 ]
 ignore = [
     "E501", # Line too long (handled by formatter)
@@ -96,6 +115,7 @@ addopts = "--cov=src/dojo --cov-report=term-missing"
 
 [tool.mypy]
 python_version = "3.14"
+strict = true
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

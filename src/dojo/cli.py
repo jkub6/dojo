@@ -60,7 +60,7 @@ def cmd_build(
         console.print("[yellow]Tip:[/yellow] Run 'dojo init' to create a configuration file.")
 
         if print_help_on_fail and parser:
-            print("\n")
+            sys.stdout.write("\n")
             parser.print_help()
 
         sys.exit(1)

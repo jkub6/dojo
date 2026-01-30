@@ -1,6 +1,7 @@
 import fnmatch
 import logging
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -55,8 +56,7 @@ def ninja_escape(path: Path | str) -> str:
     s = path.as_posix() if isinstance(path, Path) else path
     s = s.replace("$", "$$")
     s = s.replace(" ", "$ ")
-    s = s.replace(":", "$:")
-    return s
+    return s.replace(":", "$:")
 
 
 def shell_quote(path: Path | str) -> str:
@@ -96,7 +96,7 @@ def sanitize_path(base: Path, relative: Path) -> Path:
     return full_path
 
 
-def _extract_paths(data: dict, keys: list[str]) -> list[str]:
+def _extract_paths(data: dict[str, Any], keys: list[str]) -> list[str]:
     """Extract a list of paths from a dict for given keys."""
     paths = []
     for key in keys:

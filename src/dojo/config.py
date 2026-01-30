@@ -3,7 +3,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from pydantic import BaseModel, Field, field_validator, model_validator  # type: ignore
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .constants import RuleName
 from .resources import find_resource
@@ -203,7 +203,7 @@ class Config(BaseModel):
 
         # 1.5. Resolve all defaults paths
         self.defaults = _resolve_defaults(self.defaults, self.pandoc_data_dir)
-        for _type_name, type_conf in self.types.items():
+        for type_conf in self.types.values():
             type_conf.defaults = _resolve_defaults(type_conf.defaults, self.pandoc_data_dir)
             for out_conf in type_conf.outputs:
                 out_conf.defaults = _resolve_defaults(out_conf.defaults, self.pandoc_data_dir)

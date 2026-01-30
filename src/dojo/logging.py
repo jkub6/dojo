@@ -10,8 +10,3 @@ def setup_logging(level: int = logging.INFO) -> logging.Logger:
         handlers=[logging.StreamHandler(sys.stdout)],
     )
     return logging.getLogger("dojo")
-
-
-# Initialize with default
-# Remove global side-effect
-# logger = setup_logging()
