@@ -80,7 +80,7 @@ select = [
     "UP",     # pyupgrade (Modernize syntax)
     "D",      # pydocstyle (Docstrings)
     "PT",     # flake8-pytest-style (Test best practices)
-    # "C90",    # McCabe (Complexity check)
+    "C90",    # McCabe (Complexity check)
     # "ANN",    # Enforce Type Hints (Strict!)
     # "TRY",    # Exception handling anti-patterns
     "BLE",    # Ban blind exceptions (except Exception:)

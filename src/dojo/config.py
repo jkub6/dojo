@@ -272,6 +272,51 @@ class Config(BaseModel):
                 raise ValueError(f"Duplicate output IDs in type '{type_name}': {duplicates}")
 
 
+def _find_config_path(explicit_path: str | None) -> Path:
+    """Find the configuration file path to use."""
+    paths_to_check = []
+
+    # 1. CLI Argument
+    if explicit_path:
+        paths_to_check.append(Path(explicit_path))
+
+    # 2. Environment Variable
+    env_path = os.environ.get("DOJO_CONFIG")
+    if env_path:
+        paths_to_check.append(Path(env_path))
+
+    # 3. Local and User config
+    paths_to_check.extend(
+        [
+            Path("dojo.yaml"),
+            Path("config.yaml"),
+            Path.home() / ".config" / "dojo" / "config.yaml",
+        ]
+    )
+
+    for path in paths_to_check:
+        if path.exists() and path.is_file():
+            return path.resolve()
+
+    if explicit_path:
+        raise FileNotFoundError(f"Configuration file not found: {explicit_path}")
+    raise FileNotFoundError("No configuration file found in search paths")
+
+
+def _apply_config_file_exclusion(config: Config, config_path: Path) -> None:
+    """Auto-exclude configuration file if it's inside src_dir."""
+    src_path = Path(config.src_dir).resolve()
+    try:
+        rel_config = config_path.relative_to(src_path)
+        # Add implicit exclude pattern for the config file
+        pattern = str(rel_config)
+        if pattern not in config.exclude:
+            config.exclude.append(pattern)
+    except ValueError:
+        # Config file is not in src_dir
+        pass
+
+
 def load_config(config_path: str | None = None) -> tuple[Config, Path]:
     """Load configuration from multiple sources with priority.
 
@@ -285,36 +330,7 @@ def load_config(config_path: str | None = None) -> tuple[Config, Path]:
         Tuple containing (Config object, Path to loaded file)
 
     """
-    paths_to_check = []
-
-    # 1. CLI Argument
-    if config_path:
-        paths_to_check.append(Path(config_path))
-
-    # 2. Environment Variable
-    env_path = os.environ.get("DOJO_CONFIG")
-    if env_path:
-        paths_to_check.append(Path(env_path))
-
-    # 3. Local config
-    paths_to_check.append(Path("dojo.yaml"))
-    paths_to_check.append(Path("config.yaml"))
-
-    # 4. User config
-    paths_to_check.append(Path.home() / ".config" / "dojo" / "config.yaml")
-
-    selected_path = None
-    for path in paths_to_check:
-        if path.exists() and path.is_file():
-            selected_path = path.resolve()
-            break
-
-    if not selected_path:
-        # If specific config was requested but not found, raise error
-        if config_path:
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
-        # Otherwise raise generic error
-        raise FileNotFoundError("No configuration file found in search paths")
+    selected_path = _find_config_path(config_path)
 
     with open(selected_path) as f:
         try:
@@ -324,20 +340,7 @@ def load_config(config_path: str | None = None) -> tuple[Config, Path]:
 
     try:
         config = Config(**data)
-
-        # Auto-exclude configuration file if it's inside src_dir
-        # This prevents the config file itself from being treated as content
-        src_path = Path(config.src_dir).resolve()
-        try:
-            rel_config = selected_path.relative_to(src_path)
-            # Add implicit exclude pattern for the config file
-            pattern = str(rel_config)
-            if pattern not in config.exclude:
-                config.exclude.append(pattern)
-        except ValueError:
-            # Config file is not in src_dir
-            pass
-
+        _apply_config_file_exclusion(config, selected_path)
         return config, selected_path
     except Exception as e:
         raise ValueError(f"Invalid configuration in {selected_path}: {e}") from e
