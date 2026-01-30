@@ -20,6 +20,7 @@ check:
     ruff format --check .
     mypy src
     vulture
+    pip-audit --locked .
     typos .
     statix check
     nix flake check --all-systems
