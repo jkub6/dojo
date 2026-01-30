@@ -37,7 +37,7 @@ class NinjaGenerator:
     4. Derive: Output → Derived format (HTML → PDF via Decktape)
     """
 
-    def __init__(self, config: Config, config_path: Path, quiet: bool = False):
+    def __init__(self, config: Config, config_path: Path, *, quiet: bool = False):
         """Initialize the NinjaBuilder."""
         self.config = config
         self.config_path = config_path.resolve()
@@ -258,7 +258,11 @@ class NinjaGenerator:
         source_paths = []
         for parent_id in source_ids_list:
             if parent_id not in local_registry:
-                logger.error(f"Missing dependency '{parent_id}' for output '{out_config.id}'")
+                logger.error(
+                    "Missing dependency '%s' for output '%s'",
+                    parent_id,
+                    out_config.id,
+                )
                 raise DependencyError(parent_id)
             source_paths.append(local_registry[parent_id])
 
@@ -291,7 +295,7 @@ class NinjaGenerator:
         try:
             rel_path = md_path.relative_to(self.src)
         except ValueError:
-            logger.warning(f"Source file outside source directory: {md_path}")
+            logger.warning("Source file outside source directory: %s", md_path)
             return
 
         rel_stem = rel_path.with_suffix("")
@@ -330,7 +334,7 @@ class NinjaGenerator:
 
     def generate(self) -> None:
         """Scan source files and generate build.ninja."""
-        logger.info(f"Scanning source directory: {self.src}")
+        logger.info("Scanning source directory: %s", self.src)
 
         self.emit_header()
 
@@ -342,15 +346,15 @@ class NinjaGenerator:
         ]
 
         if not filtered_files:
-            logger.warning(f"No Markdown files found in {self.src}")
+            logger.warning("No Markdown files found in %s", self.src)
         else:
-            logger.info(f"Found {len(filtered_files)} Markdown file(s)")
+            logger.info("Found %d Markdown file(s)", len(filtered_files))
 
         for md_file in tqdm(filtered_files, desc="Processing", unit="file", disable=self.quiet):
             try:
                 self.process_content(md_file)
             except Exception:
-                logger.exception(f"Failed to process {md_file}")
+                logger.exception("Failed to process %s", md_file)
                 raise
 
         ninja_content = self._buffer.getvalue()
@@ -363,15 +367,15 @@ class NinjaGenerator:
             with open(self.ninja_file, "w", encoding="utf-8") as f:
                 f.write(ninja_content)
         except Exception:
-            logger.exception(f"Failed to write {self.ninja_file}")
+            logger.exception("Failed to write %s", self.ninja_file)
             raise
 
-        logger.info(f"Generated: {self.ninja_file}")
-        logger.info(f"Outputs: {len(self.all_outputs)} file(s) will be built")
+        logger.info("Generated: %s", self.ninja_file)
+        logger.info("Outputs: %d file(s) will be built", len(self.all_outputs))
         logger.info("")
         logger.info("Next steps:")
         try:
             rel_ninja = self.ninja_file.relative_to(Path.cwd())
         except ValueError:
             rel_ninja = self.ninja_file
-        logger.info(f"  ninja -f {rel_ninja}")
+        logger.info("  ninja -f %s", rel_ninja)

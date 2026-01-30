@@ -166,7 +166,7 @@ def get_recursive_yaml_deps(
             with open(yaml_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
         except (OSError, yaml.YAMLError) as e:
-            logger.warning(f"Error reading {yaml_path}: {e}")
+            logger.warning("Error reading %s: %s", yaml_path, e)
             return []
 
         if not data or not isinstance(data, dict):
@@ -228,7 +228,11 @@ def _resolve_default_deps(  # noqa: PLR0913
             # Recurse. Nested files do NOT inherit our data_dir_override.
             deps.extend(get_recursive_yaml_deps(found, visited=visited, stack=stack[:]))
         else:
-            logger.warning(f"Default file referenced in {yaml_path} not found: {default_ref}")
+            logger.warning(
+                "Default file referenced in %s not found: %s",
+                yaml_path,
+                default_ref,
+            )
 
 
 def _resolve_assets(assets: list[str], deps: list[Path]) -> None:
@@ -284,7 +288,7 @@ def parse_frontmatter_type(md_path: Path, default_type: str) -> str:
                 return str(frontmatter["type"]).strip()
 
     except (OSError, yaml.YAMLError) as e:
-        logger.warning(f"Could not parse frontmatter in {md_path}: {e}")
-        logger.debug(f"Using default type: {default_type}")
+        logger.warning("Could not parse frontmatter in %s: %s", md_path, e)
+        logger.debug("Using default type: %s", default_type)
 
     return default_type

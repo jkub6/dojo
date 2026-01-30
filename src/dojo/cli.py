@@ -20,7 +20,7 @@ def get_version() -> str:
     return "0.1.0"
 
 
-def setup_cli_logging(verbose: bool, quiet: bool) -> None:
+def setup_cli_logging(*, verbose: bool, quiet: bool) -> None:
     """Set up logging configuration."""
     if quiet:
         level = logging.ERROR
@@ -41,6 +41,7 @@ def setup_cli_logging(verbose: bool, quiet: bool) -> None:
 def cmd_build(
     args: argparse.Namespace,
     parser: argparse.ArgumentParser | None = None,
+    *,
     print_help_on_fail: bool = False,
 ) -> None:
     """Handle the build command."""
@@ -165,7 +166,7 @@ def main(argv: list[str] | None = None) -> None:
 
     args = parser.parse_args(argv)
 
-    setup_cli_logging(args.verbose, args.quiet)
+    setup_cli_logging(verbose=args.verbose, quiet=args.quiet)
 
     if args.version or args.command == "version":
         cmd_version(args)

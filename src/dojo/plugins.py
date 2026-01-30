@@ -68,12 +68,12 @@ def load_plugin(plugin_path: str) -> PluginInterface | None:
     try:
         path = Path(plugin_path).resolve()
         if not path.exists():
-            logger.error(f"Plugin file not found: {path}")
+            logger.error("Plugin file not found: %s", path)
             return None
 
         spec = importlib.util.spec_from_file_location("plugin", path)
         if spec is None or spec.loader is None:
-            logger.error(f"Failed to load plugin spec: {path}")
+            logger.error("Failed to load plugin spec: %s", path)
             return None
 
         module = importlib.util.module_from_spec(spec)
@@ -87,13 +87,13 @@ def load_plugin(plugin_path: str) -> PluginInterface | None:
                 and issubclass(item, PluginInterface)
                 and item is not PluginInterface
             ):
-                logger.info(f"Loaded plugin: {item_name} from {path}")
+                logger.info("Loaded plugin: %s from %s", item_name, path)
                 return item()
 
     except Exception:
-        logger.exception(f"Failed to load plugin {plugin_path}")
+        logger.exception("Failed to load plugin %s", plugin_path)
         return None
 
     else:
-        logger.error(f"No PluginInterface implementation found in {path}")
+        logger.error("No PluginInterface implementation found in %s", path)
         return None

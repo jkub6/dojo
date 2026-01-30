@@ -33,6 +33,7 @@ class NinjaEmitter:
         self,
         name: str,
         command: str,
+        *,
         description: str | None = None,
         pool: str | None = None,
         depfile: str | None = None,
