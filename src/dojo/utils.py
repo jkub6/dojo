@@ -13,7 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 def should_process_file(
-    path: Path, src_dir: Path, includes: list[str], excludes: list[str]
+    path: Path,
+    src_dir: Path,
+    includes: list[str],
+    excludes: list[str],
 ) -> bool:
     """Determine if a file should be processed based on include/exclude patterns.
 

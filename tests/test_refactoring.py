@@ -48,8 +48,8 @@ def test_duplicate_output_ids(tmp_path):
                 "outputs": [
                     {"id": "foo", "extension": "html", "defaults": []},
                     {"id": "foo", "extension": "pdf", "source": "foo", "tool": "bar"},
-                ]
-            }
+                ],
+            },
         },
     }
     # Wait, the second one depends on 'foo', but its own id is 'foo'.

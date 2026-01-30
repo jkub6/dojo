@@ -62,14 +62,16 @@ def test_tool_paths_missing_optional():
 
 def test_output_config_validation_source_tool():
     with pytest.raises(
-        SourceRequiresToolError, match="Outputs with 'source' must also specify 'tool'"
+        SourceRequiresToolError,
+        match="Outputs with 'source' must also specify 'tool'",
     ):
         OutputConfig(extension="pdf", source="html")
 
 
 def test_output_config_validation_defaults_or_source():
     with pytest.raises(
-        DefaultsRequiredError, match="Outputs without 'source' must specify 'defaults'"
+        DefaultsRequiredError,
+        match="Outputs without 'source' must specify 'defaults'",
     ):
         OutputConfig(extension="html", defaults=None, source=None)
 
@@ -96,9 +98,13 @@ def valid_config_data(tmp_path):
         "types": {
             "page": {
                 "outputs": [
-                    {"id": "html", "extension": "html", "defaults": str(tmp_path / "defaults.yaml")}
-                ]
-            }
+                    {
+                        "id": "html",
+                        "extension": "html",
+                        "defaults": str(tmp_path / "defaults.yaml"),
+                    },
+                ],
+            },
         },
         "defaults": str(tmp_path / "defaults.yaml"),
     }
@@ -159,7 +165,7 @@ def test_config_nested_build_allowed(valid_config_data):
 
 def test_config_duplicate_output_ids(valid_config_data):
     valid_config_data["types"]["page"]["outputs"].append(
-        {"id": "html", "extension": "htm", "defaults": valid_config_data["defaults"]}
+        {"id": "html", "extension": "htm", "defaults": valid_config_data["defaults"]},
     )
     with pytest.raises(DuplicateOutputIdError, match="Duplicate output IDs"):
         Config(**valid_config_data)
@@ -196,8 +202,8 @@ def test_load_config_auto_excludes_self(tmp_path):
                 "default_type": "page",
                 "types": {"page": {"outputs": []}},
                 "exclude": ["existing_pattern"],
-            }
-        )
+            },
+        ),
     )
 
     cfg, _ = load_config(str(c))
@@ -216,8 +222,12 @@ def test_load_config_cli_arg(tmp_path):
     (tmp_path / "src").mkdir()
     c.write_text(
         yaml.dump(
-            {"src_dir": str(tmp_path / "src"), "default_type": "t", "types": {"t": {"outputs": []}}}
-        )
+            {
+                "src_dir": str(tmp_path / "src"),
+                "default_type": "t",
+                "types": {"t": {"outputs": []}},
+            },
+        ),
     )
 
     _, p = load_config(str(c))
@@ -229,8 +239,12 @@ def test_load_config_env_var(tmp_path, monkeypatch):
     (tmp_path / "src").mkdir()
     c.write_text(
         yaml.dump(
-            {"src_dir": str(tmp_path / "src"), "default_type": "t", "types": {"t": {"outputs": []}}}
-        )
+            {
+                "src_dir": str(tmp_path / "src"),
+                "default_type": "t",
+                "types": {"t": {"outputs": []}},
+            },
+        ),
     )
 
     monkeypatch.setenv("DOJO_CONFIG", str(c))

@@ -95,7 +95,8 @@ def find_resource(
 
 
 def _check_path_reference(
-    name: str, root_contexts: list[Path] | None
+    name: str,
+    root_contexts: list[Path] | None,
 ) -> Path | None | Literal[False]:
     """Check if name is an explicit path reference.
 
@@ -135,7 +136,9 @@ def _get_potential_names(name: str, category: str) -> list[str]:
 
 
 def _get_search_roots(
-    root_contexts: list[Path] | None, category: str, extra_data_dirs: list[Path] | None
+    root_contexts: list[Path] | None,
+    category: str,
+    extra_data_dirs: list[Path] | None,
 ) -> list[Path]:
     """Get list of directories to search in."""
     search_roots = []

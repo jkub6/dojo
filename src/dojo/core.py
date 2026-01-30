@@ -188,7 +188,8 @@ class NinjaGenerator:
         post_tool = out_config.post_process
         if post_tool:
             render_target = sanitize_path(
-                self.build_dir, Path("intermediates") / rel_stem.parent / filename
+                self.build_dir,
+                Path("intermediates") / rel_stem.parent / filename,
             )
         else:
             render_target = final_path
@@ -238,7 +239,10 @@ class NinjaGenerator:
         self.all_outputs.append(final_path)
 
     def _derive_output(
-        self, out_config: OutputConfig, rel_stem: Path, local_registry: dict[str, Path]
+        self,
+        out_config: OutputConfig,
+        rel_stem: Path,
+        local_registry: dict[str, Path],
     ) -> None:
         """Derive output from other build products (e.g. HTML -> PDF)."""
         filename = f"{rel_stem.name}{out_config.suffix}.{out_config.extension}"
@@ -295,7 +299,8 @@ class NinjaGenerator:
         # Identify content type
         content_type = parse_frontmatter_type(md_path, self.config.default_type)
         type_config = self.config.types.get(
-            content_type, self.config.types[self.config.default_type]
+            content_type,
+            self.config.types[self.config.default_type],
         )
 
         # Stage 1: Compile

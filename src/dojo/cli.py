@@ -138,7 +138,10 @@ def main(argv: list[str] | None = None) -> None:
     # Global arguments
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
     parser.add_argument(
-        "-q", "--quiet", action="store_true", help="Suppress all output except errors"
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Suppress all output except errors",
     )
     parser.add_argument("--version", action="store_true", help="Show version info and exit")
 

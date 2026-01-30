@@ -24,7 +24,7 @@ def core_config_data(tmp_path):
         "build_dir": str(tmp_path / "build"),
         "default_type": "page",
         "types": {
-            "page": {"outputs": [{"id": "html", "extension": "html", "defaults": str(defaults)}]}
+            "page": {"outputs": [{"id": "html", "extension": "html", "defaults": str(defaults)}]},
         },
         "defaults": str(defaults),
     }
@@ -95,7 +95,7 @@ def test_process_content_valid(core_config):
 def test_derive_output_missing_dependency(core_config_data, tmp_path):
     # Setup config with derived output but missing source
     core_config_data["types"]["page"]["outputs"].append(
-        {"id": "pdf", "extension": "pdf", "source": "missing_html", "tool": "decktape"}
+        {"id": "pdf", "extension": "pdf", "source": "missing_html", "tool": "decktape"},
     )
 
     cfg = Config(**core_config_data)

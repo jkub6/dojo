@@ -72,7 +72,8 @@ def test_lua_dependencies_filter(tmp_path):
     # Setup content
     content_md = tmp_path / "test.md"
     content_md.write_text(
-        "---\ndependencies:\n  - data_folder/\n---\n![Img](image.png)", encoding="utf-8"
+        "---\ndependencies:\n  - data_folder/\n---\n![Img](image.png)",
+        encoding="utf-8",
     )
 
     # Setup data folder

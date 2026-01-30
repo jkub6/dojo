@@ -87,7 +87,8 @@ def test_get_pandoc_data_dirs(tmp_path, monkeypatch):
 
     (xdg / "pandoc").mkdir(parents=True)
     (Path.home() / ".pandoc").mkdir(
-        parents=True, exist_ok=True
+        parents=True,
+        exist_ok=True,
     )  # Might fail if real home not writable in test env?
     # Use mock home
 

@@ -32,8 +32,8 @@ def flex_config(tmp_path):
                         "tool": "decktape",
                         # No defaults required here
                     },
-                ]
-            }
+                ],
+            },
         },
     ), tmp_path / "dojo.yaml"
 
@@ -70,8 +70,8 @@ def test_optional_defaults(tmp_path):
                 "outputs": [
                     {"id": "base", "extension": "html", "defaults": str(d1)},
                     {"extension": "pdf", "source": "base", "tool": "decktape"},
-                ]
-            }
+                ],
+            },
         },
     )
     assert conf.types["md"].outputs[1].defaults is None
@@ -83,10 +83,13 @@ def test_missing_defaults_error(tmp_path):
 
     # Invalid: non-derived output MUST have defaults
     with pytest.raises(
-        DefaultsRequiredError, match="Outputs without 'source' must specify 'defaults'"
+        DefaultsRequiredError,
+        match="Outputs without 'source' must specify 'defaults'",
     ):
         Config(
-            src_dir=str(src), default_type="md", types={"md": {"outputs": [{"extension": "html"}]}}
+            src_dir=str(src),
+            default_type="md",
+            types={"md": {"outputs": [{"extension": "html"}]}},
         )
 
 
@@ -107,8 +110,8 @@ def test_multiple_sources_generation(tmp_path):
                     {"id": "p1", "extension": "html", "defaults": str(d1)},
                     {"id": "p2", "extension": "html", "defaults": str(d1)},
                     {"extension": "pdf", "source": ["p1", "p2"], "tool": "merge_tool"},
-                ]
-            }
+                ],
+            },
         },
     )
 

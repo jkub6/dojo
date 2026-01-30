@@ -86,12 +86,17 @@ select = [
     "TCH",    # Type-checking blocks (Move imports under IF TYPE_CHECKING)
     "ARG",    # Unused arguments (strict)
     "TID",    # flake8-tidy-imports
+    "FBT", # Boolean trap
+    "COM", # Trailing commas
+    "G",   # Logging format
 ]
 ignore = [
     "E501", # Line too long (handled by formatter)
     "D100", "D101", "D102", "D103", "D104", # Missing docstrings (enable gradually)
     "D203", # One blank line before class (conflicts with D211)
     "D213", # Multi-line docstring summary at second line (conflicts with D212)
+    "COM812", # Trailing comma missing (conflicts with formatter)
+    "ISC001", # Implicit string concatenation (conflicts with formatter)
 ]
 
 

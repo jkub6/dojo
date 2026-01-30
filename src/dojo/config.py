@@ -27,7 +27,8 @@ from .resources import find_resource
 
 
 def _resolve_defaults(
-    v: str | list[str] | None, data_dir: str | None = None
+    v: str | list[str] | None,
+    data_dir: str | None = None,
 ) -> str | list[str] | None:
     """Resolve default files using optional data-dir."""
     if v is None:
@@ -81,15 +82,18 @@ class OutputConfig(BaseModel):
     id: str | None = Field(default=None, description="Unique identifier for this output")
     extension: str = Field(description="File extension for output")
     defaults: str | list[str] | None = Field(
-        default=None, description="Path(s) to Pandoc defaults file(s)"
+        default=None,
+        description="Path(s) to Pandoc defaults file(s)",
     )
     suffix: str = Field(default="", description="Suffix to add to filename before extension")
     post_process: str | None = Field(default=None, description="Post-processing tool name")
     args: list[str] | None = Field(
-        default=None, description="Extra arguments to pass to the tool or post-processor"
+        default=None,
+        description="Extra arguments to pass to the tool or post-processor",
     )
     source: str | list[str] | None = Field(
-        default=None, description="Source output ID(s) for derived outputs"
+        default=None,
+        description="Source output ID(s) for derived outputs",
     )
     tool: str | None = Field(default=None, description="Tool to use for derived outputs")
 
@@ -110,7 +114,8 @@ class TypeConfig(BaseModel):
 
     outputs: list[OutputConfig] = Field(description="List of output formats")
     defaults: str | list[str] | None = Field(
-        default=None, description="Default render settings for this type"
+        default=None,
+        description="Default render settings for this type",
     )
 
 
@@ -124,10 +129,12 @@ class CustomRule(BaseModel):
     depfile: str | None = Field(default=None, description="Dependency file path")
     deps: str | None = Field(default=None, description="Dependency style (gcc or msvc)")
     generator: bool = Field(
-        default=False, description="Whether this is a generator rule (re-scans deps)"
+        default=False,
+        description="Whether this is a generator rule (re-scans deps)",
     )
     variables: dict[str, str] | None = Field(
-        default=None, description="Rule-level variable defaults"
+        default=None,
+        description="Rule-level variable defaults",
     )
 
     # Validation moved to Config to allow internal use of built-in names
@@ -150,7 +157,8 @@ class Config(BaseModel):
 
     # New Pandoc Configuration Options
     root_ref_dir: str = Field(
-        default=".", description="Directory to calculate root variable relative to"
+        default=".",
+        description="Directory to calculate root variable relative to",
     )
 
     add_resource_path: bool = Field(
@@ -159,11 +167,13 @@ class Config(BaseModel):
     )
 
     defaults: str | list[str] | None = Field(
-        default=None, description="Global default render settings"
+        default=None,
+        description="Global default render settings",
     )
 
     pandoc_data_dir: str | None = Field(
-        default=None, description="Directory to use as the pandoc data directory"
+        default=None,
+        description="Directory to use as the pandoc data directory",
     )
 
     @field_validator("pandoc_data_dir")
@@ -300,7 +310,7 @@ def _find_config_path(explicit_path: str | None) -> Path:
             Path("dojo.yaml"),
             Path("config.yaml"),
             Path.home() / ".config" / "dojo" / "config.yaml",
-        ]
+        ],
     )
 
     for path in paths_to_check:

@@ -50,7 +50,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
             command=" ".join(cmd_parts),
             description="⚙️  REGENERATE build.ninja",
             generator=True,
-        )
+        ),
     )
 
     # Pandoc Command Construction Helpers
@@ -100,7 +100,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
             description="🧠 COMPILE $in",
             depfile="$out.d",
             deps="gcc",
-        )
+        ),
     )
 
     # RENDER Rule (JSON AST -> Output Format)
@@ -122,7 +122,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
             name=RuleName.RENDER.value,
             command=render_cmd,
             description="🎨 RENDER $out",
-        )
+        ),
     )
 
     # MINIFY Rule
@@ -131,7 +131,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
             name=RuleName.MINIFY.value,
             command=f"{path_prefix}{config.tools.minify} $args -o $out_shell $in_shell",
             description="⚡ MINIFY $out",
-        )
+        ),
     )
 
     # GHOSTSCRIPT Rule
@@ -141,7 +141,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
             command=f"{path_prefix}{config.tools.ghostscript} -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET -dBATCH -dSAFER $args -sOutputFile=$out_shell $in_shell",
             description="🗜️  COMPRESS $out",
             pool=PoolName.HEAVY_PROCESSING.value,
-        )
+        ),
     )
 
     # DECKTAPE Rule
@@ -151,7 +151,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
             command=f"{path_prefix}{config.tools.decktape} reveal $args $in_shell $out_shell",
             description="📸 DECKTAPE $out",
             pool=PoolName.HEAVY_PROCESSING.value,
-        )
+        ),
     )
 
     return rules
