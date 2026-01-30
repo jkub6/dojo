@@ -14,6 +14,16 @@ console = Console()
 logger = logging.getLogger("dojo")
 
 
+class DojoArgs(argparse.Namespace):
+    """Typed arguments for dojo CLI."""
+
+    command: str | None
+    config: str | None
+    verbose: bool
+    quiet: bool
+    version: bool
+
+
 def get_version() -> str:
     """Get the current version of dojo."""
     # In a real package, use importlib.metadata
@@ -39,7 +49,7 @@ def setup_cli_logging(*, verbose: bool, quiet: bool) -> None:
 
 
 def cmd_build(
-    args: argparse.Namespace,
+    args: DojoArgs,
     parser: argparse.ArgumentParser | None = None,
     *,
     print_help_on_fail: bool = False,
@@ -75,7 +85,7 @@ def cmd_build(
         sys.exit(1)
 
 
-def cmd_check(args: argparse.Namespace) -> None:
+def cmd_check(args: DojoArgs) -> None:
     """Handle the check command."""
     try:
         config, config_path = load_config(args.config)
@@ -91,7 +101,7 @@ def cmd_check(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
-def cmd_init(_args: argparse.Namespace) -> None:
+def cmd_init(_args: DojoArgs) -> None:
     """Handle the init command."""
     target = Path("dojo.yaml")
     if target.exists():
@@ -122,7 +132,7 @@ types:
     console.print(f"[bold green]{msg}[/bold green]")
 
 
-def cmd_version(_args: argparse.Namespace) -> None:
+def cmd_version(_args: DojoArgs) -> None:
     """Handle the version command."""
     v = get_version()
     console.print(f"[bold]dojo[/bold] version [cyan]{v}[/cyan]")
@@ -164,7 +174,7 @@ def main(argv: list[str] | None = None) -> None:
     # Version command (as subcommand)
     subparsers.add_parser("version", help="Show version info")
 
-    args = parser.parse_args(argv)
+    args = parser.parse_args(argv, namespace=DojoArgs())
 
     setup_cli_logging(verbose=args.verbose, quiet=args.quiet)
 
@@ -173,14 +183,15 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     # Default to help if no command specified
-    if args.command is None:
+    command = args.command
+    if command is None:
         parser.print_help()
         sys.exit(0)
-    elif args.command == "build":
+    elif command == "build":
         cmd_build(args, parser=parser)
-    elif args.command == "check":
+    elif command == "check":
         cmd_check(args)
-    elif args.command == "init":
+    elif command == "init":
         cmd_init(args)
     else:
         parser.print_help()

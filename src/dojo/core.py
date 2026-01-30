@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import io
 import logging
+from collections.abc import Iterator
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from tqdm import tqdm
 
@@ -350,7 +351,10 @@ class NinjaGenerator:
         else:
             logger.info("Found %d Markdown file(s)", len(filtered_files))
 
-        for md_file in tqdm(filtered_files, desc="Processing", unit="file", disable=self.quiet):
+        for md_file in cast(
+            Iterator[Path],  # noqa: TC006
+            tqdm(filtered_files, desc="Processing", unit="file", disable=self.quiet),
+        ):
             try:
                 self.process_content(md_file)
             except Exception:

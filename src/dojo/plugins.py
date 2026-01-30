@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib.util
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from .config import CustomRule, OutputConfig
@@ -81,9 +81,9 @@ def load_plugin(plugin_path: str) -> PluginInterface | None:
 
         # Look for a class that inherits from PluginInterface
         for item_name in dir(module):
-            item = getattr(module, item_name)
+            item = cast("object", getattr(module, item_name))
             if (
-                isinstance(item, type)
+                isinstance(item, type)  # type: ignore[misc]
                 and issubclass(item, PluginInterface)
                 and item is not PluginInterface
             ):

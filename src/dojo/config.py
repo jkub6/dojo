@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 from pathlib import Path
+from typing import cast
 
 import yaml
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -62,7 +63,7 @@ class ToolPaths(BaseModel):
         """Resolve all tool paths to absolute paths and verify existence."""
         essential_tools = ["python", "pandoc"]
         for tool in ["python", "pandoc", "minify", "ghostscript", "decktape", "typst"]:
-            current = getattr(self, tool)
+            current = cast("str", getattr(self, tool))
             if current:
                 resolved = shutil.which(current)
                 if resolved:
@@ -353,12 +354,17 @@ def load_config(config_path: str | None = None) -> tuple[Config, Path]:
 
     with open(selected_path) as f:
         try:
-            data = yaml.safe_load(f)
+            raw_data: object = yaml.safe_load(f)
+            if not isinstance(raw_data, dict):
+                raise ConfigInvalidError(
+                    selected_path, ValueError("Configuration must be a dictionary")
+                )
+            data = cast("dict[str, object]", raw_data)
         except yaml.YAMLError as e:
             raise ConfigParseError(selected_path, e) from e
 
     try:
-        config = Config(**data)
+        config = Config.model_validate(data)
         _apply_config_file_exclusion(config, selected_path)
     except Exception as e:
         raise ConfigInvalidError(selected_path, e) from e

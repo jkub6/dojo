@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from typing import cast
 
 from .config import Config, CustomRule
 from .constants import PoolName, RuleName
@@ -21,7 +22,10 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     # This ensures that tools invoked by other tools (e.g. pandoc calling typst) work correctly
     # even if they aren't in the global PATH but were resolved during config loading
     tool_dirs = set()
-    for tool_path in config.tools.model_dump().values():
+    # Cast to dict[str, str] to avoid Any in values()
+    tools_dict = cast("dict[str, str]", config.tools.model_dump())
+    for tool_path_raw in tools_dict.values():
+        tool_path = str(tool_path_raw)
         if tool_path and Path(tool_path).exists():
             tool_dirs.add(str(Path(tool_path).parent))
 

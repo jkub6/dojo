@@ -2,6 +2,7 @@ import fnmatch
 import logging
 import shlex
 from pathlib import Path
+from typing import cast
 
 import yaml
 
@@ -158,17 +159,8 @@ def get_recursive_yaml_deps(
     stack.append(yaml_path)
 
     try:
-        if not yaml_path.exists():
-            return []
-
-        try:
-            with open(yaml_path, encoding="utf-8") as f:
-                data = yaml.safe_load(f)
-        except (OSError, yaml.YAMLError) as e:
-            logger.warning("Error reading %s: %s", yaml_path, e)
-            return []
-
-        if not data or not isinstance(data, dict):
+        data = _load_and_validate_yaml_dict(yaml_path)
+        if not data:
             return []
 
         # Determine the data-dir for this file's references
@@ -179,7 +171,7 @@ def get_recursive_yaml_deps(
         # This means we DO NOT inherit data_dir_override for nested search of children.
         # But we DO use it for resolving refs IN this file if this file doesn't have its own.
 
-        local_data_dir_val = data.get("data-dir")
+        local_data_dir_val = cast("str | None", data.get("data-dir"))
         current_data_dirs = []
         if local_data_dir_val:
             current_data_dirs = [Path(local_data_dir_val).resolve()]
@@ -250,6 +242,25 @@ def _resolve_assets(assets: list[str], deps: list[Path]) -> None:
             deps.append(asset_path)
 
 
+def _load_and_validate_yaml_dict(yaml_path: Path) -> dict[str, object] | None:
+    """Safe load YAML and ensure it is a dict."""
+    if not yaml_path.exists():
+        return None
+
+    try:
+        with open(yaml_path, encoding="utf-8") as f:
+            raw_data: object = yaml.safe_load(f)
+
+        if not isinstance(raw_data, dict):
+            return None
+
+        return cast("dict[str, object]", raw_data)
+
+    except (OSError, yaml.YAMLError) as e:
+        logger.warning("Error reading %s: %s", yaml_path, e)
+        return None
+
+
 def parse_frontmatter_type(md_path: Path, default_type: str) -> str:
     """Extract the 'type' field from YAML frontmatter.
 
@@ -281,7 +292,10 @@ def parse_frontmatter_type(md_path: Path, default_type: str) -> str:
 
             # Parse just the frontmatter
             frontmatter_text = "".join(frontmatter_lines)
-            frontmatter = yaml.safe_load(frontmatter_text)
+            frontmatter_raw: object = yaml.safe_load(frontmatter_text)
+            if not isinstance(frontmatter_raw, dict):
+                return default_type
+            frontmatter = cast("dict[str, object]", frontmatter_raw)
 
             if frontmatter and "type" in frontmatter:
                 return str(frontmatter["type"]).strip()
