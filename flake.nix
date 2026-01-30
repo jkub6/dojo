@@ -4,6 +4,17 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
+    pandoc = {
+      # url = "github:jgm/pandoc";
+      url = "github:jkub6/pandoc/feature/enhanced-defaults-expansion";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    citeproc-src = {
+      url = "github:jgm/citeproc";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     pyproject-nix = {
       url = "github:pyproject-nix/pyproject.nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -25,6 +36,8 @@
   outputs = {
     self,
     nixpkgs,
+    pandoc,
+    citeproc-src,
     pyproject-nix,
     uv2nix,
     pyproject-build-systems,
@@ -41,31 +54,17 @@
         ]
       );
 
-    pandoc-bin = pkgs: let
-      version = "3.8.3";
-      inherit (pkgs.stdenv.hostPlatform) system;
-      sources = {
-        "x86_64-linux" = {
-          url = "https://github.com/jgm/pandoc/releases/download/${version}/pandoc-${version}-linux-amd64.tar.gz";
-          hash = "sha256-wiT6uJ+CfTYjOA7LfBB4wWPHachJoUrCfo07+7kUybQ=";
-        };
-        "aarch64-linux" = {
-          url = "https://github.com/jgm/pandoc/releases/download/${version}/pandoc-${version}-linux-arm64.tar.gz";
-          hash = "sha256-FmpaNzh+sQvUxPJCqBCb7vdVrB6NTrA5xrXr0dkY2Nc=";
+    pandoc-src = pkgs: let
+      hp = pkgs.haskellPackages.override {
+        overrides = hself: hsuper: {
+          citeproc = hself.callCabal2nix "citeproc" citeproc-src {};
+          texmath = hself.callHackage "texmath" "0.13.0.2" {};
+          typst = hself.callHackage "typst" "0.8.1" {};
+          typst-symbols = hself.callHackage "typst-symbols" "0.1.9.1" {};
         };
       };
-      source = sources.${system} or (throw "Unsupported system: ${system}");
     in
-      pkgs.stdenv.mkDerivation {
-        pname = "pandoc-bin";
-        inherit version;
-        src = pkgs.fetchurl source;
-        installPhase = ''
-          mkdir -p $out/bin $out/share/man/man1
-          cp bin/pandoc $out/bin/
-          cp share/man/man1/pandoc.1.gz $out/share/man/man1/
-        '';
-      };
+      pkgs.haskell.lib.dontCheck (hp.callCabal2nix "pandoc" pandoc {});
 
     runtimeDeps = pkgs:
       with pkgs; [
@@ -76,7 +75,7 @@
         minify
         ninja
         # pandoc
-        (pandoc-bin pkgs)
+        (pandoc-src pkgs)
       ];
   in {
     packages = forAllSystems (system: let
