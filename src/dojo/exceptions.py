@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class DojoError(Exception):
@@ -83,7 +86,7 @@ class DefaultsRequiredError(OutputConfigDefaultError):
 class PandocDataDirError(ConfigError):
     """Raised when pandoc data directory is invalid."""
 
-    def __init__(self, path: Any, issue: str = "not found"):
+    def __init__(self, path: Path | str, issue: str = "not found"):
         """Initialize PandocDataDirError."""
         if issue == "not directory":
             super().__init__(f"Pandoc data directory is not a directory: {path}")
@@ -105,9 +108,9 @@ class DirectoryConflictError(ConfigError):
     def __init__(
         self,
         name1: str,
-        path1: Any,
+        path1: Path | str,
         name2: str,
-        path2: Any | None = None,
+        path2: Path | str | None = None,
         issue: str = "conflict",
     ):
         """Initialize DirectoryConflictError."""
@@ -139,7 +142,7 @@ class DefaultTypeNotFoundError(ConfigError):
 class DuplicateOutputIdError(ConfigError):
     """Raised when duplicate output IDs are found."""
 
-    def __init__(self, type_name: str, duplicates: Any):
+    def __init__(self, type_name: str, duplicates: set[str]):
         """Initialize DuplicateOutputIdError."""
         super().__init__(f"Duplicate output IDs in type '{type_name}': {duplicates}")
 
@@ -158,7 +161,7 @@ class ConfigFileNotFoundError(ConfigError):
 class SourceDirNotFoundError(ConfigError):
     """Raised when source directory is not found."""
 
-    def __init__(self, path: Any):
+    def __init__(self, path: Path | str):
         """Initialize SourceDirNotFoundError."""
         super().__init__(f"Source directory not found: {path}")
 
@@ -166,7 +169,7 @@ class SourceDirNotFoundError(ConfigError):
 class ConfigLoadError(ConfigError):
     """Raised when configuration cannot be loaded."""
 
-    def __init__(self, message: str, path: Any, exc: Exception | None = None):
+    def __init__(self, message: str, path: Path | str, exc: Exception | None = None):
         """Initialize ConfigLoadError."""
         msg = f"{message}: {path}"
         if exc:
@@ -177,7 +180,7 @@ class ConfigLoadError(ConfigError):
 class ConfigParseError(ConfigLoadError):
     """Raised when configuration YAML parsing fails."""
 
-    def __init__(self, path: Any, exc: Exception):
+    def __init__(self, path: Path | str, exc: Exception):
         """Initialize ConfigParseError."""
         super().__init__("Error parsing configuration file", path, exc)
 
@@ -185,7 +188,7 @@ class ConfigParseError(ConfigLoadError):
 class ConfigInvalidError(ConfigLoadError):
     """Raised when configuration validation fails."""
 
-    def __init__(self, path: Any, exc: Exception):
+    def __init__(self, path: Path | str, exc: Exception):
         """Initialize ConfigInvalidError."""
         super().__init__("Invalid configuration", path, exc)
 
@@ -209,7 +212,7 @@ class UnknownResourceCategoryError(ResourceError):
 class SecurityError(DojoError):
     """Raised for security issues like path traversal."""
 
-    def __init__(self, relative: Any, base: Any):
+    def __init__(self, relative: Path | str, base: Path | str):
         """Initialize SecurityError."""
         super().__init__(f"Path traversal detected: {relative} escapes {base}")
 

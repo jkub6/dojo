@@ -2,7 +2,6 @@ import fnmatch
 import logging
 import shlex
 from pathlib import Path
-from typing import Any
 
 import yaml
 
@@ -101,7 +100,7 @@ def sanitize_path(base: Path, relative: Path) -> Path:
     return full_path
 
 
-def _extract_paths(data: dict[str, Any], keys: list[str]) -> list[str]:
+def _extract_paths(data: dict[str, object], keys: list[str]) -> list[str]:
     """Extract a list of paths from a dict for given keys."""
     paths = []
     for key in keys:
