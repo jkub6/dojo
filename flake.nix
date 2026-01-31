@@ -4,12 +4,6 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    pandoc = {
-      # url = "github:jgm/pandoc";
-      url = "github:jkub6/pandoc/feature/enhanced-defaults-expansion";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     citeproc-src = {
       url = "github:jgm/citeproc";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -36,17 +30,42 @@
   outputs = {
     self,
     nixpkgs,
-    pandoc,
     citeproc-src,
     pyproject-nix,
     uv2nix,
     pyproject-build-systems,
   }: let
-    forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux" "aarch64-linux"];
+    # forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux" "aarch64-linux"];
+    forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux"];
 
-    workspace = uv2nix.lib.workspace.loadWorkspace {workspaceRoot = ./.;};
+    # Helper to build the custom Pandoc binary package
+    mkPandoc = pkgs: let
+      version = "3.8.3";
+      inherit (pkgs.stdenv.hostPlatform) system;
+      sources = {
+        "x86_64-linux" = {
+          url = "https://github.com/jgm/pandoc/releases/download/${version}/pandoc-${version}-linux-amd64.tar.gz";
+          hash = "sha256-wiT6uJ+CfTYjOA7LfBB4wWPHachJoUrCfo07+7kUybQ=";
+        };
+        "aarch64-linux" = {
+          url = "https://github.com/jgm/pandoc/releases/download/${version}/pandoc-${version}-linux-arm64.tar.gz";
+          hash = "sha256-FmpaNzh+sQvUxPJCqBCb7vdVrB6NTrA5xrXr0dkY2Nc=";
+        };
+      };
+      source = sources.${system} or (throw "Unsupported system: ${system}");
+    in
+      pkgs.stdenv.mkDerivation {
+        pname = "pandoc-bin";
+        inherit version;
+        src = pkgs.fetchurl source;
+        installPhase = ''
+          mkdir -p $out/bin $out/share/man/man1
+          cp bin/pandoc $out/bin/
+          cp share/man/man1/pandoc.1.gz $out/share/man/man1/
+        '';
+      };
 
-    mkPythonSet = pkgs:
+    mkPythonSet = pkgs: workspace:
       (pkgs.callPackage pyproject-nix.build.packages {python = pkgs.python314;}).overrideScope (
         pkgs.lib.composeManyExtensions [
           pyproject-build-systems.overlays.default
@@ -54,7 +73,7 @@
         ]
       );
 
-    runtimeDeps = pkgs:
+    getRuntimeDeps = pkgs:
       with pkgs; [
         chromium
         decktape
@@ -62,13 +81,15 @@
         typst
         minify
         ninja
-        pandoc.packages.${pkgs.system}.default
+        (mkPandoc pkgs)
       ];
   in {
     packages = forAllSystems (system: let
       pkgs = nixpkgs.legacyPackages.${system};
-      pythonSet = mkPythonSet pkgs;
+      workspace = uv2nix.lib.workspace.loadWorkspace {workspaceRoot = ./.;};
+      pythonSet = mkPythonSet pkgs workspace;
       venv = pythonSet.mkVirtualEnv "dojo-venv" workspace.deps.default;
+      pandoc = mkPandoc pkgs;
     in {
       default = pkgs.stdenvNoCC.mkDerivation {
         pname = "dojo";
@@ -81,8 +102,8 @@
           mkdir -p $out/bin
           makeWrapper ${venv}/bin/dojo $out/bin/dojo \
             --unset PYTHONPATH \
-            --prefix PATH : ${pkgs.lib.makeBinPath (runtimeDeps pkgs)} \
-            --set DOJO_PANDOC "${pandoc.packages.${pkgs.system}.default}/bin/pandoc" \
+            --prefix PATH : ${pkgs.lib.makeBinPath (getRuntimeDeps pkgs)} \
+            --set DOJO_PANDOC "${pandoc}/bin/pandoc" \
             --set DOJO_TYPST "${pkgs.typst}/bin/typst" \
             --set DOJO_MINIFY "${pkgs.minify}/bin/minify" \
             --set DOJO_GHOSTSCRIPT "${pkgs.ghostscript}/bin/gs" \
@@ -93,7 +114,7 @@
           description = "Professional Ninja Build Generator";
           homepage = "https://github.com/jkub6/dojo";
           license = licenses.mit;
-          platforms = platforms.unix;
+          platforms = platforms.linux; # Adjusted based on your binary targets
           mainProgram = "dojo";
         };
       };
@@ -101,7 +122,8 @@
 
     devShells = forAllSystems (system: let
       pkgs = nixpkgs.legacyPackages.${system};
-      pythonSet = mkPythonSet pkgs;
+      workspace = uv2nix.lib.workspace.loadWorkspace {workspaceRoot = ./.;};
+      pythonSet = mkPythonSet pkgs workspace;
       venv = pythonSet.mkVirtualEnv "dojo-dev-venv" workspace.deps.all;
 
       devTools = with pkgs; [
@@ -114,7 +136,7 @@
       ];
     in {
       default = pkgs.mkShell {
-        packages = (runtimeDeps pkgs) ++ devTools ++ [venv];
+        packages = (getRuntimeDeps pkgs) ++ devTools ++ [venv];
 
         shellHook = ''
           unset PYTHONPATH

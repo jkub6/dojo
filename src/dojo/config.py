@@ -72,7 +72,8 @@ class ToolPaths(BaseModel):
             env_var = f"DOJO_{tool.upper()}"
             env_path = os.environ.get(env_var)
 
-            if env_path and current == self.model_fields[tool].default:
+            resolved: str | None
+            if env_path and current == cast("object", self.model_fields[tool].default):
                 resolved = env_path
             else:
                 # 2. Regular resolution via PATH
