@@ -1,5 +1,7 @@
 import fnmatch
 import logging
+import os
+import re
 import shlex
 from pathlib import Path
 from typing import cast
@@ -10,6 +12,39 @@ from .exceptions import CircularDependencyError, SecurityError
 from .resources import find_resource
 
 logger = logging.getLogger(__name__)
+
+
+def _recursive_expand(data: object, yaml_path: Path) -> object:
+    """Recursively expand environment variables in data structure."""
+    if isinstance(data, dict):
+        return {
+            k: _recursive_expand(v, yaml_path) for k, v in cast("dict[str, object]", data).items()
+        }
+    if isinstance(data, list):
+        return [_recursive_expand(v, yaml_path) for v in data]
+    if isinstance(data, str):
+        return _expand_value(data, yaml_path)
+    return data
+
+
+def _expand_value(value: str, yaml_path: Path) -> str:
+    """Expand ${.} and environment variables in string value."""
+    # Matches \${VAR} (escaped) or ${VAR} (unescaped)
+    pattern = re.compile(r"(\\)?\$\{([^}]+)\}")
+
+    def repl(match: re.Match[str]) -> str:
+        escape = match.group(1)
+        var: str = match.group(2)
+        if escape:
+            # It was \${VAR}, return ${VAR} (unescaped)
+            return f"${{{var}}}"
+
+        # It was ${VAR}, expand it
+        if var == ".":
+            return str(yaml_path.parent)
+        return os.environ.get(var, "")
+
+    return pattern.sub(repl, value)
 
 
 def should_process_file(
@@ -254,7 +289,9 @@ def _load_and_validate_yaml_dict(yaml_path: Path) -> dict[str, object] | None:
         if not isinstance(raw_data, dict):
             return None
 
-        return cast("dict[str, object]", raw_data)
+        # Expand environment variables and ${.}
+        expanded_data = _recursive_expand(raw_data, yaml_path)
+        return cast("dict[str, object]", expanded_data)
 
     except (OSError, yaml.YAMLError) as e:
         logger.warning("Error reading %s: %s", yaml_path, e)
