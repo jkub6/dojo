@@ -38,11 +38,19 @@ class NinjaGenerator:
     4. Derive: Output → Derived format (HTML → PDF via Decktape)
     """
 
-    def __init__(self, config: Config, config_path: Path, *, quiet: bool = False):
+    def __init__(
+        self,
+        config: Config,
+        config_path: Path,
+        *,
+        quiet: bool = False,
+        dry_run: bool = False,
+    ):
         """Initialize the NinjaBuilder."""
         self.config = config
         self.config_path = config_path.resolve()
         self.quiet = quiet
+        self.dry_run = dry_run
 
         # Configure paths
         self.src = Path(self.config.src_dir).resolve()
@@ -66,6 +74,9 @@ class NinjaGenerator:
             plugin = load_plugin(plugin_path)
             if plugin:
                 self.plugins.append(plugin)
+
+        # Sort plugins by priority (lower = earlier)
+        self.plugins.sort(key=lambda p: p.priority)
 
         # Collect rules: Built-in + Config Custom + Plugin Custom
         self.rules: list[CustomRule] = get_builtin_rules(self.config, self.config_path)
@@ -132,7 +143,6 @@ class NinjaGenerator:
         """Convert Markdown to JSON (Pandoc AST)."""
         json_node = sanitize_path(self.build_dir, rel_stem.with_suffix(".json"))
 
-        compile_defaults = self._get_merged_defaults(self.config.defaults, type_config.defaults)
         compile_defaults = self._get_merged_defaults(self.config.defaults, type_config.defaults)
         variables = {
             "in_shell": shell_quote(md_path),
@@ -249,7 +259,6 @@ class NinjaGenerator:
         filename = f"{rel_stem.name}{out_config.suffix}.{out_config.extension}"
         final_path = sanitize_path(self.out_dir, rel_stem.parent / filename)
 
-        raw_source = out_config.source
         if out_config.source is None:
             raise OutputSourceMissingError()
         raw_source = out_config.source
@@ -265,8 +274,6 @@ class NinjaGenerator:
                     out_config.id,
                 )
                 raise DependencyError(parent_id)
-            source_paths.append(local_registry[parent_id])
-
             source_paths.append(local_registry[parent_id])
 
         variables = {
@@ -367,13 +374,46 @@ class NinjaGenerator:
         for plugin in self.plugins:
             ninja_content = plugin.post_process_ninja(ninja_content)
 
+        # Dry-run mode: show plan without writing
+        if self.dry_run:
+            self._log_dry_run_summary(len(filtered_files))
+            return
+
+        self._write_ninja_file(ninja_content)
+        self._log_completion_summary()
+
+    def _log_dry_run_summary(self, source_count: int) -> None:
+        """Log the build plan summary for dry-run mode."""
+        logger.info("Dry-run mode: would generate %s", self.ninja_file)
+        logger.info("")
+        logger.info("Build plan:")
+        logger.info("  - %d source file(s) processed", source_count)
+        logger.info("  - %d output file(s) would be built", len(self.all_outputs))
+
+        if not self.quiet and self.all_outputs:
+            logger.info("")
+            logger.info("Outputs:")
+            max_display = 10
+            for output in self.all_outputs[:max_display]:
+                try:
+                    rel_output = output.relative_to(Path.cwd())
+                except ValueError:
+                    rel_output = output
+                logger.info("    → %s", rel_output)
+            if len(self.all_outputs) > max_display:
+                logger.info("    ... and %d more", len(self.all_outputs) - max_display)
+
+    def _write_ninja_file(self, content: str) -> None:
+        """Write the Ninja build file to disk."""
         try:
             with open(self.ninja_file, "w", encoding="utf-8") as f:
-                f.write(ninja_content)
+                f.write(content)
         except Exception:
             logger.exception("Failed to write %s", self.ninja_file)
             raise
 
+    def _log_completion_summary(self) -> None:
+        """Log the completion summary after successful generation."""
         logger.info("Generated: %s", self.ninja_file)
         logger.info("Outputs: %d file(s) will be built", len(self.all_outputs))
         logger.info("")

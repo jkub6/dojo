@@ -3,16 +3,18 @@ from pathlib import Path
 import pytest
 
 from dojo.exceptions import UnknownResourceCategoryError
-from dojo.resources import find_resource, get_pandoc_data_dirs
+from dojo.resources import clear_resource_cache, find_resource, get_pandoc_data_dirs
 
 
 def test_find_resource_absolute_path(tmp_path):
+    clear_resource_cache()  # Ensure clean state
     f = tmp_path / "test.yaml"
     f.touch()
     assert find_resource("defaults", str(f)) == f.resolve()
 
 
 def test_find_resource_cwd_relative(tmp_path, monkeypatch):
+    clear_resource_cache()
     monkeypatch.chdir(tmp_path)
     (tmp_path / "defaults").mkdir()
     f = tmp_path / "defaults" / "relative.yaml"
@@ -31,6 +33,7 @@ def test_find_resource_cwd_relative(tmp_path, monkeypatch):
 
 
 def test_find_resource_cwd_category_subdir_ignored(tmp_path, monkeypatch):
+    clear_resource_cache()
     # If file is in CWD/defaults/foo.yaml, and we ask for "foo", it should NOT be found
     # because Pandoc doesn't search CWD/category automatically.
     monkeypatch.chdir(tmp_path)
@@ -41,6 +44,7 @@ def test_find_resource_cwd_category_subdir_ignored(tmp_path, monkeypatch):
 
 
 def test_find_resource_no_recursive_upstream_search(tmp_path, monkeypatch):
+    clear_resource_cache()
     # User is in tmp_path/subdir
     # Resource is in tmp_path/defaults/mydefault.yaml
     monkeypatch.chdir(tmp_path)
@@ -59,6 +63,7 @@ def test_find_resource_no_recursive_upstream_search(tmp_path, monkeypatch):
 
 
 def test_find_resource_xdg_search(tmp_path, monkeypatch):
+    clear_resource_cache()
     # Mock XDG_DATA_HOME
     xdg_home = tmp_path / "share"
     monkeypatch.setenv("XDG_DATA_HOME", str(xdg_home))
@@ -73,6 +78,7 @@ def test_find_resource_xdg_search(tmp_path, monkeypatch):
 
 
 def test_find_resource_not_found(tmp_path):
+    clear_resource_cache()
     assert find_resource("defaults", "nonexistent") is None
 
 
@@ -120,3 +126,24 @@ def test_get_pandoc_data_dirs_override(tmp_path, monkeypatch):
     dirs = get_pandoc_data_dirs(extra_data_dirs=[extra])
     assert dirs == [extra.resolve()]
     assert (xdg / "pandoc") not in dirs
+
+
+def test_resource_cache_works(tmp_path):
+    """Test that repeated lookups hit the cache."""
+    clear_resource_cache()
+
+    f = tmp_path / "cached.yaml"
+    f.touch()
+
+    # First call
+    result1 = find_resource("defaults", str(f))
+    assert result1 == f.resolve()
+
+    # Second call should return cached result
+    result2 = find_resource("defaults", str(f))
+    assert result2 == f.resolve()
+
+    # Clear cache and verify we can still find it
+    clear_resource_cache()
+    result3 = find_resource("defaults", str(f))
+    assert result3 == f.resolve()

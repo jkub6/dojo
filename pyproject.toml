@@ -105,7 +105,13 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101", "ARG", "S603", "PT011"]
+# Test code is allowed to:
+# - S101: Use assert statements
+# - ARG: Have unused arguments (fixtures)
+# - S603: Use subprocess without shell=False validation
+# - PT011: pytest.raises without match parameter
+# - TRY301: Abstract raise to inner function (intentional for testing exceptions)
+"tests/**/*.py" = ["S101", "ARG", "S603", "PT011", "TRY301"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

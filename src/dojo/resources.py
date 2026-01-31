@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import os
 from pathlib import Path
 from typing import Literal
@@ -8,6 +9,9 @@ from .exceptions import UnknownResourceCategoryError
 
 # Standard Pandoc data directory names
 RESOURCE_CATEGORIES = {"defaults", "templates", "filters"}
+
+# Cache size for resource lookups
+_CACHE_SIZE = 256
 
 
 def get_xdg_data_home() -> Path:
@@ -46,6 +50,31 @@ def get_pandoc_data_dirs(
     return [p for p in paths if p.exists()]
 
 
+@functools.lru_cache(maxsize=_CACHE_SIZE)  # type: ignore[misc]
+def _cached_find_resource(
+    category: str,
+    name: str,
+    root_contexts_tuple: tuple[str, ...] | None,
+    extra_data_dirs_tuple: tuple[str, ...] | None,
+) -> str | None:
+    """Cache and resolve a resource by name.
+
+    Use string tuples for hashability. Return string path or None.
+    """
+    root_contexts = [Path(p) for p in root_contexts_tuple] if root_contexts_tuple else None
+    extra_data_dirs = [Path(p) for p in extra_data_dirs_tuple] if extra_data_dirs_tuple else None
+    result = _find_resource_impl(category, name, root_contexts, extra_data_dirs)
+    return str(result) if result else None
+
+
+def clear_resource_cache() -> None:
+    """Clear the resource lookup cache.
+
+    Useful for testing or when the filesystem has changed.
+    """
+    _cached_find_resource.cache_clear()
+
+
 def find_resource(
     category: str,
     name: str,
@@ -53,6 +82,8 @@ def find_resource(
     extra_data_dirs: list[Path] | None = None,
 ) -> Path | None:
     """Find a resource (file) by name in the specified category.
+
+    This function is cached for performance. Use clear_resource_cache() to reset.
 
     Search precedence (based on Pandoc behavior):
     1. Exact path (if name contains directory separators or is absolute) inside CWD or root contexts.
@@ -69,6 +100,21 @@ def find_resource(
         Resolved absolute Path object or None if not found.
 
     """
+    # Convert to hashable tuples for caching
+    root_tuple = tuple(str(p) for p in root_contexts) if root_contexts else None
+    data_tuple = tuple(str(p) for p in extra_data_dirs) if extra_data_dirs else None
+
+    result = _cached_find_resource(category, name, root_tuple, data_tuple)
+    return Path(result) if result else None
+
+
+def _find_resource_impl(
+    category: str,
+    name: str,
+    root_contexts: list[Path] | None = None,
+    extra_data_dirs: list[Path] | None = None,
+) -> Path | None:
+    """Resolve a resource without caching."""
     if category not in RESOURCE_CATEGORIES:
         raise UnknownResourceCategoryError(category)
 

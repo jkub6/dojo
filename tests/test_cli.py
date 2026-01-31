@@ -184,3 +184,60 @@ def test_build_verbose_exception(capsys):
     output = captured.out + captured.err
     assert "Test Error" in output
     assert "ValueError" in output
+
+
+def test_build_dry_run(tmp_path, monkeypatch, capsys):
+    """Test dry-run mode doesn't write files."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "dojo.yaml").write_text("""
+src_dir: content
+output_dir: _site
+build_dir: _build
+default_type: page
+types:
+  page:
+    outputs: []
+""")
+    (tmp_path / "content").mkdir()
+    (tmp_path / "content" / "test.md").write_text("# Test\n")
+
+    main(["build", "-c", "dojo.yaml", "--dry-run"])
+
+    # Verify no build.ninja was written
+    assert not (tmp_path / "_build" / "build.ninja").exists()
+
+    captured = capsys.readouterr()
+    assert "Dry-run" in captured.out
+
+
+def test_build_dry_run_with_outputs(tmp_path, monkeypatch, capsys):
+    """Test dry-run mode shows output summary."""
+    monkeypatch.chdir(tmp_path)
+    defaults_file = tmp_path / "defaults.yaml"
+    defaults_file.write_text("standalone: true\n")
+
+    (tmp_path / "dojo.yaml").write_text(f"""
+src_dir: content
+output_dir: _site
+build_dir: _build
+default_type: page
+types:
+  page:
+    outputs:
+      - extension: html
+        defaults: {defaults_file}
+""")
+    (tmp_path / "content").mkdir()
+    (tmp_path / "content" / "index.md").write_text("# Index\n")
+
+    main(["build", "-c", "dojo.yaml", "-n"])
+
+    # Verify no files written
+    assert not (tmp_path / "_build" / "build.ninja").exists()
+    assert not (tmp_path / "_site").exists()
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert "Dry-run" in output
+    # Should show the build plan
+    assert "source file" in output.lower() or "Build plan" in output

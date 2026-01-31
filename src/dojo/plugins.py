@@ -18,7 +18,16 @@ class PluginInterface:
     - Adding custom Ninja rules
     - Modifying output configurations
     - Post-processing the generated Ninja file
+
+    Attributes:
+        priority: Execution order (lower = earlier). Default is 100.
+            Use 0-49 for validation/preprocessing, 50-99 for transformations,
+            100 for default, 101-200 for post-processing.
+
     """
+
+    # Default priority - plugins execute in this order
+    priority: int = 100
 
     def get_custom_rules(self) -> list[CustomRule]:
         """Return custom Ninja rules to add.

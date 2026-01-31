@@ -8,6 +8,7 @@ from rich.logging import RichHandler
 
 from .config import load_config
 from .core import NinjaGenerator
+from .logging import setup_logging as setup_json_logging
 
 console = Console()
 
@@ -15,13 +16,19 @@ logger = logging.getLogger("dojo")
 
 
 class DojoArgs(argparse.Namespace):
-    """Typed arguments for dojo CLI."""
+    """Typed arguments for dojo CLI.
 
-    command: str | None
-    config: str | None
-    verbose: bool
-    quiet: bool
-    version: bool
+    All attributes have default values to ensure they are always present,
+    even when the corresponding argument is not parsed (e.g., subcommand-specific args).
+    """
+
+    command: str | None = None
+    config: str | None = None
+    verbose: bool = False
+    quiet: bool = False
+    version: bool = False
+    dry_run: bool = False
+    json_output: bool = False
 
 
 def get_version() -> str:
@@ -30,7 +37,7 @@ def get_version() -> str:
     return "0.1.0"
 
 
-def setup_cli_logging(*, verbose: bool, quiet: bool) -> None:
+def setup_cli_logging(*, verbose: bool, quiet: bool, json_output: bool = False) -> None:
     """Set up logging configuration."""
     if quiet:
         level = logging.ERROR
@@ -39,6 +46,12 @@ def setup_cli_logging(*, verbose: bool, quiet: bool) -> None:
     else:
         level = logging.INFO
 
+    # Use JSON formatter for machine-parseable output
+    if json_output:
+        setup_json_logging(level=level, json_output=True)
+        return
+
+    # Use Rich for human-readable output
     logging.basicConfig(
         level=level,
         format="%(message)s",
@@ -57,15 +70,21 @@ def cmd_build(
     """Handle the build command."""
     try:
         config, config_path = load_config(args.config)
+
         if not args.quiet:
             console.print(f"[bold green]Using configuration:[/bold green] {config_path}")
 
-        generator = NinjaGenerator(config, config_path, quiet=args.quiet)
+        generator = NinjaGenerator(config, config_path, quiet=args.quiet, dry_run=args.dry_run)
 
         generator.generate()
 
         if not args.quiet:
-            console.print("[bold green]✨ Build configuration generated successfully![/bold green]")
+            if args.dry_run:
+                console.print("[bold cyan]🔍 Dry-run complete. No files written.[/bold cyan]")
+            else:
+                console.print(
+                    "[bold green]✨ Build configuration generated successfully![/bold green]"
+                )
 
     except FileNotFoundError as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
@@ -155,19 +174,30 @@ def main(argv: list[str] | None = None) -> None:
         help="Suppress all output except errors",
     )
     parser.add_argument("--version", action="store_true", help="Show version info and exit")
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="Output logs as JSON for CI/tooling integration",
+    )
 
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
 
     # Build command
-    # Build command
     build_parser = subparsers.add_parser("build", help="Generate Ninja build file (default)")
     build_parser.add_argument("-c", "--config", help="Path to configuration file")
+    build_parser.add_argument(
+        "-n",
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="Show what would be built without generating files",
+    )
 
     # Check command
     check_parser = subparsers.add_parser("check", help="Validate configuration")
     check_parser.add_argument("-c", "--config", help="Path to configuration file")
 
-    # Init command
     # Init command
     subparsers.add_parser("init", help="Create a sample configuration")
 
@@ -176,7 +206,11 @@ def main(argv: list[str] | None = None) -> None:
 
     args = parser.parse_args(argv, namespace=DojoArgs())
 
-    setup_cli_logging(verbose=args.verbose, quiet=args.quiet)
+    setup_cli_logging(
+        verbose=args.verbose,
+        quiet=args.quiet,
+        json_output=args.json_output,
+    )
 
     if args.version or args.command == "version":
         cmd_version(args)

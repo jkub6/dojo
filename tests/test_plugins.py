@@ -67,3 +67,47 @@ def test_interface_methods():
     assert plugin.get_custom_rules() == []
     assert plugin.modify_output_config("config", "type") == "config"
     assert plugin.post_process_ninja("content") == "content"
+
+
+def test_plugin_priority_default():
+    """Test that default plugin priority is 100."""
+    plugin = PluginInterface()
+    expected_default = 100
+    assert plugin.priority == expected_default
+
+
+def test_plugin_priority_custom(tmp_path):
+    """Test plugin with custom priority."""
+    plugin_file = tmp_path / "priority_plugin.py"
+    content = """
+from dojo.plugins import PluginInterface
+
+class PriorityPlugin(PluginInterface):
+    priority = 50
+"""
+    plugin_file.write_text(content)
+
+    plugin = load_plugin(str(plugin_file))
+    assert plugin is not None
+    expected_priority = 50
+    assert plugin.priority == expected_priority
+
+
+def test_plugin_priority_sorting():
+    """Test plugins are sorted correctly by priority."""
+
+    class LowPriority(PluginInterface):
+        priority = 200
+
+    class HighPriority(PluginInterface):
+        priority = 10
+
+    class DefaultPriority(PluginInterface):
+        pass  # Uses default 100
+
+    plugins = [LowPriority(), DefaultPriority(), HighPriority()]
+    sorted_plugins = sorted(plugins, key=lambda p: getattr(p, "priority", 100))
+
+    assert isinstance(sorted_plugins[0], HighPriority)
+    assert isinstance(sorted_plugins[1], DefaultPriority)
+    assert isinstance(sorted_plugins[2], LowPriority)
