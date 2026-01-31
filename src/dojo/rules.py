@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 from typing import cast
@@ -21,24 +22,32 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     # Create a PATH environment variable string that includes all resolved tool directories
     # This ensures that tools invoked by other tools (e.g. pandoc calling typst) work correctly
     # even if they aren't in the global PATH but were resolved during config loading
-    tool_dirs = set()
+    tool_dirs = []
     # Cast to dict[str, str] to avoid Any in values()
     tools_dict = cast("dict[str, str]", config.tools.model_dump())
     for tool_path_raw in tools_dict.values():
         tool_path = str(tool_path_raw)
         if tool_path and Path(tool_path).exists():
-            tool_dirs.add(str(Path(tool_path).parent))
+            parent_dir = str(Path(tool_path).parent)
+            if parent_dir not in tool_dirs:
+                tool_dirs.append(parent_dir)
+
+    # Propagate DOJO_ environment variables and set PATH
+    env_vars = {k: v for k, v in os.environ.items() if k.startswith("DOJO_")}
+    if tool_dirs:
+        env_vars["PATH"] = f"{':'.join(tool_dirs)}:$PATH"
 
     path_prefix = ""
-    if tool_dirs:
-        # Sort for determinism
-        path_env = ":".join(sorted(tool_dirs))
-        path_prefix = f"env PATH={path_env}:$PATH "
+    if env_vars:
+        # Sort keys for determinism in the generated ninja file
+        env_parts = [f"{k}={shell_quote(v)}" for k, v in sorted(env_vars.items())]
+        path_prefix = f"env {' '.join(env_parts)} "
 
     rules = []
 
     # REGENERATE Rule
     # We use sys.executable -m dojo to ensure we run the same package context
+    # We include path_prefix to ensure the sub-run has the same tool environment
     cmd_parts = [
         sys.executable,
         "-m",
@@ -51,7 +60,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     rules.append(
         CustomRule(
             name=RuleName.REGENERATE.value,
-            command=" ".join(cmd_parts),
+            command=f"{path_prefix}{' '.join(cmd_parts)}",
             description="⚙️  REGENERATE build.ninja",
             generator=True,
         ),

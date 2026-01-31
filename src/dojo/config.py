@@ -64,16 +64,28 @@ class ToolPaths(BaseModel):
         essential_tools = ["python", "pandoc"]
         for tool in ["python", "pandoc", "minify", "ghostscript", "decktape", "typst"]:
             current = cast("str", getattr(self, tool))
-            if current:
+            if not current:
+                continue
+
+            # 1. Check for Environment Variable Override (e.g., DOJO_PANDOC)
+            # We prioritize this if the current value is the default
+            env_var = f"DOJO_{tool.upper()}"
+            env_path = os.environ.get(env_var)
+
+            if env_path and current == self.model_fields[tool].default:
+                resolved = env_path
+            else:
+                # 2. Regular resolution via PATH
                 resolved = shutil.which(current)
-                if resolved:
-                    setattr(self, tool, resolved)
-                elif tool in essential_tools:
-                    raise EssentialToolNotFoundError(tool, current)
-                else:
-                    # Optional tool not found
-                    # We accept this but if it is used later, it will fail at runtime
-                    pass
+
+            if resolved:
+                setattr(self, tool, resolved)
+            elif tool in essential_tools:
+                raise EssentialToolNotFoundError(tool, current)
+            else:
+                # Optional tool not found
+                # We accept this but if it is used later, it will fail at runtime
+                pass
         return self
 
 

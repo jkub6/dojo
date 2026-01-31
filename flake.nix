@@ -54,18 +54,6 @@
         ]
       );
 
-    pandoc-src = pkgs: let
-      hp = pkgs.haskellPackages.override {
-        overrides = hself: hsuper: {
-          citeproc = hself.callCabal2nix "citeproc" citeproc-src {};
-          texmath = hself.callHackage "texmath" "0.13.0.2" {};
-          typst = hself.callHackage "typst" "0.8.1" {};
-          typst-symbols = hself.callHackage "typst-symbols" "0.1.9.1" {};
-        };
-      };
-    in
-      pkgs.haskell.lib.dontCheck (hp.callCabal2nix "pandoc" pandoc {});
-
     runtimeDeps = pkgs:
       with pkgs; [
         chromium
@@ -74,8 +62,7 @@
         typst
         minify
         ninja
-        # pandoc
-        (pandoc-src pkgs)
+        pandoc.packages.${pkgs.system}.default
       ];
   in {
     packages = forAllSystems (system: let
@@ -94,7 +81,12 @@
           mkdir -p $out/bin
           makeWrapper ${venv}/bin/dojo $out/bin/dojo \
             --unset PYTHONPATH \
-            --prefix PATH : ${pkgs.lib.makeBinPath (runtimeDeps pkgs)}
+            --prefix PATH : ${pkgs.lib.makeBinPath (runtimeDeps pkgs)} \
+            --set DOJO_PANDOC "${pandoc.packages.${pkgs.system}.default}/bin/pandoc" \
+            --set DOJO_TYPST "${pkgs.typst}/bin/typst" \
+            --set DOJO_MINIFY "${pkgs.minify}/bin/minify" \
+            --set DOJO_GHOSTSCRIPT "${pkgs.ghostscript}/bin/gs" \
+            --set DOJO_DECKTAPE "${pkgs.decktape}/bin/decktape"
         '';
 
         meta = with pkgs.lib; {
