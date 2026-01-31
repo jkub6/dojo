@@ -40,16 +40,12 @@
 
     # Helper to build the custom Pandoc binary package
     mkPandoc = pkgs: let
-      version = "3.8.3";
+      version = "3.8.3-jake";
       inherit (pkgs.stdenv.hostPlatform) system;
       sources = {
         "x86_64-linux" = {
-          url = "https://github.com/jgm/pandoc/releases/download/${version}/pandoc-${version}-linux-amd64.tar.gz";
-          hash = "sha256-wiT6uJ+CfTYjOA7LfBB4wWPHachJoUrCfo07+7kUybQ=";
-        };
-        "aarch64-linux" = {
-          url = "https://github.com/jgm/pandoc/releases/download/${version}/pandoc-${version}-linux-arm64.tar.gz";
-          hash = "sha256-FmpaNzh+sQvUxPJCqBCb7vdVrB6NTrA5xrXr0dkY2Nc=";
+          url = "https://github.com/jkub6/pandoc/releases/download/jake-test/nightly-linux.zip";
+          hash = "sha256-l34bkcPDV09vDab4qRt8oEZdxaFD8NUFpsEf6ys82Dk=";
         };
       };
       source = sources.${system} or (throw "Unsupported system: ${system}");
@@ -58,10 +54,34 @@
         pname = "pandoc-bin";
         inherit version;
         src = pkgs.fetchurl source;
+
+        # 1. Add autoPatchelfHook to fix the binary
+        nativeBuildInputs = [
+          pkgs.unzip
+          pkgs.autoPatchelfHook
+        ];
+
+        # 2. Add dependencies the binary likely needs to link against
+        # Pandoc (Haskell) usually needs gmp, zlib, and standard C++ libs
+        buildInputs = [
+          pkgs.gmp
+          pkgs.zlib
+          pkgs.stdenv.cc.cc.lib
+        ];
+
+        setSourceRoot = "sourceRoot=$(echo pandoc-nightly-linux-*)";
+
         installPhase = ''
-          mkdir -p $out/bin $out/share/man/man1
-          cp bin/pandoc $out/bin/
-          cp share/man/man1/pandoc.1.gz $out/share/man/man1/
+          runHook preInstall
+          mkdir -p $out/bin
+          cp pandoc $out/bin/pandoc
+          chmod +x $out/bin/pandoc
+
+          if [ -d "share" ]; then
+            mkdir -p $out/share/man/man1
+            cp -r share/man/man1/* $out/share/man/man1/
+          fi
+          runHook postInstall
         '';
       };
 
