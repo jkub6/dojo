@@ -145,6 +145,15 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
         ),
     )
 
+    # COPY Rule
+    rules.append(
+        CustomRule(
+            name=RuleName.COPY.value,
+            command="cp $in_shell $out_shell",
+            description="📂 COPY $out",
+        ),
+    )
+
     # MINIFY Rule
     rules.append(
         CustomRule(

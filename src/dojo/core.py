@@ -17,6 +17,7 @@ from .exceptions import DependencyError, OutputSourceMissingError, OutputToolMis
 from .plugins import PluginInterface, load_plugin
 from .rules import get_builtin_rules
 from .utils import (
+    get_frontmatter_assets,
     get_recursive_yaml_deps,
     ninja_escape,
     parse_frontmatter_type,
@@ -67,6 +68,7 @@ class NinjaGenerator:
 
         # Track all final outputs
         self.all_outputs: list[Path] = []
+        self.copied_assets: set[Path] = set()
 
         # Load plugins
         self.plugins: list[PluginInterface] = []
@@ -339,6 +341,37 @@ class NinjaGenerator:
             self._render_stage(current_config, json_node, rel_stem, local_registry)
 
         self.emitter.newline()
+
+        # Handle assets referenced in frontmatter (e.g., css)
+        assets = get_frontmatter_assets(md_path)
+        for asset in assets:
+            try:
+                rel_asset = asset.relative_to(self.src)
+            except ValueError:
+                logger.warning(
+                    "Referenced asset outside source directory, cannot auto-copy: %s", asset
+                )
+                continue
+
+            final_path = sanitize_path(self.out_dir, rel_asset)
+
+            # Avoid duplicate rules for the same asset
+            if final_path in self.copied_assets:
+                continue
+
+            self.emitter.build(
+                outputs=final_path,
+                rule=RuleName.COPY.value,
+                inputs=asset,
+                variables={
+                    "in_shell": shell_quote(asset),
+                    "out_shell": shell_quote(final_path),
+                },
+            )
+
+            self.copied_assets.add(final_path)
+            self.all_outputs.append(final_path)
+            self.emitter.newline()
 
     def generate(self) -> None:
         """Scan source files and generate build.ninja."""

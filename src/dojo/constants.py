@@ -7,6 +7,7 @@ class RuleName(str, Enum):
     REGENERATE = "regenerate"
     COMPILE = "compile"
     RENDER = "render"
+    COPY = "copy"
     MINIFY = "minify"
     GHOSTSCRIPT = "ghostscript"
     DECKTAPE = "decktape"

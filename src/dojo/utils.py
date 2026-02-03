@@ -298,15 +298,13 @@ def _load_and_validate_yaml_dict(yaml_path: Path) -> dict[str, object] | None:
         return None
 
 
-def parse_frontmatter_type(md_path: Path, default_type: str) -> str:
-    """Extract the 'type' field from YAML frontmatter.
+def parse_frontmatter(md_path: Path) -> dict[str, object] | None:
+    """Parse YAML frontmatter from a markdown file.
 
-    Returns default_type if:
+    Returns None if:
     - No frontmatter exists
     - Frontmatter is malformed
-    - No 'type' field is present
-
-    This is a lightweight parser - only reads until end of frontmatter.
+    - File cannot be read
     """
     try:
         with open(md_path, encoding="utf-8") as f:
@@ -318,7 +316,7 @@ def parse_frontmatter_type(md_path: Path, default_type: str) -> str:
                     break
 
             if first_line.strip() != "---":
-                return default_type
+                return None
 
             # Collect frontmatter content
             frontmatter_lines = []
@@ -331,14 +329,57 @@ def parse_frontmatter_type(md_path: Path, default_type: str) -> str:
             frontmatter_text = "".join(frontmatter_lines)
             frontmatter_raw: object = yaml.safe_load(frontmatter_text)
             if not isinstance(frontmatter_raw, dict):
-                return default_type
-            frontmatter = cast("dict[str, object]", frontmatter_raw)
-
-            if frontmatter and "type" in frontmatter:
-                return str(frontmatter["type"]).strip()
+                return None
+            return cast("dict[str, object]", frontmatter_raw)
 
     except (OSError, yaml.YAMLError) as e:
         logger.warning("Could not parse frontmatter in %s: %s", md_path, e)
-        logger.debug("Using default type: %s", default_type)
+
+    return None
+
+
+def parse_frontmatter_type(md_path: Path, default_type: str) -> str:
+    """Extract the 'type' field from YAML frontmatter.
+
+    Returns default_type if:
+    - No frontmatter exists
+    - Frontmatter is malformed
+    - No 'type' field is present
+
+    This is a lightweight parser - only reads until end of frontmatter.
+    """
+    frontmatter = parse_frontmatter(md_path)
+    if frontmatter and "type" in frontmatter:
+        return str(frontmatter["type"]).strip()
 
     return default_type
+
+
+def get_frontmatter_assets(md_path: Path) -> list[Path]:
+    """Extract asset paths from markdown frontmatter."""
+    frontmatter = parse_frontmatter(md_path)
+    if not frontmatter:
+        return []
+
+    # Asset keys that implicitly reference files we might need to copy
+    # We only care about assets that need to be present in the output directory
+    # For now, let's focus on css, but others might be needed too.
+    # Pandoc uses 'css' for stylesheets.
+    # 'bibliography' and 'csl' are used for citation processing, not output assets usually?
+    # Actually bibliography are read by pandoc, not linked in HTML (unless served?)
+    # But files referenced in `css` definitely need to be served.
+    asset_keys = ["css"]
+
+    raw_assets = _extract_paths(frontmatter, asset_keys)
+
+    assets = []
+    for asset_ref in raw_assets:
+        # Resolve relative to the markdown file
+        asset_path = Path(asset_ref)
+        if not asset_path.is_absolute():
+            asset_path = md_path.parent / asset_path
+
+        if asset_path.exists():
+            assets.append(asset_path.resolve())
+
+    return assets
