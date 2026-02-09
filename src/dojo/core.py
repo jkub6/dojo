@@ -20,10 +20,15 @@ from .utils import (
     get_frontmatter_assets,
     get_recursive_yaml_deps,
     ninja_escape,
+    parse_frontmatter,
     parse_frontmatter_type,
+    resolve_glob_dependencies,
     sanitize_path,
+    scan_css_dependencies,
+    scan_html_dependencies,
     shell_quote,
     should_process_file,
+    _extract_paths,
 )
 
 logger = logging.getLogger(__name__)
@@ -342,9 +347,35 @@ class NinjaGenerator:
 
         self.emitter.newline()
 
-        # Handle assets referenced in frontmatter (e.g., css)
-        assets = get_frontmatter_assets(md_path)
-        for asset in assets:
+        # Handle assets referenced in frontmatter and recursive dependencies
+        # 1. Get initial assets from frontmatter 'css'
+        pending_assets = set(get_frontmatter_assets(md_path))
+        
+        # 2. Get assets from 'dependencies' glob patterns
+        frontmatter = parse_frontmatter(md_path)
+        if frontmatter and "dependencies" in frontmatter:
+            dep_patterns = _extract_paths(frontmatter, ["dependencies"])
+            glob_assets = resolve_glob_dependencies(md_path.parent, dep_patterns)
+            pending_assets.update(glob_assets)
+
+        # 3. Recursive processing loop
+        # We use a while loop to handle nested dependencies discovered during scanning
+        queue = list(pending_assets)
+        processed_assets = set()
+        
+        while queue:
+            asset = queue.pop(0)
+            
+            # Avoid processing the same asset twice in this cycle
+            if asset in processed_assets:
+                continue
+            processed_assets.add(asset)
+            
+            # Self-reference check: Don't copy the source markdown file itself
+            # even if a glob included it.
+            if asset.resolve() == md_path.resolve():
+                continue
+
             try:
                 rel_asset = asset.relative_to(self.src)
             except ValueError:
@@ -355,23 +386,38 @@ class NinjaGenerator:
 
             final_path = sanitize_path(self.out_dir, rel_asset)
 
-            # Avoid duplicate rules for the same asset
-            if final_path in self.copied_assets:
-                continue
-
-            self.emitter.build(
-                outputs=final_path,
-                rule=RuleName.COPY.value,
-                inputs=asset,
-                variables={
-                    "in_shell": shell_quote(asset),
-                    "out_shell": shell_quote(final_path),
-                },
-            )
-
-            self.copied_assets.add(final_path)
-            self.all_outputs.append(final_path)
-            self.emitter.newline()
+            # Global deduplication: Only emit COPY rule once per build
+            if final_path not in self.copied_assets:
+                self.emitter.build(
+                    outputs=final_path,
+                    rule=RuleName.COPY.value,
+                    inputs=asset,
+                    variables={
+                        "in_shell": shell_quote(asset),
+                        "out_shell": shell_quote(final_path),
+                    },
+                )
+                self.copied_assets.add(final_path)
+                self.all_outputs.append(final_path)
+                self.emitter.newline()
+            
+            # Smart Scanning: Look for nested dependencies
+            # CSS -> url()
+            if asset.suffix.lower() == ".css":
+                new_deps = scan_css_dependencies(asset)
+                for dep in new_deps:
+                    if dep not in processed_assets:
+                        queue.append(dep)
+            
+            # HTML -> src, href
+            elif asset.suffix.lower() == ".html":
+                new_deps = scan_html_dependencies(asset)
+                for dep in new_deps:
+                    if dep not in processed_assets:
+                        queue.append(dep)
+            
+            # Explicitly DO NOT scan JS files
+            # Any other file types are just copied (leaf nodes)
 
     def generate(self) -> None:
         """Scan source files and generate build.ninja."""
