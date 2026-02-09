@@ -40,39 +40,42 @@
 
     mkPandoc = pkgs: let
       version = "3.9";
-      
+
       # Determine suffix based on system
-      suffix = {
-        "x86_64-linux"   = "linux-amd64.tar.gz";
-        "aarch64-linux"  = "linux-arm64.tar.gz";
-        "x86_64-darwin"  = "x86_64-macOS.zip";
-        "aarch64-darwin" = "arm64-macOS.zip"; 
-      }.${pkgs.system} or (throw "Unsupported system: ${pkgs.system}");
+      suffix =
+        {
+          "x86_64-linux" = "linux-amd64.tar.gz";
+          "aarch64-linux" = "linux-arm64.tar.gz";
+          "x86_64-darwin" = "x86_64-macOS.zip";
+          "aarch64-darwin" = "arm64-macOS.zip";
+        }.${
+          pkgs.system
+        } or (throw "Unsupported system: ${pkgs.system}");
 
       url = "https://github.com/jgm/pandoc/releases/download/${version}/pandoc-${version}-${suffix}";
     in
-    pkgs.stdenv.mkDerivation {
-      pname = "pandoc-bin";
-      inherit version;
+      pkgs.stdenv.mkDerivation {
+        pname = "pandoc-bin";
+        inherit version;
 
-      src = pkgs.fetchurl {
-        inherit url;
-        hash = "sha256-hyoQx+wp1SeIMdhVsRvUreDfTV7JoImjGXvGOjfrQAM="; 
+        src = pkgs.fetchurl {
+          inherit url;
+          hash = "sha256-hyoQx+wp1SeIMdhVsRvUreDfTV7JoImjGXvGOjfrQAM=";
+        };
+
+        nativeBuildInputs = [pkgs.unzip pkgs.installShellFiles];
+
+        installPhase = ''
+          mkdir -p $out/bin
+          # Handle the different directory structures of zip vs tar.gz
+          if [ -d bin ]; then
+            cp bin/pandoc $out/bin/
+          else
+            # Fallback for flat archives or different layouts
+            cp pandoc $out/bin/ || cp */bin/pandoc $out/bin/
+          fi
+        '';
       };
-
-      nativeBuildInputs = [ pkgs.unzip pkgs.installShellFiles ];
-
-      installPhase = ''
-        mkdir -p $out/bin
-        # Handle the different directory structures of zip vs tar.gz
-        if [ -d bin ]; then
-          cp bin/pandoc $out/bin/
-        else
-          # Fallback for flat archives or different layouts
-          cp pandoc $out/bin/ || cp */bin/pandoc $out/bin/
-        fi
-      '';
-    };
 
     mkPythonSet = pkgs: workspace:
       (pkgs.callPackage pyproject-nix.build.packages {python = pkgs.python314;}).overrideScope (
@@ -123,7 +126,7 @@
           description = "Professional Ninja Build Generator";
           homepage = "https://github.com/jkub6/dojo";
           license = licenses.mit;
-          platforms = platforms.all; 
+          platforms = platforms.all;
           mainProgram = "dojo";
         };
       };
