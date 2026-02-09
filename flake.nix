@@ -35,55 +35,43 @@
     uv2nix,
     pyproject-build-systems,
   }: let
-    # forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux" "aarch64-linux"];
-    forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux"];
+    forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
 
-    # Helper to build the custom Pandoc binary package
     mkPandoc = pkgs: let
-      version = "3.8.3-jake";
-      inherit (pkgs.stdenv.hostPlatform) system;
-      sources = {
-        "x86_64-linux" = {
-          url = "https://github.com/jkub6/pandoc/releases/download/jake-test/nightly-linux.zip";
-          hash = "sha256-l34bkcPDV09vDab4qRt8oEZdxaFD8NUFpsEf6ys82Dk=";
-        };
-      };
-      source = sources.${system} or (throw "Unsupported system: ${system}");
+      version = "3.9";
+      
+      # Determine suffix based on system
+      suffix = {
+        "x86_64-linux"   = "linux-amd64.tar.gz";
+        "aarch64-linux"  = "linux-arm64.tar.gz";
+        "x86_64-darwin"  = "x86_64-macOS.zip";
+        "aarch64-darwin" = "arm64-macOS.zip"; 
+      }.${pkgs.system} or (throw "Unsupported system: ${pkgs.system}");
+
+      url = "https://github.com/jgm/pandoc/releases/download/${version}/pandoc-${version}-${suffix}";
     in
-      pkgs.stdenv.mkDerivation {
-        pname = "pandoc-bin";
-        inherit version;
-        src = pkgs.fetchurl source;
+    pkgs.stdenv.mkDerivation {
+      pname = "pandoc-bin";
+      inherit version;
 
-        # 1. Add autoPatchelfHook to fix the binary
-        nativeBuildInputs = [
-          pkgs.unzip
-          pkgs.autoPatchelfHook
-        ];
-
-        # 2. Add dependencies the binary likely needs to link against
-        # Pandoc (Haskell) usually needs gmp, zlib, and standard C++ libs
-        buildInputs = [
-          pkgs.gmp
-          pkgs.zlib
-          pkgs.stdenv.cc.cc.lib
-        ];
-
-        setSourceRoot = "sourceRoot=$(echo pandoc-nightly-linux-*)";
-
-        installPhase = ''
-          runHook preInstall
-          mkdir -p $out/bin
-          cp pandoc $out/bin/pandoc
-          chmod +x $out/bin/pandoc
-
-          if [ -d "share" ]; then
-            mkdir -p $out/share/man/man1
-            cp -r share/man/man1/* $out/share/man/man1/
-          fi
-          runHook postInstall
-        '';
+      src = pkgs.fetchurl {
+        inherit url;
+        hash = "sha256-hyoQx+wp1SeIMdhVsRvUreDfTV7JoImjGXvGOjfrQAM="; 
       };
+
+      nativeBuildInputs = [ pkgs.unzip pkgs.installShellFiles ];
+
+      installPhase = ''
+        mkdir -p $out/bin
+        # Handle the different directory structures of zip vs tar.gz
+        if [ -d bin ]; then
+          cp bin/pandoc $out/bin/
+        else
+          # Fallback for flat archives or different layouts
+          cp pandoc $out/bin/ || cp */bin/pandoc $out/bin/
+        fi
+      '';
+    };
 
     mkPythonSet = pkgs: workspace:
       (pkgs.callPackage pyproject-nix.build.packages {python = pkgs.python314;}).overrideScope (
@@ -134,7 +122,7 @@
           description = "Professional Ninja Build Generator";
           homepage = "https://github.com/jkub6/dojo";
           license = licenses.mit;
-          platforms = platforms.linux; # Adjusted based on your binary targets
+          platforms = platforms.all; 
           mainProgram = "dojo";
         };
       };
