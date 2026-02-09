@@ -1,0 +1,4 @@
+standalone: true
+to: html5
+metadata:
+  lang: en
