@@ -35,7 +35,8 @@
     uv2nix,
     pyproject-build-systems,
   }: let
-    forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
+    forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux" "aarch64-linux"];
+    # forAllSystems = nixpkgs.lib.genAttrs ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
 
     mkPandoc = pkgs: let
       version = "3.9";

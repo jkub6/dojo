@@ -1,6 +1,8 @@
 import argparse
 import logging
 import sys
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as get_pkg_version
 from pathlib import Path
 
 from rich.console import Console
@@ -9,6 +11,7 @@ from rich.logging import RichHandler
 from .config import load_config
 from .core import NinjaGenerator
 from .logging import setup_logging as setup_json_logging
+from .schema import print_schema, write_schema
 
 console = Console()
 
@@ -29,12 +32,19 @@ class DojoArgs(argparse.Namespace):
     version: bool = False
     dry_run: bool = False
     json_output: bool = False
+    output: str | None = None
 
 
 def get_version() -> str:
-    """Get the current version of dojo."""
-    # In a real package, use importlib.metadata
-    return "0.1.0"
+    """Get the current version of dojo.
+
+    Uses importlib.metadata to read version from package metadata,
+    with fallback for development installs.
+    """
+    try:
+        return get_pkg_version("dojo")
+    except PackageNotFoundError:
+        return "0.1.0-dev"
 
 
 def setup_cli_logging(*, verbose: bool, quiet: bool, json_output: bool = False) -> None:
@@ -157,6 +167,16 @@ def cmd_version(_args: DojoArgs) -> None:
     console.print(f"[bold]dojo[/bold] version [cyan]{v}[/cyan]")
 
 
+def cmd_schema(args: DojoArgs) -> None:
+    """Handle the schema command."""
+    if args.output:
+        output_path = Path(args.output)
+        write_schema(output_path)
+        console.print(f"[bold green]✓ Schema written to:[/bold green] {output_path}")
+    else:
+        print_schema()
+
+
 def main(argv: list[str] | None = None) -> None:
     """CLI entry point for dojo."""
     parser = argparse.ArgumentParser(
@@ -201,6 +221,14 @@ def main(argv: list[str] | None = None) -> None:
     # Init command
     subparsers.add_parser("init", help="Create a sample configuration")
 
+    # Schema command
+    schema_parser = subparsers.add_parser("schema", help="Output JSON Schema for configuration")
+    schema_parser.add_argument(
+        "-o",
+        "--output",
+        help="Write schema to file instead of stdout",
+    )
+
     # Version command (as subcommand)
     subparsers.add_parser("version", help="Show version info")
 
@@ -227,6 +255,8 @@ def main(argv: list[str] | None = None) -> None:
         cmd_check(args)
     elif command == "init":
         cmd_init(args)
+    elif command == "schema":
+        cmd_schema(args)
     else:
         parser.print_help()
         sys.exit(1)

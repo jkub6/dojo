@@ -1,3 +1,9 @@
+"""Core build generator for the dojo static site pipeline.
+
+This module provides the NinjaGenerator class that orchestrates the build
+pipeline using decomposed stage classes for better maintainability.
+"""
+
 from __future__ import annotations
 
 import io
@@ -12,24 +18,13 @@ from .constants import PoolName, RuleName
 from .emitter import NinjaEmitter
 
 if TYPE_CHECKING:
-    from .config import Config, CustomRule, OutputConfig, TypeConfig
-from .exceptions import DependencyError, OutputSourceMissingError, OutputToolMissingError
+    from .config import Config, CustomRule
+
+from .paths import should_process_file
 from .plugins import PluginInterface, load_plugin
 from .rules import get_builtin_rules
-from .utils import (
-    get_frontmatter_assets,
-    get_recursive_yaml_deps,
-    ninja_escape,
-    parse_frontmatter,
-    parse_frontmatter_type,
-    resolve_glob_dependencies,
-    sanitize_path,
-    scan_css_dependencies,
-    scan_html_dependencies,
-    shell_quote,
-    should_process_file,
-    _extract_paths,
-)
+from .stages import AssetProcessor, CompileStage, RenderStage
+from .yaml_utils import parse_frontmatter_type
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +37,11 @@ class NinjaGenerator:
     2. Render: JSON → Output format (HTML, PDF, etc)
     3. Post-process: Output → Optimized (minify, compress)
     4. Derive: Output → Derived format (HTML → PDF via Decktape)
+
+    This class orchestrates the pipeline using specialized stage classes:
+    - CompileStage: Handles Markdown to JSON AST conversion
+    - RenderStage: Handles JSON to output format rendering
+    - AssetProcessor: Handles dependency tracking and asset copying
     """
 
     def __init__(
@@ -91,23 +91,35 @@ class NinjaGenerator:
         for plugin in self.plugins:
             self.rules.extend(plugin.get_custom_rules())
 
+        # Initialize pipeline stages
+        self._compile_stage = CompileStage(
+            config=self.config,
+            build_dir=self.build_dir,
+            emitter=self.emitter,
+        )
+        self._render_stage = RenderStage(
+            config=self.config,
+            out_dir=self.out_dir,
+            build_dir=self.build_dir,
+            emitter=self.emitter,
+            all_outputs=self.all_outputs,
+        )
+        self._asset_processor = AssetProcessor(
+            src=self.src,
+            out_dir=self.out_dir,
+            emitter=self.emitter,
+            copied_assets=self.copied_assets,
+            all_outputs=self.all_outputs,
+        )
+
+    # Keep legacy methods for backward compatibility with tests
     def _get_merged_defaults(self, *sources: str | list[str] | None) -> list[Path]:
         """Merge default files from multiple sources and return absolute paths."""
-        merged = []
-        for src in sources:
-            if not src:
-                continue
-            if isinstance(src, str):
-                merged.append(Path(src))
-            else:
-                merged.extend(Path(s) for s in src)
-        return merged
+        return self._compile_stage._get_merged_defaults(*sources)
 
     def _format_defaults_var(self, defaults: list[Path]) -> str:
         """Format list of defaults into ninja variable string."""
-        if not defaults:
-            return ""
-        return "-d " + " -d ".join(ninja_escape(d) for d in defaults)
+        return self._compile_stage._format_defaults_var(defaults)
 
     def emit_header(self) -> None:
         """Generate Ninja file header with version, pools, and rules."""
@@ -146,165 +158,6 @@ class NinjaGenerator:
                 )
                 self.emitter.newline()
 
-    def _compile_stage(self, md_path: Path, rel_stem: Path, type_config: TypeConfig) -> Path:
-        """Convert Markdown to JSON (Pandoc AST)."""
-        json_node = sanitize_path(self.build_dir, rel_stem.with_suffix(".json"))
-
-        compile_defaults = self._get_merged_defaults(self.config.defaults, type_config.defaults)
-        variables = {
-            "in_shell": shell_quote(md_path),
-            "out_shell": shell_quote(json_node),
-        }
-        implicit = []
-
-        if compile_defaults:
-            variables["defaults"] = self._format_defaults_var(compile_defaults)
-            # Find a way to add implicit dependencies. NinjaEmitter.build supports it.
-            # but wait, the original code added them with " | "
-            # So I should pass them to implicit.
-            # _get_dep_string returns a string, I need paths.
-            raw_deps = []
-            data_dir = Path(self.config.pandoc_data_dir) if self.config.pandoc_data_dir else None
-            for df in compile_defaults:
-                raw_deps.append(df)
-                raw_deps.extend(get_recursive_yaml_deps(df, data_dir_override=data_dir))
-            implicit = sorted(set(raw_deps))
-
-        self.emitter.build(
-            outputs=json_node,
-            rule=RuleName.COMPILE.value,
-            inputs=md_path,
-            implicit=implicit,
-            variables=variables,
-        )
-        return json_node
-
-    def _render_stage(
-        self,
-        out_config: OutputConfig,
-        json_node: Path,
-        rel_stem: Path,
-        local_registry: dict[str, Path],
-    ) -> None:
-        """Convert JSON to Output format or Derived Output."""
-        if out_config.source:
-            self._derive_output(out_config, rel_stem, local_registry)
-        else:
-            self._standard_render(out_config, rel_stem, json_node, local_registry)
-
-    def _standard_render(
-        self,
-        out_config: OutputConfig,
-        rel_stem: Path,
-        json_node: Path,
-        local_registry: dict[str, Path],
-    ) -> None:
-        """Render standard Pandoc with optional post-processing."""
-        filename = f"{rel_stem.name}{out_config.suffix}.{out_config.extension}"
-        final_path = sanitize_path(self.out_dir, rel_stem.parent / filename)
-
-        post_tool = out_config.post_process
-        if post_tool:
-            render_target = sanitize_path(
-                self.build_dir,
-                Path("intermediates") / rel_stem.parent / filename,
-            )
-        else:
-            render_target = final_path
-
-        # Gather dependencies for rendering
-        all_defaults = self._get_merged_defaults(out_config.defaults)
-        variables = {}
-        implicit = []
-
-        if all_defaults:
-            variables["defaults"] = self._format_defaults_var(all_defaults)
-            raw_deps = []
-            data_dir = Path(self.config.pandoc_data_dir) if self.config.pandoc_data_dir else None
-            for df in all_defaults:
-                raw_deps.append(df)
-                raw_deps.extend(get_recursive_yaml_deps(df, data_dir_override=data_dir))
-            implicit = sorted(set(raw_deps))
-
-        variables["in_shell"] = shell_quote(json_node)
-        variables["out_shell"] = shell_quote(render_target)
-
-        if out_config.args:
-            variables["args"] = " ".join(out_config.args)
-
-        self.emitter.build(
-            outputs=render_target,
-            rule=RuleName.RENDER.value,
-            inputs=json_node,
-            implicit=implicit,
-            variables=variables,
-        )
-
-        if post_tool:
-            self.emitter.build(
-                outputs=final_path,
-                rule=post_tool,
-                inputs=render_target,
-                variables={
-                    "in_shell": shell_quote(render_target),
-                    "out_shell": shell_quote(final_path),
-                },
-            )
-
-        if out_config.id:
-            local_registry[out_config.id] = final_path
-
-        self.all_outputs.append(final_path)
-
-    def _derive_output(
-        self,
-        out_config: OutputConfig,
-        rel_stem: Path,
-        local_registry: dict[str, Path],
-    ) -> None:
-        """Derive output from other build products (e.g. HTML -> PDF)."""
-        filename = f"{rel_stem.name}{out_config.suffix}.{out_config.extension}"
-        final_path = sanitize_path(self.out_dir, rel_stem.parent / filename)
-
-        if out_config.source is None:
-            raise OutputSourceMissingError()
-        raw_source = out_config.source
-
-        source_ids_list: list[str] = [raw_source] if isinstance(raw_source, str) else raw_source
-
-        source_paths = []
-        for parent_id in source_ids_list:
-            if parent_id not in local_registry:
-                logger.error(
-                    "Missing dependency '%s' for output '%s'",
-                    parent_id,
-                    out_config.id,
-                )
-                raise DependencyError(parent_id)
-            source_paths.append(local_registry[parent_id])
-
-        variables = {
-            "in_shell": " ".join(shell_quote(p) for p in source_paths),
-            "out_shell": shell_quote(final_path),
-        }
-        if out_config.args:
-            variables["args"] = " ".join(out_config.args)
-
-        if out_config.tool is None:
-            raise OutputToolMissingError()
-
-        self.emitter.build(
-            outputs=final_path,
-            rule=out_config.tool,
-            inputs=source_paths,
-            variables=variables,
-        )
-
-        if out_config.id:
-            local_registry[out_config.id] = final_path
-
-        self.all_outputs.append(final_path)
-
     def process_content(self, md_path: Path) -> None:
         """Generate Ninja build rules for a single Markdown source file."""
         try:
@@ -329,7 +182,7 @@ class NinjaGenerator:
             src_comment = md_path
 
         self.emitter.comment(f"Source: {src_comment}")
-        json_node = self._compile_stage(md_path, rel_stem, type_config)
+        json_node = self._compile_stage.compile(md_path, rel_stem, type_config)
         self.emitter.newline()
 
         if not type_config.outputs:
@@ -343,81 +196,12 @@ class NinjaGenerator:
             for plugin in self.plugins:
                 current_config = plugin.modify_output_config(current_config, content_type)
 
-            self._render_stage(current_config, json_node, rel_stem, local_registry)
+            self._render_stage.render(current_config, json_node, rel_stem, local_registry)
 
         self.emitter.newline()
 
-        # Handle assets referenced in frontmatter and recursive dependencies
-        # 1. Get initial assets from frontmatter 'css'
-        pending_assets = set(get_frontmatter_assets(md_path))
-        
-        # 2. Get assets from 'dependencies' glob patterns
-        frontmatter = parse_frontmatter(md_path)
-        if frontmatter and "dependencies" in frontmatter:
-            dep_patterns = _extract_paths(frontmatter, ["dependencies"])
-            glob_assets = resolve_glob_dependencies(md_path.parent, dep_patterns)
-            pending_assets.update(glob_assets)
-
-        # 3. Recursive processing loop
-        # We use a while loop to handle nested dependencies discovered during scanning
-        queue = list(pending_assets)
-        processed_assets = set()
-        
-        while queue:
-            asset = queue.pop(0)
-            
-            # Avoid processing the same asset twice in this cycle
-            if asset in processed_assets:
-                continue
-            processed_assets.add(asset)
-            
-            # Self-reference check: Don't copy the source markdown file itself
-            # even if a glob included it.
-            if asset.resolve() == md_path.resolve():
-                continue
-
-            try:
-                rel_asset = asset.relative_to(self.src)
-            except ValueError:
-                logger.warning(
-                    "Referenced asset outside source directory, cannot auto-copy: %s", asset
-                )
-                continue
-
-            final_path = sanitize_path(self.out_dir, rel_asset)
-
-            # Global deduplication: Only emit COPY rule once per build
-            if final_path not in self.copied_assets:
-                self.emitter.build(
-                    outputs=final_path,
-                    rule=RuleName.COPY.value,
-                    inputs=asset,
-                    variables={
-                        "in_shell": shell_quote(asset),
-                        "out_shell": shell_quote(final_path),
-                    },
-                )
-                self.copied_assets.add(final_path)
-                self.all_outputs.append(final_path)
-                self.emitter.newline()
-            
-            # Smart Scanning: Look for nested dependencies
-            # CSS -> url()
-            if asset.suffix.lower() == ".css":
-                new_deps = scan_css_dependencies(asset)
-                for dep in new_deps:
-                    if dep not in processed_assets:
-                        queue.append(dep)
-            
-            # HTML -> src, href
-            elif asset.suffix.lower() == ".html":
-                new_deps = scan_html_dependencies(asset)
-                for dep in new_deps:
-                    if dep not in processed_assets:
-                        queue.append(dep)
-            
-            # Explicitly DO NOT scan JS files
-            # Any other file types are just copied (leaf nodes)
+        # Stage 3: Asset processing
+        self._asset_processor.process_assets(md_path)
 
     def generate(self) -> None:
         """Scan source files and generate build.ninja."""
