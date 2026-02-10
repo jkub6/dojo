@@ -26,6 +26,7 @@ wheels/
 
 # Testing and Coverage
 .coverage
+.coverage*
 htmlcov/
 .tox/
 .nox/

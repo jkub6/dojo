@@ -34,6 +34,8 @@ dev = [
   "pytest",
   "pytest-cov",
   "pytest-xdist",
+  "pytest-randomly",
+  "pytest-timeout",
   "mypy",
   "types-PyYAML",
   "vulture",
@@ -132,6 +134,7 @@ python_files = "test_*.py"
 python_functions = "test_*"
 python_classes = "Test*"
 addopts = "--cov=src/dojo --cov-report=term-missing"
+timeout = 30
 
 [tool.mypy]
 python_version = "3.14"

@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import json
+import shutil
+import subprocess
+from pathlib import Path
+
 import pytest
 import yaml
 
@@ -295,3 +300,179 @@ def test_generate_with_format_links_slides_suffix(multi_output_config, tmp_path)
     extensions = {s["extension"] for s in siblings}
     assert "html" in extensions
     assert "pdf" in extensions
+
+
+# ---------------------------------------------------------------------------
+# Pandoc Integration Tests: Lua Filter Execution
+#
+# These tests run the format_links.lua filter through an actual Pandoc
+# invocation.  They verify that the filter doesn't crash and produces the
+# correct format-links metadata in the document AST.
+# ---------------------------------------------------------------------------
+
+# Locate the filter relative to the source tree
+_FILTER_PATH = Path(__file__).parent.parent / "src/dojo/resources/format_links.lua"
+
+
+def _run_pandoc_with_filter(
+    tmp_path: Path,
+    *,
+    markdown: str = "# Test",
+    current_suffix: str = "",
+    siblings: list[dict[str, str]] | None = None,
+    output_name: str = "article.html",
+) -> dict:
+    """Run Pandoc with format_links.lua and return the AST metadata.
+
+    Creates a minimal Markdown file, writes a defaults YAML that injects
+    dojo-sibling-formats metadata, runs Pandoc with -t json, and returns
+    the metadata dict from the resulting AST.
+    """
+    pandoc_exe = shutil.which("pandoc")
+    if not pandoc_exe:
+        pytest.skip("Pandoc not found")
+
+    if not _FILTER_PATH.exists():
+        pytest.fail(f"Lua filter not found at {_FILTER_PATH}")
+
+    if siblings is None:
+        siblings = [
+            {"label": "PDF", "suffix": "", "extension": "pdf"},
+        ]
+
+    # Write the Markdown source
+    md_file = tmp_path / "input.md"
+    md_file.write_text(markdown, encoding="utf-8")
+
+    # Write a defaults file with dojo metadata
+    defaults_data = {
+        "filters": [str(_FILTER_PATH.resolve())],
+        "metadata": {
+            "dojo-current-suffix": current_suffix,
+            "dojo-sibling-formats": siblings,
+        },
+    }
+    defaults_file = tmp_path / "format-links.yaml"
+    with open(defaults_file, "w", encoding="utf-8") as f:
+        yaml.dump(defaults_data, f, default_flow_style=False, allow_unicode=True)
+
+    # Run Pandoc: Markdown → JSON AST with the filter applied
+    output_file = tmp_path / output_name
+    cmd = [
+        pandoc_exe,
+        str(md_file),
+        "-d",
+        str(defaults_file),
+        "-t",
+        "json",
+        "-o",
+        str(output_file),
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=tmp_path, check=False)
+    assert result.returncode == 0, f"Pandoc failed (exit {result.returncode}):\n{result.stderr}"
+
+    # Parse the JSON AST and extract metadata
+    ast = json.loads(output_file.read_text("utf-8"))
+    return ast.get("meta", {})
+
+
+def test_lua_filter_runs_without_error(tmp_path):
+    """The format_links.lua filter should execute without crashing.
+
+    This is the test that would have caught the original nil crash
+    with PANDOC_STATE.output_file.
+    """
+    meta = _run_pandoc_with_filter(tmp_path)
+
+    # If we got here, the filter didn't crash
+    assert "format-links" in meta
+
+    # Internal dojo-* metadata should be cleaned up
+    assert "dojo-sibling-formats" not in meta
+    assert "dojo-current-suffix" not in meta
+
+
+def test_lua_filter_correct_href(tmp_path):
+    """Verify the filter computes correct sibling hrefs from the output filename."""
+    meta = _run_pandoc_with_filter(
+        tmp_path,
+        output_name="article.html",
+        siblings=[
+            {"label": "PDF", "suffix": "", "extension": "pdf"},
+            {"label": "Slides", "suffix": "-slides", "extension": "html"},
+        ],
+    )
+
+    links = meta["format-links"]["c"]
+    hrefs = {_meta_str(link["c"]["label"]): _meta_str(link["c"]["href"]) for link in links}
+
+    assert hrefs["PDF"] == "article.pdf"
+    assert hrefs["Slides"] == "article-slides.html"
+
+
+def test_lua_filter_suffix_stripping(tmp_path):
+    """When current output has a suffix, the filter should strip it to get the base stem."""
+    meta = _run_pandoc_with_filter(
+        tmp_path,
+        output_name="article-slides.html",
+        current_suffix="-slides",
+        siblings=[
+            {"label": "HTML", "suffix": "", "extension": "html"},
+            {"label": "PDF", "suffix": "", "extension": "pdf"},
+        ],
+    )
+
+    links = meta["format-links"]["c"]
+    hrefs = {_meta_str(link["c"]["label"]): _meta_str(link["c"]["href"]) for link in links}
+
+    # Suffix "-slides" should be stripped, giving base stem "article"
+    assert hrefs["HTML"] == "article.html"
+    assert hrefs["PDF"] == "article.pdf"
+
+
+def test_lua_filter_no_siblings(tmp_path):
+    """With no siblings, the filter should not inject format-links metadata."""
+    meta = _run_pandoc_with_filter(
+        tmp_path,
+        siblings=[],
+    )
+
+    # No siblings means no format-links
+    assert "format-links" not in meta
+
+
+def test_lua_filter_no_dojo_metadata(tmp_path):
+    """Without dojo metadata, the filter should be a no-op and not crash."""
+    pandoc_exe = shutil.which("pandoc")
+    if not pandoc_exe:
+        pytest.skip("Pandoc not found")
+
+    if not _FILTER_PATH.exists():
+        pytest.fail(f"Lua filter not found at {_FILTER_PATH}")
+
+    md_file = tmp_path / "plain.md"
+    md_file.write_text("# Just a heading", encoding="utf-8")
+    output_file = tmp_path / "plain.json"
+
+    cmd = [
+        pandoc_exe,
+        str(md_file),
+        "--lua-filter",
+        str(_FILTER_PATH),
+        "-t",
+        "json",
+        "-o",
+        str(output_file),
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=tmp_path, check=False)
+    assert result.returncode == 0, f"Pandoc failed:\n{result.stderr}"
+
+
+def _meta_str(meta_val: dict) -> str:
+    """Extract a plain string from a Pandoc JSON AST MetaString value."""
+    # Pandoc JSON: {"t": "MetaString", "c": "the string"}
+    if isinstance(meta_val, dict) and "c" in meta_val:
+        return meta_val["c"]
+    return str(meta_val)
