@@ -8,9 +8,8 @@ from __future__ import annotations
 
 import io
 import logging
-from collections.abc import Iterator
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from tqdm import tqdm
 
@@ -18,12 +17,14 @@ from .constants import PoolName, RuleName
 from .emitter import NinjaEmitter
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from .config import Config, CustomRule
 
 from .paths import should_process_file
 from .plugins import PluginInterface, load_plugin
 from .rules import get_builtin_rules
-from .stages import AssetProcessor, CompileStage, RenderStage
+from .stages import AssetProcessor, CompileStage, RenderStage, format_defaults_var, merge_defaults
 from .yaml_utils import parse_frontmatter_type
 
 logger = logging.getLogger(__name__)
@@ -115,11 +116,11 @@ class NinjaGenerator:
     # Keep legacy methods for backward compatibility with tests
     def _get_merged_defaults(self, *sources: str | list[str] | None) -> list[Path]:
         """Merge default files from multiple sources and return absolute paths."""
-        return self._compile_stage._get_merged_defaults(*sources)
+        return merge_defaults(*sources)
 
     def _format_defaults_var(self, defaults: list[Path]) -> str:
         """Format list of defaults into ninja variable string."""
-        return self._compile_stage._format_defaults_var(defaults)
+        return format_defaults_var(defaults)
 
     def emit_header(self) -> None:
         """Generate Ninja file header with version, pools, and rules."""
@@ -221,10 +222,10 @@ class NinjaGenerator:
         else:
             logger.info("Found %d Markdown file(s)", len(filtered_files))
 
-        for md_file in cast(
-            Iterator[Path],  # noqa: TC006
-            tqdm(filtered_files, desc="Processing", unit="file", disable=self.quiet),
-        ):
+        progress: Iterable[Path] = tqdm(
+            filtered_files, desc="Processing", unit="file", disable=self.quiet
+        )
+        for md_file in progress:
             try:
                 self.process_content(md_file)
             except Exception:

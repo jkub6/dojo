@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class RuleName(str, Enum):
+class RuleName(StrEnum):
     """Ninja rule names to avoid magic strings."""
 
     REGENERATE = "regenerate"
@@ -13,7 +13,7 @@ class RuleName(str, Enum):
     DECKTAPE = "decktape"
 
 
-class PoolName(str, Enum):
+class PoolName(StrEnum):
     """Ninja pool names to avoid magic strings."""
 
     HEAVY_PROCESSING = "heavy_processing"

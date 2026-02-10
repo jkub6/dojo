@@ -23,8 +23,6 @@ from .paths import (
     should_process_file,
 )
 from .yaml_utils import (
-    _extract_paths,
-    _load_and_validate_yaml_dict,
     get_frontmatter_assets,
     get_recursive_yaml_deps,
     parse_frontmatter,
@@ -32,8 +30,6 @@ from .yaml_utils import (
 )
 
 __all__ = [
-    "_extract_paths",
-    "_load_and_validate_yaml_dict",
     "get_frontmatter_assets",
     "get_recursive_yaml_deps",
     "ninja_escape",

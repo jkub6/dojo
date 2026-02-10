@@ -10,16 +10,12 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 import yaml
 
 from .exceptions import CircularDependencyError
-
-if TYPE_CHECKING:
-    from .resources import find_resource as _find_resource
-else:
-    from .resources import find_resource as _find_resource
+from .resources import find_resource as _find_resource
 
 logger = logging.getLogger(__name__)
 

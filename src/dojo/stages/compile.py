@@ -11,7 +11,8 @@ from typing import TYPE_CHECKING
 
 from dojo.constants import RuleName
 from dojo.emitter import NinjaEmitter
-from dojo.paths import ninja_escape, sanitize_path, shell_quote
+from dojo.paths import sanitize_path, shell_quote
+from dojo.stages._defaults import format_defaults_var, merge_defaults
 from dojo.yaml_utils import get_recursive_yaml_deps
 
 if TYPE_CHECKING:
@@ -46,24 +47,6 @@ class CompileStage:
         self.build_dir = build_dir
         self.emitter = emitter
 
-    def _get_merged_defaults(self, *sources: str | list[str] | None) -> list[Path]:
-        """Merge default files from multiple sources and return absolute paths."""
-        merged = []
-        for src in sources:
-            if not src:
-                continue
-            if isinstance(src, str):
-                merged.append(Path(src))
-            else:
-                merged.extend(Path(s) for s in src)
-        return merged
-
-    def _format_defaults_var(self, defaults: list[Path]) -> str:
-        """Format list of defaults into ninja variable string."""
-        if not defaults:
-            return ""
-        return "-d " + " -d ".join(ninja_escape(d) for d in defaults)
-
     def compile(
         self,
         md_path: Path,
@@ -83,7 +66,7 @@ class CompileStage:
         """
         json_node = sanitize_path(self.build_dir, rel_stem.with_suffix(".json"))
 
-        compile_defaults = self._get_merged_defaults(
+        compile_defaults = merge_defaults(
             self.config.defaults,
             type_config.defaults,
         )
@@ -94,7 +77,7 @@ class CompileStage:
         implicit: list[Path] = []
 
         if compile_defaults:
-            variables["defaults"] = self._format_defaults_var(compile_defaults)
+            variables["defaults"] = format_defaults_var(compile_defaults)
             raw_deps: list[Path] = []
             data_dir = Path(self.config.pandoc_data_dir) if self.config.pandoc_data_dir else None
             for df in compile_defaults:

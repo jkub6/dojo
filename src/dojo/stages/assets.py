@@ -8,6 +8,7 @@ resources.
 from __future__ import annotations
 
 import logging
+from collections import deque
 from pathlib import Path
 
 from dojo.constants import RuleName
@@ -83,11 +84,11 @@ class AssetProcessor:
 
         # 3. Recursive processing loop
         # We use a while loop to handle nested dependencies discovered during scanning
-        queue = list(pending_assets)
+        queue = deque(pending_assets)
         processed_assets: set[Path] = set()
 
         while queue:
-            asset = queue.pop(0)
+            asset = queue.popleft()
 
             # Avoid processing the same asset twice in this cycle
             if asset in processed_assets:

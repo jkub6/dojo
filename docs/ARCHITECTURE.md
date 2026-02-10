@@ -146,7 +146,7 @@ Use `dojo schema` to export the full JSON Schema for IDE integration.
 2. **Plugins:** Python modules implementing `PluginInterface`
 3. **Defaults Files:** Pandoc YAML defaults for templates, filters, etc.
 
-See [PLUGINS.md](PLUGINS.md) for plugin authoring guide.
+See [Plugin Development Guide](plugins.md) for plugin authoring guide.
 
 ## Incremental Build Support
 

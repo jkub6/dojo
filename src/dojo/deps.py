@@ -69,7 +69,7 @@ def scan_css_dependencies(css_path: Path) -> list[Path]:
     # Regex to match url('...') url("...") or url(...)
     # Capture group 2 is quotes, group 3 is unquoted
     # Simple regex: url\(\s*(?:(["'])(.*?)\1|([^)]*))s*\)
-    url_pattern = re.compile(r"url\(\s*(?:([\"'])(.*?)\1|([^)]*))s*\)", re.IGNORECASE)
+    url_pattern = re.compile(r"url\(\s*(?:([\"'])(.*?)\1|([^)]*?))\s*\)", re.IGNORECASE)
 
     for match in url_pattern.finditer(content):
         # group 2 is quoted value, group 3 is unquoted value

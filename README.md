@@ -2,42 +2,50 @@
 
 Professional Ninja Build Generator for Static Site Generation.
 
-## Installation
+## Quick Start (Nix — Recommended)
+
+This project uses a `flake.nix` that provides all necessary tools (Python, Pandoc, Decktape, etc.) in a reproducible environment.
 
 ```bash
-# Install dependencies and the package execution mode
+# Enter the development environment
+nix develop
+
+# Generate the build plan and execute it
+dojo build -c dojo.yaml && ninja -f _build/build.ninja
+```
+
+## Installation (pip)
+
+```bash
+# Install the package in editable mode
 pip install -e .
 
-# Install development dependencies (optional, for running tests)
-pip install pytest
+# Install development dependencies
+pip install -e ".[dev]"
 ```
 
 ## Usage
 
 ### 1. Create Configuration
-Create a `config.yaml` file (see `dojo.yaml` for an example) to define your site structure.
+Create a `dojo.yaml` file to define your site structure. Use `dojo init` to generate a starter config, or see the [Architecture Guide](docs/ARCHITECTURE.md) for the full schema.
 
-### 2. Run the Builder
-Run `dojo` to generate the Ninja build plan:
-
+### 2. Generate the Build Plan
 ```bash
-dojo config.yaml
+dojo build -c dojo.yaml
 ```
 
 ### 3. Build the Site
-Use `ninja` to execute the build plan:
-
 ```bash
 ninja -f _build/build.ninja
 ```
 
-### Nix Usage (Recommended)
-This project includes a `flake.nix` that provides all necessary tools (python, pandoc, decktape, etc.) in a reproducible environment.
+## Development
+
+Common tasks are defined in the `justfile`:
 
 ```bash
-# Enter the environment
-nix develop
-
-# Run the build
-dojo config.yaml && ninja -f _build/build.ninja
+just check   # Run all static analysis (ruff, mypy, vulture, etc.)
+just test    # Run tests with coverage
+just fix     # Auto-format and fix linting issues
+just clean   # Remove build artifacts
 ```

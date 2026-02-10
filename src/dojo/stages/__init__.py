@@ -9,6 +9,7 @@ This package contains the decomposed stages of the build pipeline:
 
 from __future__ import annotations
 
+from ._defaults import format_defaults_var, merge_defaults
 from .assets import AssetProcessor
 from .compile import CompileStage
 from .render import RenderStage
@@ -17,4 +18,6 @@ __all__ = [
     "AssetProcessor",
     "CompileStage",
     "RenderStage",
+    "format_defaults_var",
+    "merge_defaults",
 ]

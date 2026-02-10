@@ -1,7 +1,8 @@
 import os
 from unittest.mock import patch
 
-from dojo.utils import _load_and_validate_yaml_dict, get_recursive_yaml_deps
+from dojo.utils import get_recursive_yaml_deps
+from dojo.yaml_utils import _load_and_validate_yaml_dict
 
 
 def test_defaults_expansion(tmp_path):
