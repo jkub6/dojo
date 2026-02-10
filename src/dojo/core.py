@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import yaml
 from tqdm import tqdm
 
 from .constants import PoolName, RuleName
@@ -19,7 +20,7 @@ from .emitter import NinjaEmitter
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from .config import Config, CustomRule
+    from .config import Config, CustomRule, OutputConfig
 
 from .paths import should_process_file
 from .plugins import PluginInterface, load_plugin
@@ -113,6 +114,9 @@ class NinjaGenerator:
             all_outputs=self.all_outputs,
         )
 
+        # Format link defaults: populated by _generate_format_link_defaults()
+        self._format_link_defaults: dict[tuple[str, str], Path] = {}
+
     # Keep legacy methods for backward compatibility with tests
     def _get_merged_defaults(self, *sources: str | list[str] | None) -> list[Path]:
         """Merge default files from multiple sources and return absolute paths."""
@@ -121,6 +125,122 @@ class NinjaGenerator:
     def _format_defaults_var(self, defaults: list[Path]) -> str:
         """Format list of defaults into ninja variable string."""
         return format_defaults_var(defaults)
+
+    def _generate_format_link_defaults(self) -> None:
+        """Generate Pandoc defaults files for cross-format links.
+
+        For each (type, output) pair where the type has multiple outputs,
+        creates a YAML defaults file containing:
+        - A reference to the bundled format_links.lua filter
+        - Metadata with the current output's suffix and sibling format specs
+
+        The generated files are stored in ``_build/_dojo/`` and recorded in
+        ``self._format_link_defaults`` for later use by ``_apply_format_link_defaults()``.
+        """
+        dojo_dir = self.build_dir / "_dojo"
+        dojo_dir.mkdir(parents=True, exist_ok=True)
+
+        filter_path = Path(__file__).parent / "resources" / "format_links.lua"
+
+        for type_name, type_config in self.config.types.items():
+            # Only generate for types with multiple outputs
+            min_outputs = 2
+            if len(type_config.outputs) < min_outputs:
+                continue
+
+            for out_config in type_config.outputs:
+                # Skip derived outputs (they don't go through Pandoc render)
+                if out_config.source is not None:
+                    continue
+
+                output_id = out_config.id or out_config.extension
+
+                # Compute siblings: all OTHER outputs in this type
+                siblings = []
+                for sibling in type_config.outputs:
+                    if sibling is out_config:
+                        continue
+                    sibling_id = sibling.id or sibling.extension
+                    siblings.append(
+                        {
+                            "label": sibling.label or sibling_id.upper(),
+                            "suffix": sibling.suffix,
+                            "extension": sibling.extension,
+                        }
+                    )
+
+                # Build defaults YAML content
+                defaults_data: dict[str, object] = {
+                    "filters": [str(filter_path.resolve())],
+                    "metadata": {
+                        "dojo-current-suffix": out_config.suffix,
+                        "dojo-sibling-formats": siblings,
+                    },
+                }
+
+                # Write the defaults file
+                defaults_path = dojo_dir / f"format-links-{type_name}-{output_id}.yaml"
+                with open(defaults_path, "w", encoding="utf-8") as f:
+                    yaml.dump(
+                        defaults_data,
+                        f,
+                        default_flow_style=False,
+                        allow_unicode=True,
+                    )
+
+                self._format_link_defaults[(type_name, output_id)] = defaults_path.resolve()
+
+                logger.debug(
+                    "Generated format link defaults: %s (%d siblings)",
+                    defaults_path.name,
+                    len(siblings),
+                )
+
+    def _apply_format_link_defaults(
+        self,
+        out_config: OutputConfig,
+        content_type: str,
+    ) -> OutputConfig:
+        """Prepend format link defaults to an output config if applicable.
+
+        Only modifies standard render outputs (not derived outputs).
+        Returns the original config unchanged if format links are disabled
+        or no defaults were generated for this (type, output) pair.
+
+        Args:
+            out_config: Output configuration to potentially modify
+            content_type: Content type name for registry lookup
+
+        Returns:
+            Modified output config with format link defaults prepended,
+            or the original config if not applicable.
+
+        """
+        if not self._format_link_defaults:
+            return out_config
+
+        # Skip derived outputs
+        if out_config.source is not None:
+            return out_config
+
+        output_id = out_config.id or out_config.extension
+        format_key = (content_type, output_id)
+
+        if format_key not in self._format_link_defaults:
+            return out_config
+
+        extra_default = str(self._format_link_defaults[format_key])
+
+        # Prepend format link defaults (lower priority) before user defaults
+        existing = out_config.defaults
+        if existing is None:
+            new_defaults: str | list[str] = [extra_default]
+        elif isinstance(existing, str):
+            new_defaults = [extra_default, existing]
+        else:
+            new_defaults = [extra_default, *existing]
+
+        return out_config.model_copy(update={"defaults": new_defaults})
 
     def emit_header(self) -> None:
         """Generate Ninja file header with version, pools, and rules."""
@@ -197,6 +317,12 @@ class NinjaGenerator:
             for plugin in self.plugins:
                 current_config = plugin.modify_output_config(current_config, content_type)
 
+            # Format Links: Prepend generated defaults for standard renders
+            current_config = self._apply_format_link_defaults(
+                current_config,
+                content_type,
+            )
+
             self._render_stage.render(current_config, json_node, rel_stem, local_registry)
 
         self.emitter.newline()
@@ -207,6 +333,10 @@ class NinjaGenerator:
     def generate(self) -> None:
         """Scan source files and generate build.ninja."""
         logger.info("Scanning source directory: %s", self.src)
+
+        # Generate format link defaults before processing content
+        if self.config.format_links:
+            self._generate_format_link_defaults()
 
         self.emit_header()
 

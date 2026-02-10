@@ -33,6 +33,7 @@ dependencies = [
 dev = [
   "pytest",
   "pytest-cov",
+  "pytest-xdist",
   "mypy",
   "types-PyYAML",
   "vulture",
@@ -166,6 +167,12 @@ ignore_missing_imports = true
 # This is an external library type we cannot change.
 [[tool.mypy.overrides]]
 module = "dojo.schema"
+disallow_any_expr = false
+
+# core.py uses Pydantic's model_copy(update=...) which accepts dict[str, Any].
+# This is an external library type we cannot change.
+[[tool.mypy.overrides]]
+module = "dojo.core"
 disallow_any_expr = false
 
 [tool.coverage.run]

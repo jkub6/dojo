@@ -110,6 +110,10 @@ class OutputConfig(BaseModel):
         description="Source output ID(s) for derived outputs",
     )
     tool: str | None = Field(default=None, description="Tool to use for derived outputs")
+    label: str | None = Field(
+        default=None,
+        description="Display label for format links sidebar (defaults to ID uppercase)",
+    )
 
     @model_validator(mode="after")
     def validate_derived_output(self) -> OutputConfig:
@@ -169,7 +173,12 @@ class Config(BaseModel):
     exclude: list[str] = Field(default_factory=list, description="Glob patterns to exclude")
     include: list[str] = Field(default_factory=list, description="Glob patterns to include")
 
-    # New Pandoc Configuration Options
+    format_links: bool = Field(
+        default=False,
+        description="Auto-generate cross-format links for multi-output types",
+    )
+
+    # Pandoc Configuration Options
     root_ref_dir: str = Field(
         default=".",
         description="Directory to calculate root variable relative to",

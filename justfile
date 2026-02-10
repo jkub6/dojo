@@ -27,7 +27,7 @@ check:
 
 # Run tests with coverage
 test:
-    pytest --cov=src
+    pytest --cov=src -n auto
 
 # Update lockfile safely using Nix python
 lock:
