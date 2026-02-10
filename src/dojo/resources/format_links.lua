@@ -10,16 +10,45 @@
 ---
 --- Internal dojo-* metadata keys are cleaned up so they don't leak to output.
 
+--- Extract the filename (basename) from a file path.
+--- Falls back to string manipulation if pandoc.path is unavailable.
+local function get_basename(filepath)
+  -- Try pandoc.path.split first (available in Pandoc >= 2.12)
+  if pandoc.path and pandoc.path.split then
+    local _, base = pandoc.path.split(filepath)
+    if base and base ~= "" then
+      return base
+    end
+  end
+
+  -- Fallback: use string pattern matching
+  -- Match everything after the last / or \ separator
+  local base = filepath:match("[/\\]([^/\\]+)$")
+  if base then
+    return base
+  end
+
+  -- No separator found: the whole string is the filename
+  return filepath
+end
+
 function Pandoc(doc)
   local siblings = doc.meta["dojo-sibling-formats"]
   if not siblings then return end
 
   -- Get the output file path from Pandoc state
-  local output = PANDOC_STATE.output_file
-  if not output or output == "" then return end
+  -- PANDOC_STATE.output_file may be nil if no -o flag was used,
+  -- or may be a non-string type in some Pandoc versions.
+  local raw_output = PANDOC_STATE and PANDOC_STATE.output_file
+  if raw_output == nil then return end
+
+  -- Ensure we have a plain Lua string
+  local output = tostring(raw_output)
+  if output == "" or output == "nil" then return end
 
   -- Extract just the filename from the output path
-  local _, base = pandoc.path.split(output)
+  local base = get_basename(output)
+  if not base or base == "" then return end
 
   -- Remove extension to get the stem
   local stem = base:match("^(.+)%.[^.]+$") or base
