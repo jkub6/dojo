@@ -51,7 +51,7 @@ class NinjaGenerator:
         *,
         quiet: bool = False,
         dry_run: bool = False,
-    ):
+    ) -> None:
         """Initialize the NinjaBuilder."""
         self.config = config
         self.config_path = config_path.resolve()

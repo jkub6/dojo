@@ -78,7 +78,7 @@ select = [
     "D",      # pydocstyle (Docstrings)
     "PT",     # flake8-pytest-style (Test best practices)
     "C90",    # McCabe (Complexity check)
-    # "ANN",    # Enforce Type Hints (Strict!)
+    "ANN",    # Enforce Type Hints (Strict!)
     "TRY",    # Exception handling anti-patterns
     "BLE",    # Ban blind exceptions (except Exception:)
     "PERF",   # Performance anti-patterns
@@ -87,13 +87,14 @@ select = [
     "TCH",    # Type-checking blocks (Move imports under IF TYPE_CHECKING)
     "ARG",    # Unused arguments (strict)
     "TID",    # flake8-tidy-imports
-    "FBT", # Boolean trap
-    "COM", # Trailing commas
-    "G",   # Logging format
+    "FBT",    # Boolean trap
+    "COM",    # Trailing commas
+    "G",      # Logging format
 ]
 ignore = [
+    "D100", "D103",  # Missing docstrings (enable gradually)
+
     "E501", # Line too long (handled by formatter)
-    "D100", "D101", "D102", "D103", "D104", # Missing docstrings (enable gradually)
     "D203", # One blank line before class (conflicts with D211)
     "D213", # Multi-line docstring summary at second line (conflicts with D212)
     "COM812", # Trailing comma missing (conflicts with formatter)
@@ -114,7 +115,8 @@ indent-style = "space"
 # - PT011: pytest.raises without match parameter
 # - TRY301: Abstract raise to inner function (intentional for testing exceptions)
 # - PLC0415: Inline imports (common practice for test isolation)
-"tests/**/*.py" = ["S101", "ARG", "S603", "S607", "PT011", "TRY301", "PLC0415"]
+# - ANN: Annotations
+"tests/**/*.py" = ["S101", "ARG", "S603", "S607", "PT011", "TRY301", "PLC0415", "ANN"]
 
 # Stage modules have imports that TC rules incorrectly flag as type-hint-only.
 # NinjaEmitter and Path are used for both type hints AND runtime operations
@@ -138,7 +140,7 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 check_untyped_defs = true
 disallow_any_unimported = true
-disallow_any_expr = true  # Start with false, enable later
+disallow_any_expr = true
 disallow_any_decorated = true
 disallow_any_explicit = true
 disallow_subclassing_any = true

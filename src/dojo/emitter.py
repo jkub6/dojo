@@ -12,7 +12,7 @@ from .utils import ninja_escape
 class NinjaEmitter:
     """Handles the low-level emission of Ninja build file syntax."""
 
-    def __init__(self, fp: TextIO):
+    def __init__(self, fp: TextIO) -> None:
         """Initialize the NinjaEmitter."""
         self.fp = fp
 

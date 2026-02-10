@@ -13,7 +13,7 @@ class DojoError(Exception):
 class ConfigError(DojoError):
     """Configuration validation error."""
 
-    def __init__(self, message: str):
+    def __init__(self, message: str) -> None:
         """Initialize ConfigError."""
         super().__init__(message)
 
@@ -21,7 +21,7 @@ class ConfigError(DojoError):
 class DefaultsNotFoundError(ConfigError):
     """Raised when a defaults file cannot be found."""
 
-    def __init__(self, path: str):
+    def __init__(self, path: str) -> None:
         """Initialize DefaultsNotFoundError."""
         super().__init__(f"Defaults file not found: {path} (checked exact, project, and data dirs)")
 
@@ -29,7 +29,7 @@ class DefaultsNotFoundError(ConfigError):
 class EssentialToolNotFoundError(ConfigError):
     """Raised when a required external tool is missing."""
 
-    def __init__(self, tool: str, path: str | None = None):
+    def __init__(self, tool: str, path: str | None = None) -> None:
         """Initialize EssentialToolNotFoundError."""
         msg = f"Essential tool '{tool}' not found"
         if path:
@@ -40,7 +40,7 @@ class EssentialToolNotFoundError(ConfigError):
 class OutputConfigSourceError(ConfigError):
     """Raised when output source configuration is invalid."""
 
-    def __init__(self, message: str):
+    def __init__(self, message: str) -> None:
         """Initialize OutputConfigSourceError."""
         super().__init__(message)
 
@@ -86,7 +86,7 @@ class DefaultsRequiredError(OutputConfigDefaultError):
 class PandocDataDirError(ConfigError):
     """Raised when pandoc data directory is invalid."""
 
-    def __init__(self, path: Path | str, issue: str = "not found"):
+    def __init__(self, path: Path | str, issue: str = "not found") -> None:
         """Initialize PandocDataDirError."""
         if issue == "not directory":
             super().__init__(f"Pandoc data directory is not a directory: {path}")
@@ -97,7 +97,7 @@ class PandocDataDirError(ConfigError):
 class CustomRuleConflictError(ConfigError):
     """Raised when a custom rule name conflicts with built-ins."""
 
-    def __init__(self, name: str):
+    def __init__(self, name: str) -> None:
         """Initialize CustomRuleConflictError."""
         super().__init__(f"Custom rule name '{name}' conflicts with built-in rule")
 
@@ -112,7 +112,7 @@ class DirectoryConflictError(ConfigError):
         name2: str,
         path2: Path | str | None = None,
         issue: str = "conflict",
-    ):
+    ) -> None:
         """Initialize DirectoryConflictError."""
         if issue == "same":
             msg = f"Directory conflict: {name1} and {name2} are the same ({path1})"
@@ -126,7 +126,7 @@ class DirectoryConflictError(ConfigError):
 class DependencyError(ConfigError):
     """Raised when a dependency is missing."""
 
-    def __init__(self, parent_id: str):
+    def __init__(self, parent_id: str) -> None:
         """Initialize DependencyError."""
         super().__init__(f"Missing dependency: {parent_id}")
 
@@ -134,7 +134,7 @@ class DependencyError(ConfigError):
 class DefaultTypeNotFoundError(ConfigError):
     """Raised when default_type is not found in types."""
 
-    def __init__(self, default_type: str):
+    def __init__(self, default_type: str) -> None:
         """Initialize DefaultTypeNotFoundError."""
         super().__init__(f"default_type '{default_type}' not found in types")
 
@@ -142,7 +142,7 @@ class DefaultTypeNotFoundError(ConfigError):
 class DuplicateOutputIdError(ConfigError):
     """Raised when duplicate output IDs are found."""
 
-    def __init__(self, type_name: str, duplicates: set[str]):
+    def __init__(self, type_name: str, duplicates: set[str]) -> None:
         """Initialize DuplicateOutputIdError."""
         super().__init__(f"Duplicate output IDs in type '{type_name}': {duplicates}")
 
@@ -150,7 +150,7 @@ class DuplicateOutputIdError(ConfigError):
 class ConfigFileNotFoundError(ConfigError):
     """Raised when configuration file is not found."""
 
-    def __init__(self, path: str | None = None):
+    def __init__(self, path: str | None = None) -> None:
         """Initialize ConfigFileNotFoundError."""
         if path:
             super().__init__(f"Configuration file not found: {path}")
@@ -161,7 +161,7 @@ class ConfigFileNotFoundError(ConfigError):
 class SourceDirNotFoundError(ConfigError):
     """Raised when source directory is not found."""
 
-    def __init__(self, path: Path | str):
+    def __init__(self, path: Path | str) -> None:
         """Initialize SourceDirNotFoundError."""
         super().__init__(f"Source directory not found: {path}")
 
@@ -169,7 +169,7 @@ class SourceDirNotFoundError(ConfigError):
 class ConfigLoadError(ConfigError):
     """Raised when configuration cannot be loaded."""
 
-    def __init__(self, message: str, path: Path | str, exc: Exception | None = None):
+    def __init__(self, message: str, path: Path | str, exc: Exception | None = None) -> None:
         """Initialize ConfigLoadError."""
         msg = f"{message}: {path}"
         if exc:
@@ -180,7 +180,7 @@ class ConfigLoadError(ConfigError):
 class ConfigParseError(ConfigLoadError):
     """Raised when configuration YAML parsing fails."""
 
-    def __init__(self, path: Path | str, exc: Exception):
+    def __init__(self, path: Path | str, exc: Exception) -> None:
         """Initialize ConfigParseError."""
         super().__init__("Error parsing configuration file", path, exc)
 
@@ -188,7 +188,7 @@ class ConfigParseError(ConfigLoadError):
 class ConfigInvalidError(ConfigLoadError):
     """Raised when configuration validation fails."""
 
-    def __init__(self, path: Path | str, exc: Exception):
+    def __init__(self, path: Path | str, exc: Exception) -> None:
         """Initialize ConfigInvalidError."""
         super().__init__("Invalid configuration", path, exc)
 
@@ -196,7 +196,7 @@ class ConfigInvalidError(ConfigLoadError):
 class ResourceError(DojoError):
     """Raised when a resource error occurs."""
 
-    def __init__(self, message: str, resource: str):
+    def __init__(self, message: str, resource: str) -> None:
         """Initialize ResourceError."""
         super().__init__(f"{message}: {resource}")
 
@@ -204,7 +204,7 @@ class ResourceError(DojoError):
 class UnknownResourceCategoryError(ResourceError):
     """Raised when a resource category is unknown."""
 
-    def __init__(self, category: str):
+    def __init__(self, category: str) -> None:
         """Initialize UnknownResourceCategoryError."""
         super().__init__("Unknown resource category", category)
 
@@ -212,7 +212,7 @@ class UnknownResourceCategoryError(ResourceError):
 class SecurityError(DojoError):
     """Raised for security issues like path traversal."""
 
-    def __init__(self, relative: Path | str, base: Path | str):
+    def __init__(self, relative: Path | str, base: Path | str) -> None:
         """Initialize SecurityError."""
         super().__init__(f"Path traversal detected: {relative} escapes {base}")
 
@@ -220,6 +220,6 @@ class SecurityError(DojoError):
 class CircularDependencyError(DojoError):
     """Raised when a circular dependency is detected."""
 
-    def __init__(self, cycle: str):
+    def __init__(self, cycle: str) -> None:
         """Initialize CircularDependencyError."""
         super().__init__(f"Circular dependency detected: {cycle}")
