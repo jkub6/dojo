@@ -19,7 +19,7 @@ from dojo.stages._defaults import format_defaults_var, merge_defaults
 from dojo.yaml_utils import get_recursive_yaml_deps
 
 if TYPE_CHECKING:
-    from dojo.config import Config, OutputConfig
+    from dojo.config import Config, OutputConfig, PipelineStep
 
 logger = logging.getLogger(__name__)
 
@@ -95,11 +95,11 @@ class RenderStage:
         filename = f"{rel_stem.name}{out_config.suffix}.{out_config.extension}"
         final_path = sanitize_path(self.out_dir, rel_stem.parent / filename)
 
-        post_tool = out_config.post_process
-        if post_tool:
+        steps = out_config.post_process
+        if steps:
             render_target = sanitize_path(
                 self.build_dir,
-                Path("intermediates") / rel_stem.parent / filename,
+                Path("intermediates") / rel_stem.parent / f"{filename}.0",
             )
         else:
             render_target = final_path
@@ -132,16 +132,8 @@ class RenderStage:
             variables=variables,
         )
 
-        if post_tool:
-            self.emitter.build(
-                outputs=final_path,
-                rule=post_tool,
-                inputs=render_target,
-                variables={
-                    "in_shell": shell_quote(render_target),
-                    "out_shell": shell_quote(final_path),
-                },
-            )
+        if steps:
+            self._emit_pipeline_steps(steps, render_target, final_path, filename, rel_stem)
 
         if out_config.id:
             local_registry[out_config.id] = final_path
@@ -175,9 +167,18 @@ class RenderStage:
                 raise DependencyError(parent_id)
             source_paths.append(local_registry[parent_id])
 
+        steps = out_config.post_process
+        if steps:
+            render_target = sanitize_path(
+                self.build_dir,
+                Path("intermediates") / rel_stem.parent / f"{filename}.0",
+            )
+        else:
+            render_target = final_path
+
         variables = {
             "in_shell": " ".join(shell_quote(p) for p in source_paths),
-            "out_shell": shell_quote(final_path),
+            "out_shell": shell_quote(render_target),
         }
         if out_config.args:
             variables["args"] = " ".join(out_config.args)
@@ -186,13 +187,51 @@ class RenderStage:
             raise OutputToolMissingError()
 
         self.emitter.build(
-            outputs=final_path,
+            outputs=render_target,
             rule=out_config.tool,
             inputs=source_paths,
             variables=variables,
         )
 
+        if steps:
+            self._emit_pipeline_steps(steps, render_target, final_path, filename, rel_stem)
+
         if out_config.id:
             local_registry[out_config.id] = final_path
 
         self.all_outputs.append(final_path)
+
+    def _emit_pipeline_steps(
+        self,
+        steps: list[PipelineStep],
+        initial_input: Path,
+        final_output: Path,
+        base_filename: str,
+        rel_stem: Path,
+    ) -> None:
+        """Emit Ninja build rules for a sequence of post-processing steps."""
+        current_input = initial_input
+        for i, step in enumerate(steps):
+            is_last = i == len(steps) - 1
+            if is_last:
+                step_output = final_output
+            else:
+                step_output = sanitize_path(
+                    self.build_dir,
+                    Path("intermediates") / rel_stem.parent / f"{base_filename}.{i + 1}",
+                )
+
+            variables = {
+                "in_shell": shell_quote(current_input),
+                "out_shell": shell_quote(step_output),
+            }
+            if step.args:
+                variables["args"] = " ".join(step.args)
+
+            self.emitter.build(
+                outputs=step_output,
+                rule=step.tool,
+                inputs=current_input,
+                variables=variables,
+            )
+            current_input = step_output

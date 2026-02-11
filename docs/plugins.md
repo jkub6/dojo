@@ -201,7 +201,7 @@ class MinifyPlugin(PluginInterface):
     ) -> OutputConfig:
         # Add minification post-processing for HTML
         if output_config.extension == "html" and not output_config.post_process:
-            return output_config.model_copy(update={"post_process": "minify"})
+            return output_config.model_copy(update={"post_process": ["minify"]})
         return output_config
 ```
 

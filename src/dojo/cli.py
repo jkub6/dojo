@@ -142,17 +142,23 @@ def cmd_init(_args: DojoArgs) -> None:
     content = """src_dir: content
 output_dir: _site
 build_dir: _build
-default_type: markdown
+default_type: page
 
 tools:
   python: python3
   pandoc: pandoc
+  # minify: minify # Optional: install 'minify' tool
 
 types:
-  markdown:
+  page:
     outputs:
       - extension: html
         defaults: defaults/html.yaml
+        # Example of a multi-step post-processing pipeline
+        # post_process:
+        #   - tool: minify
+        #   - tool: custom_tool
+        #     args: ["--param", "value"]
 """
     with open(target, "w") as f:
         f.write(content)

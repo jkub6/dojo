@@ -90,6 +90,13 @@ class ToolPaths(BaseModel):
         return self
 
 
+class PipelineStep(BaseModel):
+    """A single step in a build pipeline."""
+
+    tool: str = Field(description="Tool to use for this step")
+    args: list[str] = Field(default_factory=list, description="Arguments for this tool")
+
+
 class OutputConfig(BaseModel):
     """Configuration for a single output format."""
 
@@ -100,10 +107,13 @@ class OutputConfig(BaseModel):
         description="Path(s) to Pandoc defaults file(s)",
     )
     suffix: str = Field(default="", description="Suffix to add to filename before extension")
-    post_process: str | None = Field(default=None, description="Post-processing tool name")
+    post_process: list[PipelineStep] = Field(
+        default_factory=list,
+        description="Post-processing pipeline steps",
+    )
     args: list[str] | None = Field(
         default=None,
-        description="Extra arguments to pass to the tool or post-processor",
+        description="Extra arguments to pass to the initial tool",
     )
     source: str | list[str] | None = Field(
         default=None,
@@ -114,6 +124,26 @@ class OutputConfig(BaseModel):
         default=None,
         description="Display label for format links sidebar (defaults to ID uppercase)",
     )
+
+    @field_validator("post_process", mode="before")
+    @classmethod
+    def normalize_post_process(cls, v: object) -> list[object]:
+        """Normalize post_process into a list of PipelineStep dicts."""
+        if v is None:
+            return []
+        if isinstance(v, (str, dict)):
+            v = [v]
+
+        if not isinstance(v, list):
+            raise TypeError(v)
+
+        normalized: list[object] = []
+        for item in v:
+            if isinstance(item, str):
+                normalized.append({"tool": item})
+            else:
+                normalized.append(item)
+        return normalized
 
     @model_validator(mode="after")
     def validate_derived_output(self) -> OutputConfig:

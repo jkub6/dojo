@@ -95,8 +95,8 @@ The compile stage parses Markdown with YAML frontmatter and produces a Pandoc AS
 
 The render stage transforms JSON AST to final formats using Pandoc's rich output capabilities. Key features:
 - Format-specific templates and defaults
-- Post-processing hooks (minification)
-- Derived outputs (HTML → PDF via Decktape)
+- Post-processing hooks (minification, or multi-step pipelines)
+- Derived outputs (HTML → PDF via Decktape, which can also be post-processed)
 
 ### 3. Asset Stage
 **Input:** Content frontmatter, CSS, HTML  
@@ -133,6 +133,11 @@ types:
         extension: pdf
         source: html      # Derived from HTML output
         tool: decktape    # Tool to use
+        args: ["--size", "A4"] # Tool-specific arguments
+        post_process:     # Multi-step pipeline
+          - tool: ghostscript
+            args: ["-dPDFSETTINGS=/screen"]
+          - tool: minify
 
 plugins:                  # Optional plugin paths
   - plugins/custom.py
