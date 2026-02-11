@@ -140,12 +140,11 @@ class NinjaGenerator:
         dojo_dir = self.build_dir / "_dojo"
         dojo_dir.mkdir(parents=True, exist_ok=True)
 
-        filter_path = Path(__file__).parent / "resources" / "format_links.lua"
+        filter_path = (Path(__file__).parent / "resources" / "format_links.lua").resolve()
 
         for type_name, type_config in self.config.types.items():
             # Only generate for types with multiple outputs
-            min_outputs = 2
-            if len(type_config.outputs) < min_outputs:
+            if len(type_config.outputs) < 2:  # noqa: PLR2004
                 continue
 
             for out_config in type_config.outputs:
@@ -154,24 +153,11 @@ class NinjaGenerator:
                     continue
 
                 output_id = out_config.id or out_config.extension
-
-                # Compute siblings: all OTHER outputs in this type
-                siblings = []
-                for sibling in type_config.outputs:
-                    if sibling is out_config:
-                        continue
-                    sibling_id = sibling.id or sibling.extension
-                    siblings.append(
-                        {
-                            "label": sibling.label or sibling_id.upper(),
-                            "suffix": sibling.suffix,
-                            "extension": sibling.extension,
-                        }
-                    )
+                siblings = self._get_sibling_formats(type_config.outputs, out_config)
 
                 # Build defaults YAML content
                 defaults_data: dict[str, object] = {
-                    "filters": [str(filter_path.resolve())],
+                    "filters": [str(filter_path)],
                     "metadata": {
                         "dojo-current-suffix": out_config.suffix,
                         "dojo-sibling-formats": siblings,
@@ -180,21 +166,64 @@ class NinjaGenerator:
 
                 # Write the defaults file
                 defaults_path = dojo_dir / f"format-links-{type_name}-{output_id}.yaml"
-                with open(defaults_path, "w", encoding="utf-8") as f:
-                    yaml.dump(
-                        defaults_data,
-                        f,
-                        default_flow_style=False,
-                        allow_unicode=True,
+                new_content = yaml.dump(
+                    defaults_data,
+                    default_flow_style=False,
+                    allow_unicode=True,
+                )
+
+                if self._write_if_changed(defaults_path, new_content):
+                    logger.debug(
+                        "Generated format link defaults: %s (%d siblings)",
+                        defaults_path.name,
+                        len(siblings),
                     )
 
                 self._format_link_defaults[(type_name, output_id)] = defaults_path.resolve()
 
-                logger.debug(
-                    "Generated format link defaults: %s (%d siblings)",
-                    defaults_path.name,
-                    len(siblings),
-                )
+    def _get_sibling_formats(
+        self,
+        outputs: list[OutputConfig],
+        current: OutputConfig,
+    ) -> list[dict[str, str | None]]:
+        """Compute sibling formats for cross-format links."""
+        siblings: list[dict[str, str | None]] = []
+        for sibling in outputs:
+            if sibling is current:
+                continue
+            sibling_id = sibling.id or sibling.extension
+            siblings.append(
+                {
+                    "label": sibling.label or sibling_id.upper(),
+                    "suffix": sibling.suffix,
+                    "extension": sibling.extension,
+                }
+            )
+        return siblings
+
+    def _write_if_changed(self, target: Path, content: str) -> bool:
+        """Write content to target file only if it has changed.
+
+        Returns:
+            True if the file was written, False if it was unchanged.
+
+        """
+        if target.exists():
+            try:
+                current_content = target.read_text(encoding="utf-8")
+                if current_content == content:
+                    return False
+            except OSError as e:
+                logger.warning("Failed to read %s for change detection: %s", target, e)
+
+        try:
+            with open(target, "w", encoding="utf-8") as f:
+                f.write(content)
+        except OSError:
+            logger.exception("Failed to write %s", target)
+            raise
+        else:
+            return True
 
     def _apply_format_link_defaults(
         self,
@@ -400,12 +429,10 @@ class NinjaGenerator:
 
     def _write_ninja_file(self, content: str) -> None:
         """Write the Ninja build file to disk."""
-        try:
-            with open(self.ninja_file, "w", encoding="utf-8") as f:
-                f.write(content)
-        except Exception:
-            logger.exception("Failed to write %s", self.ninja_file)
-            raise
+        if self._write_if_changed(self.ninja_file, content):
+            logger.info("Generated: %s", self.ninja_file)
+        else:
+            logger.debug("Ninja file unchanged, skipping write")
 
     def _log_completion_summary(self) -> None:
         """Log the completion summary after successful generation."""
