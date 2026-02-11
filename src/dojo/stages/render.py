@@ -99,7 +99,7 @@ class RenderStage:
         if steps:
             render_target = sanitize_path(
                 self.build_dir,
-                Path("intermediates") / rel_stem.parent / f"{filename}.0",
+                Path("intermediates") / rel_stem.parent / f"{filename}.0.{out_config.extension}",
             )
         else:
             render_target = final_path
@@ -133,7 +133,13 @@ class RenderStage:
         )
 
         if steps:
-            self._emit_pipeline_steps(steps, render_target, final_path, filename, rel_stem)
+            self._emit_pipeline_steps(
+                steps,
+                render_target,
+                final_path,
+                rel_stem.parent / filename,
+                out_config.extension,
+            )
 
         if out_config.id:
             local_registry[out_config.id] = final_path
@@ -171,7 +177,7 @@ class RenderStage:
         if steps:
             render_target = sanitize_path(
                 self.build_dir,
-                Path("intermediates") / rel_stem.parent / f"{filename}.0",
+                Path("intermediates") / rel_stem.parent / f"{filename}.0.{out_config.extension}",
             )
         else:
             render_target = final_path
@@ -194,7 +200,13 @@ class RenderStage:
         )
 
         if steps:
-            self._emit_pipeline_steps(steps, render_target, final_path, filename, rel_stem)
+            self._emit_pipeline_steps(
+                steps,
+                render_target,
+                final_path,
+                rel_stem.parent / filename,
+                out_config.extension,
+            )
 
         if out_config.id:
             local_registry[out_config.id] = final_path
@@ -206,8 +218,8 @@ class RenderStage:
         steps: list[PipelineStep],
         initial_input: Path,
         final_output: Path,
-        base_filename: str,
-        rel_stem: Path,
+        base_path: Path,
+        extension: str,
     ) -> None:
         """Emit Ninja build rules for a sequence of post-processing steps."""
         current_input = initial_input
@@ -218,7 +230,7 @@ class RenderStage:
             else:
                 step_output = sanitize_path(
                     self.build_dir,
-                    Path("intermediates") / rel_stem.parent / f"{base_filename}.{i + 1}",
+                    Path("intermediates") / f"{base_path}.{i + 1}.{extension}",
                 )
 
             variables = {
