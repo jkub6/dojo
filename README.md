@@ -27,7 +27,7 @@ pip install -e ".[dev]"
 ## Usage
 
 ### 1. Create Configuration
-Create a `dojo.yaml` file to define your site structure. Use `dojo init` to generate a starter config, or see the [Architecture Guide](docs/ARCHITECTURE.md) for the full schema.
+Create a `dojo.yaml` file to define your site structure, tools, and resource pools. Use `dojo init` to generate a starter config, or see the [Architecture Guide](docs/ARCHITECTURE.md) for the full schema.
 
 ### 2. Generate the Build Plan
 ```bash

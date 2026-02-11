@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import cast
 
 from .config import Config, CustomRule
-from .constants import PoolName, RuleName
+from .constants import RuleName
 from .utils import shell_quote
 
 
@@ -92,6 +92,10 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
         # We assume the path is already resolved by the config validator
         base_flags += f" --data-dir={shell_quote(config.pandoc_data_dir)}"
 
+    # Helper to get pool for a rule
+    def get_pool(rule_name: str) -> str | None:
+        return config.rule_pools.get(rule_name)
+
     # COMPILE Rule (Markdown -> JSON AST)
     # We attach the dependencies.lua filter at the end to track all assets
     resources_dir = Path(__file__).parent / "resources"
@@ -120,6 +124,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
             description="🧠 COMPILE $in",
             depfile="$out.d",
             deps="gcc",
+            pool=get_pool(RuleName.COMPILE.value),
         ),
     )
 
@@ -142,6 +147,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
             name=RuleName.RENDER.value,
             command=render_cmd,
             description="🎨 RENDER $out",
+            pool=get_pool(RuleName.RENDER.value),
         ),
     )
 
@@ -151,6 +157,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
             name=RuleName.COPY.value,
             command="cp $in_shell $out_shell",
             description="📂 COPY $out",
+            pool=get_pool(RuleName.COPY.value),
         ),
     )
 
@@ -160,6 +167,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
             name=RuleName.MINIFY.value,
             command=f"{path_prefix}{config.tools.minify} $args -o $out_shell $in_shell",
             description="⚡ MINIFY $out",
+            pool=get_pool(RuleName.MINIFY.value),
         ),
     )
 
@@ -169,7 +177,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
             name=RuleName.GHOSTSCRIPT.value,
             command=f"{path_prefix}{config.tools.ghostscript} -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET -dBATCH -dSAFER $args -sOutputFile=$out_shell $in_shell",
             description="🗜️  COMPRESS $out",
-            pool=PoolName.HEAVY_PROCESSING.value,
+            pool=get_pool(RuleName.GHOSTSCRIPT.value),
         ),
     )
 
@@ -179,7 +187,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
             name=RuleName.DECKTAPE.value,
             command=f"{path_prefix}{config.tools.decktape} reveal $args $in_shell $out_shell",
             description="📸 DECKTAPE $out",
-            pool=PoolName.HEAVY_PROCESSING.value,
+            pool=get_pool(RuleName.DECKTAPE.value),
         ),
     )
 

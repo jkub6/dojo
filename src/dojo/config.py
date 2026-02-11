@@ -208,6 +208,17 @@ class Config(BaseModel):
         description="Auto-generate cross-format links for multi-output types",
     )
 
+    # Job Pooling Configuration
+    pools: dict[str, int] = Field(
+        default_factory=dict,
+        description="Named resource pools and their depth (concurrency)",
+    )
+
+    rule_pools: dict[str, str] = Field(
+        default_factory=dict,
+        description="Mapping of rule names to pool names",
+    )
+
     # Pandoc Configuration Options
     root_ref_dir: str = Field(
         default=".",
@@ -259,6 +270,16 @@ class Config(BaseModel):
         if not path.exists():
             raise SourceDirNotFoundError(path)
         return v
+
+    @model_validator(mode="after")
+    def validate_pools(self) -> Config:
+        """Validate that all rule pools are defined."""
+        for rule, pool in self.rule_pools.items():
+            if pool not in self.pools:
+                raise ConfigInvalidError(
+                    "", ValueError(f"Rule '{rule}' references undefined pool '{pool}'")
+                )
+        return self
 
     def _auto_exclude(self, child: Path, parent: Path) -> None:
         """Automatically exclude child directory from parent scanning."""

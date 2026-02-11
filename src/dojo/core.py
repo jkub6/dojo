@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 import yaml
 from tqdm import tqdm
 
-from .constants import PoolName, RuleName
+from .constants import RuleName
 from .emitter import NinjaEmitter
 
 if TYPE_CHECKING:
@@ -252,9 +252,10 @@ class NinjaGenerator:
 
         # Pools
         self.emitter.comment("Resource pools prevent CPU/memory saturation")
-        self.emitter.fp.write(f"pool {PoolName.HEAVY_PROCESSING.value}\n")
-        self.emitter.variable("depth", "1", indent=1)
-        self.emitter.newline()
+        for pool_name, depth in self.config.pools.items():
+            self.emitter.fp.write(f"pool {pool_name}\n")
+            self.emitter.variable("depth", str(depth), indent=1)
+            self.emitter.newline()
 
         # Rules
         self.emitter.comment("Rules")

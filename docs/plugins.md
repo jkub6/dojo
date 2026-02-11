@@ -95,7 +95,7 @@ def get_custom_rules(self) -> list[CustomRule]:
                     "-dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET -dBATCH "
                     "-sOutputFile=$out $in",
             description="🗜️  COMPRESS $out",
-            pool="heavy_processing",  # Limit concurrent runs
+            pool="heavy",  # Must be defined in dojo.yaml 'pools'
         )
     ]
 ```

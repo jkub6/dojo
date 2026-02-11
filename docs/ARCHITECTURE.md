@@ -117,6 +117,12 @@ output_dir: _site        # Output directory
 build_dir: _build        # Build artifacts directory
 default_type: page       # Default content type
 
+pools:                   # Resource pools (concurrency limits)
+  heavy: 2               # Limit heavy tasks to 2 parallel jobs
+
+rule_pools:              # Assign rules to pools
+  decktape: heavy        # Run decktape in the 'heavy' pool
+
 types:
   page:                   # Content type definition
     outputs:

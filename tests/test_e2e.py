@@ -63,6 +63,10 @@ src_dir: "{content}"
 output_dir: "{project / "_site"}"
 build_dir: "{project / "_build"}"
 default_type: page
+pools:
+  test_pool: 1
+rule_pools:
+  compile: test_pool
 types:
   page:
     outputs:

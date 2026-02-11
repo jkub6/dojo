@@ -11,9 +11,3 @@ class RuleName(StrEnum):
     MINIFY = "minify"
     GHOSTSCRIPT = "ghostscript"
     DECKTAPE = "decktape"
-
-
-class PoolName(StrEnum):
-    """Ninja pool names to avoid magic strings."""
-
-    HEAVY_PROCESSING = "heavy_processing"

@@ -149,6 +149,12 @@ tools:
   pandoc: pandoc
   # minify: minify # Optional: install 'minify' tool
 
+# pools:
+#   heavy: 2 # Limit concurrent heavy tasks
+
+# rule_pools:
+#   decktape: heavy # Assign decktape rule to the heavy pool
+
 types:
   page:
     outputs:
