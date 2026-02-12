@@ -35,12 +35,17 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     # Propagate DOJO_ environment variables and set PATH
     env_vars = {k: v for k, v in os.environ.items() if k.startswith("DOJO_")}
     if tool_dirs:
-        env_vars["PATH"] = f"{':'.join(tool_dirs)}:$PATH"
+        env_vars["PATH"] = f"{':'.join(tool_dirs)}:$$PATH"
 
     path_prefix = ""
     if env_vars:
         # Sort keys for determinism in the generated ninja file
-        env_parts = [f"{k}={shell_quote(v)}" for k, v in sorted(env_vars.items())]
+        env_parts = []
+        for k, v in sorted(env_vars.items()):
+            if k == "PATH":
+                env_parts.append(f'{k}="{v}"')
+            else:
+                env_parts.append(f"{k}={shell_quote(v)}")
         path_prefix = f"env {' '.join(env_parts)} "
 
     rules = []
