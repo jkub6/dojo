@@ -436,7 +436,6 @@ class NinjaGenerator:
 
     def _log_completion_summary(self) -> None:
         """Log the completion summary after successful generation."""
-        logger.info("Generated: %s", self.ninja_file)
         logger.info("Outputs: %d file(s) will be built", len(self.all_outputs))
         logger.info("")
         logger.info("Next steps:")
