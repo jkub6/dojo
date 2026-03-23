@@ -34,21 +34,29 @@ end
 
 function Pandoc(doc)
   local siblings = doc.meta["dojo-sibling-formats"]
-  if not siblings then return end
+  if not siblings then
+    return
+  end
 
   -- Get the output file path from Pandoc state
   -- PANDOC_STATE.output_file may be nil if no -o flag was used,
   -- or may be a non-string type in some Pandoc versions.
   local raw_output = PANDOC_STATE and PANDOC_STATE.output_file
-  if raw_output == nil then return end
+  if raw_output == nil then
+    return
+  end
 
   -- Ensure we have a plain Lua string
   local output = tostring(raw_output)
-  if output == "" or output == "nil" then return end
+  if output == "" or output == "nil" then
+    return
+  end
 
   -- Extract just the filename from the output path
   local base = get_basename(output)
-  if not base or base == "" then return end
+  if not base or base == "" then
+    return
+  end
 
   -- Remove extension to get the stem
   local stem = base:match("^(.+)%.[^.]+$") or base

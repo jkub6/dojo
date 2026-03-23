@@ -17,6 +17,7 @@ from tqdm import tqdm
 from .constants import RuleName
 from .emitter import NinjaEmitter
 
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
@@ -27,6 +28,7 @@ from .plugins import PluginInterface, load_plugin
 from .rules import get_builtin_rules
 from .stages import AssetProcessor, CompileStage, RenderStage
 from .yaml_utils import parse_frontmatter_type
+
 
 logger = logging.getLogger(__name__)
 

@@ -1,7 +1,6 @@
 from unittest.mock import patch
 
 import pytest
-
 from dojo.cli import entry_point, main
 
 

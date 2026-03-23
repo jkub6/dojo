@@ -1,15 +1,18 @@
 -- fix_typst_csl.lua
 -- This filter shipped by Dojo resolves the Pandoc relative path escaping bug for Typst outputs.
--- It dynamically adjusts CSL and bibliography file paths to root-relative paths, calculated seamlessly 
+-- It dynamically adjusts CSL and bibliography file paths to root-relative paths, calculated seamlessly
 -- via metadata variables (`dojo-rel-src-dir` and `dojo-data-dir`) injected by the Dojo build module.
 
 local function rewrite_path(p, meta)
   local path_str = pandoc.utils.stringify(p)
   -- If it's already root-relative or an absolute URL, leave it alone
-  if path_str:match("^/") or path_str:match("^http") then return p end
+  if path_str:match("^/") or path_str:match("^http") then
+    return p
+  end
 
   -- Resolve dynamic metadata from dojo/rules.py
-  local rel_src_dir = meta["dojo-rel-src-dir"] and pandoc.utils.stringify(meta["dojo-rel-src-dir"]) or ""
+  local rel_src_dir = meta["dojo-rel-src-dir"] and pandoc.utils.stringify(meta["dojo-rel-src-dir"])
+    or ""
   local data_dir = meta["dojo-data-dir"] and pandoc.utils.stringify(meta["dojo-data-dir"]) or ""
 
   -- Determine if the path is a CSL by checking common extensions or keywords

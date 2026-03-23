@@ -1,5 +1,4 @@
 import pytest
-
 from dojo.utils import should_process_file
 
 

@@ -3,13 +3,13 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from dojo.deps import (
     resolve_glob_dependencies,
     scan_css_dependencies,
     scan_html_dependencies,
 )
 from dojo.utils import get_recursive_yaml_deps
+
 
 # =============================================================================
 # UNIT TESTS: dojo.deps (Asset Discovery Logic)

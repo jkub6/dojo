@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+
 if TYPE_CHECKING:
     from .config import CustomRule, OutputConfig
 

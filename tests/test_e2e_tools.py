@@ -10,11 +10,11 @@ import shutil
 import subprocess
 from typing import TYPE_CHECKING
 
+
 if TYPE_CHECKING:
     from pathlib import Path
 
 import pytest
-
 from dojo.cli import main
 
 

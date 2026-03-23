@@ -19,6 +19,7 @@ from dojo.constants import ASSET_KEYS
 from .exceptions import CircularDependencyError
 from .resources import find_resource as _find_resource
 
+
 logger = logging.getLogger(__name__)
 
 

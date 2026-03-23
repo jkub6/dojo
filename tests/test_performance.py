@@ -2,6 +2,7 @@ import time
 
 from dojo.cli import main
 
+
 PERF_THRESHOLD_SECONDS = 2.0
 
 

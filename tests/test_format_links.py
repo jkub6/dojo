@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 import yaml
-
 from dojo.config import Config, OutputConfig
 from dojo.core import NinjaGenerator
+
 
 # --- Config Tests ---
 

@@ -13,6 +13,7 @@ from typing import Literal
 
 from .exceptions import UnknownResourceCategoryError
 
+
 # Standard Pandoc data directory names
 RESOURCE_CATEGORIES = {"defaults", "templates", "filters"}
 

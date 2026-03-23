@@ -1,5 +1,4 @@
 import pytest
-
 from dojo.cli import main
 
 

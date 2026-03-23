@@ -16,6 +16,7 @@ import logging
 from dojo.config import CustomRule
 from dojo.plugins import PluginInterface
 
+
 logger = logging.getLogger(__name__)
 
 
