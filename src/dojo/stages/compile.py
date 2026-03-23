@@ -12,8 +12,7 @@ from typing import TYPE_CHECKING
 from dojo.constants import RuleName
 from dojo.emitter import NinjaEmitter
 from dojo.paths import sanitize_path, shell_quote
-from dojo.stages._defaults import format_defaults_var, merge_defaults
-from dojo.yaml_utils import get_recursive_yaml_deps
+from dojo.stages._defaults import resolve_stage_dependencies
 
 if TYPE_CHECKING:
     from dojo.config import Config, TypeConfig
@@ -66,24 +65,20 @@ class CompileStage:
         """
         json_node = sanitize_path(self.build_dir, rel_stem.with_suffix(".json"))
 
-        compile_defaults = merge_defaults(
+        defaults_var, implicit = resolve_stage_dependencies(
             self.config.defaults,
             type_config.defaults,
+            pandoc_data_dir=self.config.pandoc_data_dir,
         )
-        variables = {
+
+        variables = {}
+        if defaults_var:
+            variables["defaults"] = defaults_var
+
+        variables.update({
             "in_shell": shell_quote(md_path),
             "out_shell": shell_quote(json_node),
-        }
-        implicit: list[Path] = []
-
-        if compile_defaults:
-            variables["defaults"] = format_defaults_var(compile_defaults)
-            raw_deps: list[Path] = []
-            data_dir = Path(self.config.pandoc_data_dir) if self.config.pandoc_data_dir else None
-            for df in compile_defaults:
-                raw_deps.append(df)
-                raw_deps.extend(get_recursive_yaml_deps(df, data_dir_override=data_dir))
-            implicit = sorted(set(raw_deps))
+        })
 
         self.emitter.build(
             outputs=json_node,

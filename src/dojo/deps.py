@@ -15,6 +15,11 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
+def is_remote_url(url: str) -> bool:
+    """Check if a URL is remote (http, https, data, mailto, etc.)."""
+    return url.lower().startswith(("http:", "https:", "data:", "mailto:", "tel:", "//"))
+
+
 def resolve_glob_dependencies(
     base_dir: Path,
     patterns: list[str],
@@ -80,7 +85,7 @@ def scan_css_dependencies(css_path: Path) -> list[Path]:
             continue
 
         # Ignore data URIs and remote URLs
-        if url_val.startswith(("data:", "http:", "https:")):
+        if is_remote_url(url_val):
             continue
 
         # Resolve relative to CSS file
@@ -125,7 +130,7 @@ def scan_html_dependencies(html_path: Path) -> list[Path]:
             continue
 
         # Ignore invalid start characters for local files
-        if url_val.startswith(("http:", "https:", "data:", "mailto:", "#")):
+        if is_remote_url(url_val) or url_val.startswith("#"):
             continue
 
         # Resolve relative to HTML file

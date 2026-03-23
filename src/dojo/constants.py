@@ -11,3 +11,14 @@ class RuleName(StrEnum):
     MINIFY = "minify"
     GHOSTSCRIPT = "ghostscript"
     DECKTAPE = "decktape"
+
+
+# Asset keys that implicitly reference files that should be tracked/copied
+ASSET_KEYS = [
+    "css",
+    "bibliography",
+    "csl",
+    "template",
+    "include-before",
+    "include-after",
+]

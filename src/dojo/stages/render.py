@@ -15,8 +15,7 @@ from dojo.constants import RuleName
 from dojo.emitter import NinjaEmitter
 from dojo.exceptions import DependencyError, OutputSourceMissingError, OutputToolMissingError
 from dojo.paths import sanitize_path, shell_quote
-from dojo.stages._defaults import format_defaults_var, merge_defaults
-from dojo.yaml_utils import get_recursive_yaml_deps
+from dojo.stages._defaults import resolve_stage_dependencies
 
 if TYPE_CHECKING:
     from dojo.config import Config, OutputConfig, PipelineStep
@@ -104,22 +103,20 @@ class RenderStage:
         else:
             render_target = final_path
 
-        # Gather dependencies for rendering
-        all_defaults = merge_defaults(out_config.defaults)
+        # Resolve dependencies
+        defaults_var, implicit = resolve_stage_dependencies(
+            out_config.defaults,
+            pandoc_data_dir=self.config.pandoc_data_dir,
+        )
+
         variables: dict[str, str] = {}
-        implicit: list[Path] = []
+        if defaults_var:
+            variables["defaults"] = defaults_var
 
-        if all_defaults:
-            variables["defaults"] = format_defaults_var(all_defaults)
-            raw_deps: list[Path] = []
-            data_dir = Path(self.config.pandoc_data_dir) if self.config.pandoc_data_dir else None
-            for df in all_defaults:
-                raw_deps.append(df)
-                raw_deps.extend(get_recursive_yaml_deps(df, data_dir_override=data_dir))
-            implicit = sorted(set(raw_deps))
-
-        variables["in_shell"] = shell_quote(json_node)
-        variables["out_shell"] = shell_quote(render_target)
+        variables.update({
+            "in_shell": shell_quote(json_node),
+            "out_shell": shell_quote(render_target),
+        })
 
         if out_config.args:
             variables["args"] = " ".join(out_config.args)

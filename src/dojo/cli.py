@@ -246,31 +246,38 @@ def main(argv: list[str] | None = None) -> None:
 
     args = parser.parse_args(argv, namespace=DojoArgs())
 
-    setup_cli_logging(
-        verbose=args.verbose,
-        quiet=args.quiet,
-        json_output=args.json_output,
-    )
+    try:
+        setup_cli_logging(
+            verbose=args.verbose,
+            quiet=args.quiet,
+            json_output=args.json_output,
+        )
 
-    if args.version or args.command == "version":
-        cmd_version(args)
-        return
+        if args.version or args.command == "version":
+            cmd_version(args)
+            return
 
-    # Default to help if no command specified
-    command = args.command
-    if command is None:
-        parser.print_help()
-        sys.exit(0)
-    elif command == "build":
-        cmd_build(args, parser=parser)
-    elif command == "check":
-        cmd_check(args)
-    elif command == "init":
-        cmd_init(args)
-    elif command == "schema":
-        cmd_schema(args)
-    else:
-        parser.print_help()
+        # Default to help if no command specified
+        command = args.command
+        if command is None:
+            parser.print_help()
+            sys.exit(0)
+        elif command == "build":
+            cmd_build(args, parser=parser)
+        elif command == "check":
+            cmd_check(args)
+        elif command == "init":
+            cmd_init(args)
+        elif command == "schema":
+            cmd_schema(args)
+        else:
+            parser.print_help()
+            sys.exit(1)
+    except Exception as e:
+        if args.verbose:
+            logger.exception("Unexpected error")
+        else:
+            console.print(f"[bold red]Error:[/bold red] {e}")
         sys.exit(1)
 
 

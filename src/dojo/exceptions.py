@@ -147,15 +147,18 @@ class DuplicateOutputIdError(ConfigError):
         super().__init__(f"Duplicate output IDs in type '{type_name}': {duplicates}")
 
 
-class ConfigFileNotFoundError(ConfigError):
+class ConfigFileNotFoundError(ConfigError, FileNotFoundError):
     """Raised when configuration file is not found."""
 
     def __init__(self, path: str | None = None) -> None:
         """Initialize ConfigFileNotFoundError."""
         if path:
-            super().__init__(f"Configuration file not found: {path}")
+            msg = f"Configuration file not found: {path}"
         else:
-            super().__init__("No configuration file found in search paths")
+            msg = "No configuration file found in search paths"
+        # Initialize both base classes
+        ConfigError.__init__(self, msg)
+        FileNotFoundError.__init__(self, msg)
 
 
 class SourceDirNotFoundError(ConfigError):

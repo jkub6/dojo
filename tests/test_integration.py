@@ -1,7 +1,9 @@
-import subprocess
 import sys
+from pathlib import Path
 
 import pytest
+
+from dojo.cli import main
 
 
 @pytest.fixture
@@ -41,23 +43,17 @@ types:
     return project_dir, config_path
 
 
-def test_build_command_subprocess(temp_project):
-    """Test the full build command execution via subprocess (Integration)."""
+def test_build_command_in_process(temp_project, capsys):
+    """Test the full build command execution in-process (Integration)."""
     project_dir, config_path = temp_project
 
-    result = subprocess.run(
-        [sys.executable, "-m", "dojo", "build", "-c", str(config_path)],
-        capture_output=True,
-        text=True,
-        cwd=str(project_dir),
-        check=False,
-    )
-
-    assert result.returncode == 0, f"Build failed: {result.stderr}"
-    assert (
-        "Build configuration generated successfully" in result.stdout
-        or "Build configuration generated successfully" in result.stderr
-    )
+    try:
+        main(["build", "-c", str(config_path)])
+    except SystemExit as exc:
+        assert exc.code == 0
+    
+    captured = capsys.readouterr()
+    assert "Build configuration generated successfully" in captured.out
 
     # Check if build.ninja was created
     build_ninja = project_dir / "_build" / "build.ninja"
@@ -65,29 +61,31 @@ def test_build_command_subprocess(temp_project):
     assert "rule compile" in build_ninja.read_text()
 
 
-def test_cli_version_subprocess():
-    """Test version command via subprocess."""
-    result = subprocess.run(
-        [sys.executable, "-m", "dojo", "--version"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+def test_cli_version_in_process(capsys):
+    """Test version command in-process."""
+    # version command itself might not raise SystemExit if it just prints and returns
+    # but cli.py uses argparse which might exit on some versions
+    try:
+        main(["--version"])
+    except SystemExit as exc:
+        assert exc.code == 0
 
-    assert result.returncode == 0
-    assert "dojo" in result.stdout or "dojo" in result.stderr
+    captured = capsys.readouterr()
+    assert "dojo" in captured.out or "dojo" in captured.err
 
 
-def test_build_no_config_subprocess(tmp_path):
-    """Test failure when no config found via subprocess."""
+def test_build_no_config_in_process(tmp_path, capsys):
+    """Test failure when no config found in-process."""
     # Run in empty temp dir
-    result = subprocess.run(
-        [sys.executable, "-m", "dojo", "build"],
-        capture_output=True,
-        text=True,
-        cwd=str(tmp_path),
-        check=False,
-    )
+    import os
+    old_cwd = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        with pytest.raises(SystemExit) as exc:
+            main(["build"])
+        assert exc.value.code != 0
+    finally:
+        os.chdir(old_cwd)
 
-    assert result.returncode != 0
-    assert "Error" in result.stdout or "Error" in result.stderr
+    captured = capsys.readouterr()
+    assert "Error" in captured.out or "Error" in captured.err

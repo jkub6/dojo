@@ -73,12 +73,13 @@ tools:
   minify: {mock_minify}
 """)
 
+    from dojo.cli import main
+
     # First build
-    subprocess.run(
-        [sys.executable, "-m", "dojo", "build", "-c", str(config_path)],
-        cwd=str(project),
-        check=True,
-    )
+    try:
+        main(["build", "-c", str(config_path)])
+    except SystemExit as exc:
+        assert exc.code == 0
 
     # Run ninja first time to populate cache
     subprocess.run(
@@ -88,11 +89,10 @@ tools:
     )
 
     # Second build (immediate re-run)
-    subprocess.run(
-        [sys.executable, "-m", "dojo", "build", "-c", str(config_path)],
-        cwd=str(project),
-        check=True,
-    )
+    try:
+        main(["build", "-c", str(config_path)])
+    except SystemExit as exc:
+        assert exc.code == 0
 
     # Run ninja second time - should do nothing
     result = subprocess.run(

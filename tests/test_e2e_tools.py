@@ -13,6 +13,8 @@ from pathlib import Path
 
 import pytest
 
+from dojo.cli import main
+
 def tool_available(name: str) -> bool:
     """Check if a tool is available in PATH."""
     return shutil.which(name) is not None
@@ -89,15 +91,11 @@ class TestOptionalToolsPipeline:
         """Test that dojo generates build.ninja and ninja executes all tools successfully."""
         project, config_path = tools_project
 
-        # Step 1: Run dojo build
-        dojo_result = subprocess.run(
-            [sys.executable, "-m", "dojo", "build", "-c", str(config_path)],
-            capture_output=True,
-            text=True,
-            cwd=str(project),
-            check=False,
-        )
-        assert dojo_result.returncode == 0, f"dojo build failed: {dojo_result.stderr}"
+        # Step 1: Run dojo build (In-process for coverage)
+        try:
+            main(["build", "-c", str(config_path)])
+        except SystemExit as e:
+            assert e.code == 0
 
         # Verify build.ninja was created
         build_ninja = project / "_build" / "build.ninja"
@@ -117,7 +115,7 @@ class TestOptionalToolsPipeline:
             cwd=str(project),
             check=False,
         )
-        assert ninja_result.returncode == 0, f"ninja failed: {ninja_result.stderr}\\n{ninja_result.stdout}"
+        assert ninja_result.returncode == 0, f"ninja failed: {ninja_result.stderr}\n{ninja_result.stdout}"
 
         # Verify HTML was created and minified (should have very few newlines)
         output_html = project / "_site" / "index.html"

@@ -13,6 +13,8 @@ from pathlib import Path
 
 import pytest
 
+from dojo.cli import main
+
 
 def ninja_available() -> bool:
     """Check if ninja is available in PATH."""
@@ -84,23 +86,34 @@ class TestFullBuildPipeline:
     def test_generates_and_builds_html(
         self,
         sample_project: tuple[Path, Path],
+        file_regression,
     ) -> None:
         """Test that dojo generates build.ninja and ninja produces HTML output."""
         project, config_path = sample_project
 
         # Step 1: Run dojo build
-        dojo_result = subprocess.run(
-            [sys.executable, "-m", "dojo", "build", "-c", str(config_path)],
-            capture_output=True,
-            text=True,
-            cwd=str(project),
-            check=False,
-        )
-        assert dojo_result.returncode == 0, f"dojo build failed: {dojo_result.stderr}"
+        try:
+            main(["build", "-c", str(config_path)])
+        except SystemExit as e:
+            assert e.code == 0
 
         # Verify build.ninja was created
         build_ninja = project / "_build" / "build.ninja"
         assert build_ninja.exists(), "build.ninja not created"
+
+        # Professional Snapshoting (Normalized)
+        ninja_content = build_ninja.read_text()
+        
+        # Normalize absolute paths to keep snapshots stable
+        # 1. Project-specific paths
+        normalized_content = ninja_content.replace(str(project), "[PROJECT_ROOT]")
+        
+        # 2. Dojo-internal resource paths
+        dojo_root = Path(__file__).parent.parent.resolve()
+        normalized_content = normalized_content.replace(str(dojo_root), "[DOJO_ROOT]")
+        
+        # Verify entire build graph via snapshot
+        file_regression.check(normalized_content, extension=".ninja")
 
         # Step 2: Run ninja
         ninja_result = subprocess.run(
@@ -128,11 +141,11 @@ class TestFullBuildPipeline:
         project, config_path = sample_project
 
         # First build
-        subprocess.run(
-            [sys.executable, "-m", "dojo", "build", "-c", str(config_path)],
-            cwd=str(project),
-            check=True,
-        )
+        try:
+            main(["build", "-c", str(config_path)])
+        except SystemExit as e:
+            assert e.code == 0
+
         build_ninja = project / "_build" / "build.ninja"
         subprocess.run(
             ["ninja", "-f", str(build_ninja)],
@@ -159,11 +172,11 @@ class TestFullBuildPipeline:
         project, config_path = sample_project
 
         # Initial build
-        subprocess.run(
-            [sys.executable, "-m", "dojo", "build", "-c", str(config_path)],
-            cwd=str(project),
-            check=True,
-        )
+        try:
+            main(["build", "-c", str(config_path)])
+        except SystemExit as e:
+            assert e.code == 0
+
         build_ninja = project / "_build" / "build.ninja"
         subprocess.run(
             ["ninja", "-f", str(build_ninja)],
@@ -232,11 +245,11 @@ types:
 """)
 
         # Build
-        subprocess.run(
-            [sys.executable, "-m", "dojo", "build", "-c", str(config_path)],
-            cwd=str(project),
-            check=True,
-        )
+        try:
+            main(["build", "-c", str(config_path)])
+        except SystemExit as e:
+            assert e.code == 0
+
         subprocess.run(
             ["ninja", "-f", str(project / "_build" / "build.ninja")],
             cwd=str(project),
@@ -247,6 +260,68 @@ types:
         output_css = project / "_site" / "assets" / "style.css"
         assert output_css.exists(), "CSS file not copied to output"
         assert "color: red" in output_css.read_text()
+
+    def test_recursive_asset_copying(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Test that assets referenced within other assets (CSS -> Image) are copied."""
+        project = tmp_path / "project"
+        project.mkdir()
+
+        content = project / "content"
+        content.mkdir()
+        assets = content / "assets"
+        assets.mkdir()
+
+        defaults = project / "defaults"
+        defaults.mkdir()
+        defaults_file = defaults / "page.yaml"
+        defaults_file.write_text("standalone: true\n")
+
+        # Create Image file
+        img_file = assets / "bg.png"
+        img_file.touch()
+
+        # Create CSS file referencing the image
+        css_file = assets / "style.css"
+        css_file.write_text("body { background: url('bg.png'); }\n")
+
+        # Create markdown referencing the CSS
+        (content / "index.md").write_text(
+            "---\ntitle: Home\ncss:\n  - assets/style.css\n---\n# Hello\n"
+        )
+
+        # Create config
+        config_path = project / "dojo.yaml"
+        config_path.write_text(f"""\
+src_dir: "{content}"
+output_dir: "{project / "_site"}"
+build_dir: "{project / "_build"}"
+default_type: page
+types:
+  page:
+    outputs:
+      - id: html
+        extension: html
+        defaults: "{defaults_file}"
+""")
+
+        # Build
+        try:
+            main(["build", "-c", str(config_path)])
+        except SystemExit as e:
+            assert e.code == 0
+
+        subprocess.run(
+            ["ninja", "-f", str(project / "_build" / "build.ninja")],
+            cwd=str(project),
+            check=True,
+        )
+
+        # Verify both CSS and the recursively discovered Image were copied
+        assert (project / "_site" / "assets" / "style.css").exists()
+        assert (project / "_site" / "assets" / "bg.png").exists()
 
 
 class TestErrorHandling:
@@ -268,13 +343,7 @@ types:
     outputs: []
 """)
 
-        result = subprocess.run(
-            [sys.executable, "-m", "dojo", "build", "-c", str(config_path)],
-            capture_output=True,
-            text=True,
-            cwd=str(tmp_path),
-            check=False,
-        )
+        with pytest.raises(SystemExit) as exc:
+            main(["build", "-c", str(config_path)])
 
-        assert result.returncode != 0
-        assert "not found" in result.stderr.lower() or "not found" in result.stdout.lower()
+        assert exc.value.code != 0

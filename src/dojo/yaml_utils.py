@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import cast
 
 import yaml
+from dojo.constants import ASSET_KEYS
 
 from .exceptions import CircularDependencyError
 from .resources import find_resource as _find_resource
@@ -95,31 +96,39 @@ def parse_frontmatter(md_path: Path) -> dict[str, object] | None:
     - No frontmatter exists
     - Frontmatter is malformed
     - File cannot be read
+
+    Efficiency: Only reads until the end of the frontmatter block.
     """
     try:
         with open(md_path, encoding="utf-8") as f:
-            # Check for frontmatter delimiter
-            first_line = ""
-            for line in f:
-                if line.strip():
-                    first_line = line
-                    break
-
-            if first_line.strip() != "---":
+            # Skip optional leading whitespace/newlines
+            line = f.readline()
+            while line and not line.strip():
+                line = f.readline()
+            
+            if not line or line.strip() != "---":
                 return None
 
-            # Collect frontmatter content
+            # Collect frontmatter content iteratively
             frontmatter_lines = []
             for line in f:
-                if line.strip() == "---":
+                stripped = line.strip()
+                if stripped == "---":
                     break
                 frontmatter_lines.append(line)
+            else:
+                # No closing --- found
+                return None
 
-            # Parse just the frontmatter
+            # Parse just the collected frontmatter
             frontmatter_text = "".join(frontmatter_lines)
+            if not frontmatter_text.strip():
+                return {}
+
             frontmatter_raw: object = yaml.safe_load(frontmatter_text)
             if not isinstance(frontmatter_raw, dict):
                 return None
+
             return cast("dict[str, object]", frontmatter_raw)
 
     except (OSError, yaml.YAMLError) as e:
@@ -158,7 +167,7 @@ def get_frontmatter_assets(md_path: Path) -> list[Path]:
     # 'bibliography' and 'csl' are used for citation processing, not output assets usually?
     # Actually bibliography are read by pandoc, not linked in HTML (unless served?)
     # But files referenced in `css` definitely need to be served.
-    asset_keys = ["css"]
+    asset_keys = ASSET_KEYS
 
     raw_assets = _extract_paths(frontmatter, asset_keys)
 
@@ -244,7 +253,7 @@ def get_recursive_yaml_deps(
 
         # 2. Handle Leaf Assets (CSS, templates, etc)
         # Pandoc behavior: relative paths are relative to CWD (executable location).
-        asset_keys = ["css", "bibliography", "csl", "template", "include-before", "include-after"]
+        asset_keys = ASSET_KEYS
         assets = _extract_paths(data, asset_keys)
         _resolve_assets(assets, deps)
 
@@ -300,3 +309,8 @@ def _resolve_assets(assets: list[str], deps: list[Path]) -> None:
         # The original code checked .exists().
         if asset_path.exists():
             deps.append(asset_path)
+
+    return deps
+
+
+

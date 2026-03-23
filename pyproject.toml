@@ -7,7 +7,7 @@ name = "dojo"
 version = "0.1.0"
 description = "Professional Ninja Build Generator for Static Site Generation"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 license = "MIT"
 authors = [
   {name = "Jake", email = "jkub66@gmail.com"},
@@ -18,7 +18,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Build Tools",
@@ -38,6 +37,9 @@ dev = [
   "pytest-xdist",
   "pytest-randomly",
   "pytest-timeout",
+  "pytest-mock",
+  "pytest-regressions",
+  "hypothesis",
   "mypy",
   "types-PyYAML",
   "vulture",
@@ -58,7 +60,7 @@ packages = ["src/dojo"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py313"
 src = ["src"]
 
 [tool.ruff.lint]
@@ -139,7 +141,7 @@ timeout = 30
 pythonpath = "src"
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.13"
 strict = true
 warn_return_any = true
 warn_unused_configs = true

@@ -32,6 +32,9 @@
                 pytest-xdist
                 pytest-randomly
                 pytest-timeout
+                pytest-mock
+                pytest-regressions
+                hypothesis
                 jsonschema
                 final.ninja
                 final.pandoc
@@ -76,6 +79,9 @@
                p.pytest-xdist
                p.pytest-randomly
                p.pytest-timeout
+               p.pytest-mock
+               p.pytest-regressions
+               p.hypothesis
                p.mypy
                p.types-pyyaml
                p.vulture

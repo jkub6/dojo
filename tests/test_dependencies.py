@@ -114,3 +114,77 @@ def test_lua_dependencies_filter(tmp_path):
     assert str(output_json) + ":" in content
     assert "image.png" in content
     assert "data_folder/data.csv" in content
+
+
+def test_get_recursive_yaml_deps_list_defaults(tmp_path):
+    """Verify that 'defaults' can be a list of files."""
+    root = tmp_path / "root.yaml"
+    d1 = tmp_path / "d1.yaml"
+    d2 = tmp_path / "d2.yaml"
+
+    d1.write_text("foo: 1", encoding="utf-8")
+    d2.write_text("bar: 2", encoding="utf-8")
+    root.write_text(f"defaults:\n  - {d1}\n  - {d2}", encoding="utf-8")
+
+    deps = get_recursive_yaml_deps(root)
+    assert d1.resolve() in deps
+    assert d2.resolve() in deps
+    assert len(deps) == 2
+
+
+def test_get_recursive_yaml_deps_assets_extraction(tmp_path, monkeypatch):
+    """Verify extraction of various asset keys."""
+    monkeypatch.chdir(tmp_path)
+    root = tmp_path / "root.yaml"
+    
+    # Create assets
+    assets = {
+        "style.css": "css",
+        "bib.bib": "bibliography",
+        "style.csl": "csl",
+        "tmpl.html": "template",
+        "before.md": "include-before",
+        "after.md": "include-after",
+    }
+    for name in assets:
+        (tmp_path / name).touch()
+
+    # Create YAML referencing them
+    content = "\n".join([f"{key}: {name}" for name, key in assets.items()])
+    root.write_text(content, encoding="utf-8")
+
+    deps = get_recursive_yaml_deps(root)
+    
+    for name in assets:
+        assert (tmp_path / name).resolve() in deps
+
+
+def test_get_recursive_yaml_deps_complex_data_dir(tmp_path, monkeypatch):
+    """Verify data-dir overrides and fallback logic.
+    
+    Structure:
+    /root.yaml (defaults: child.yaml)
+    /data1/child.yaml (defaults: leaf.yaml, data-dir: /data2)
+    /data2/defaults/leaf.yaml
+    """
+    monkeypatch.chdir(tmp_path)
+    
+    data1 = tmp_path / "data1"
+    data1.mkdir()
+    data2 = tmp_path / "data2"
+    data2.mkdir()
+    (data2 / "defaults").mkdir()
+    
+    root = tmp_path / "root.yaml"
+    child = data1 / "child.yaml"
+    leaf = data2 / "defaults" / "leaf.yaml"
+    leaf.touch()
+    
+    root.write_text(f"defaults: {child}", encoding="utf-8")
+    # child.yaml points to 'leaf' which should be found in data-dir/defaults/
+    child.write_text(f"data-dir: {data2}\ndefaults: leaf", encoding="utf-8")
+    
+    deps = get_recursive_yaml_deps(root)
+    
+    assert child.resolve() in deps
+    assert leaf.resolve() in deps

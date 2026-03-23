@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, TextIO
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-from .utils import ninja_escape
+from .paths import ninja_escape
 
 
 class NinjaEmitter:
@@ -28,6 +28,12 @@ class NinjaEmitter:
         """Write a variable assignment."""
         padding = "  " * indent
         self.fp.write(f"{padding}{name} = {value}\n")
+
+    def pool(self, name: str, depth: int) -> None:
+        """Write a pool definition."""
+        self.fp.write(f"pool {name}\n")
+        self.variable("depth", str(depth), indent=1)
+        self.newline()
 
     def rule(  # noqa: PLR0913
         self,

@@ -7,6 +7,7 @@ from dojo.config import Config, OutputConfig
 from dojo.constants import RuleName
 from dojo.core import NinjaGenerator
 from dojo.exceptions import DefaultsRequiredError, DependencyError, SourceRequiresToolError
+from dojo.stages._defaults import format_defaults_var, merge_defaults
 
 
 @pytest.fixture
@@ -56,13 +57,13 @@ def test_get_merged_defaults(core_config):
     gen = NinjaGenerator(cfg, path)
 
     # Test None
-    assert gen._get_merged_defaults(None) == []
+    assert merge_defaults(None) == []
     # Test single
     p = str(Path("a").resolve())
-    assert gen._get_merged_defaults(p)[0] == Path("a").resolve()
+    assert merge_defaults(p)[0] == Path("a").resolve()
     # Test list
     expected_count = 2
-    assert len(gen._get_merged_defaults([p, p])) == expected_count
+    assert len(merge_defaults([p, p])) == expected_count
 
 
 def test_process_content_outside_src(core_config, tmp_path, caplog):
@@ -150,17 +151,14 @@ def test_plugin_integration(core_config, tmp_path):
     assert "# Plugin was here" in ninja_content
 
 
-def test_format_defaults_var_empty(core_config):
-    cfg, path = core_config
-    gen = NinjaGenerator(cfg, path)
-    assert gen._format_defaults_var([]) == ""
+    assert format_defaults_var([]) == ""
 
 
 def test_derive_output_none_source():
     # Pydantic validation now catches this
     # Pydantic validation now catches this
     with pytest.raises(DefaultsRequiredError):
-        OutputConfig(id="pdf", extension="pdf", source=None, tool="decktape")
+        OutputConfig(id="pdf", extension="pdf", source=None, tool="decktape", defaults=None)
 
 
 def test_derive_output_none_tool():

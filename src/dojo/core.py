@@ -53,25 +53,30 @@ class NinjaGenerator:
         *,
         quiet: bool = False,
         dry_run: bool = False,
+        emitter: NinjaEmitter | None = None,
     ) -> None:
         """Initialize the NinjaBuilder."""
         self.config = config
-        self.config_path = config_path.resolve()
+        self.config_path = Path(config_path).absolute()
         self.quiet = quiet
         self.dry_run = dry_run
 
         # Configure paths
-        self.src = Path(self.config.src_dir).resolve()
-        self.out_dir = Path(self.config.output_dir).resolve()
-        self.build_dir = Path(self.config.build_dir).resolve()
+        self.src = Path(self.config.src_dir).absolute()
+        self.out_dir = Path(self.config.output_dir).absolute()
+        self.build_dir = Path(self.config.build_dir).absolute()
         self.ninja_file = self.build_dir / "build.ninja"
 
         # Create build directory
         self.build_dir.mkdir(parents=True, exist_ok=True)
 
         # Buffer and Emitter
-        self._buffer = io.StringIO()
-        self.emitter = NinjaEmitter(self._buffer)
+        if emitter:
+            self.emitter = emitter
+            self._buffer = io.StringIO()  # Dummy buffer if emitter is external
+        else:
+            self._buffer = io.StringIO()
+            self.emitter = NinjaEmitter(self._buffer)
 
         # Track all final outputs
         self.all_outputs: list[Path] = []
@@ -117,14 +122,6 @@ class NinjaGenerator:
         # Format link defaults: populated by _generate_format_link_defaults()
         self._format_link_defaults: dict[tuple[str, str], Path] = {}
 
-    # Keep legacy methods for backward compatibility with tests
-    def _get_merged_defaults(self, *sources: str | list[str] | None) -> list[Path]:
-        """Merge default files from multiple sources and return absolute paths."""
-        return merge_defaults(*sources)
-
-    def _format_defaults_var(self, defaults: list[Path]) -> str:
-        """Format list of defaults into ninja variable string."""
-        return format_defaults_var(defaults)
 
     def _generate_format_link_defaults(self) -> None:
         """Generate Pandoc defaults files for cross-format links.
@@ -282,9 +279,7 @@ class NinjaGenerator:
         # Pools
         self.emitter.comment("Resource pools prevent CPU/memory saturation")
         for pool_name, depth in self.config.pools.items():
-            self.emitter.fp.write(f"pool {pool_name}\n")
-            self.emitter.variable("depth", str(depth), indent=1)
-            self.emitter.newline()
+            self.emitter.pool(pool_name, depth)
 
         # Rules
         self.emitter.comment("Rules")
