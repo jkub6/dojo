@@ -1,4 +1,3 @@
-
 import pytest
 
 from dojo.cli import main
@@ -45,10 +44,7 @@ def test_build_command_in_process(temp_project, capsys):
     """Test the full build command execution in-process (Integration)."""
     project_dir, config_path = temp_project
 
-    try:
-        main(["build", "-c", str(config_path)])
-    except SystemExit as exc:
-        assert exc.code == 0
+    main(["build", "-c", str(config_path)])
 
     captured = capsys.readouterr()
     assert "Build configuration generated successfully" in captured.out
@@ -63,10 +59,7 @@ def test_cli_version_in_process(capsys):
     """Test version command in-process."""
     # version command itself might not raise SystemExit if it just prints and returns
     # but cli.py uses argparse which might exit on some versions
-    try:
-        main(["--version"])
-    except SystemExit as exc:
-        assert exc.code == 0
+    main(["--version"])
 
     captured = capsys.readouterr()
     assert "dojo" in captured.out or "dojo" in captured.err

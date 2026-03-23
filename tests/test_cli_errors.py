@@ -6,7 +6,10 @@ and other error conditions gracefully with appropriate exit codes and messages.
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 import pytest
 import yaml

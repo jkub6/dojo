@@ -10,6 +10,7 @@ from dojo.paths import sanitize_path, should_process_file
 
 @st.composite
 def path_and_base(draw):
+    """Generate a base path and a relative path for testing path sanitization."""
     base = Path("/base")
     # Generate relative paths that might try to escape
     parts = draw(
@@ -25,6 +26,7 @@ def path_and_base(draw):
 
 @given(path_and_base())
 def test_sanitize_path_properties(pair):
+    """Verify properties of sanitized paths using property-based testing."""
     base, rel = pair
     try:
         result = sanitize_path(base, rel)
@@ -43,8 +45,9 @@ def test_sanitize_path_properties(pair):
         raise
 
 
-def test_sanitize_path_traversal_trap():
-    base = Path("/tmp/dojo-test")
+def test_sanitize_path_traversal_trap(tmp_path):
+    """Verify that path traversal attempts are detected and trapped."""
+    base = tmp_path / "dojo-test"
     base.mkdir(parents=True, exist_ok=True)
     with pytest.raises(SecurityError):
         sanitize_path(base, Path("../../../etc/passwd"))
@@ -55,6 +58,7 @@ def test_sanitize_path_traversal_trap():
     st.lists(st.text(min_size=1, alphabet="abcdefgh/.*")),
 )
 def test_should_process_file_properties(includes, excludes):
+    """Verify properties of the file processing filter."""
     src_dir = Path("/src")
     file_path = Path("/src/content/index.md")
 
@@ -66,6 +70,6 @@ def test_should_process_file_properties(includes, excludes):
 
     # Property: If includes is empty, all non-excluded files are processed
     if not includes:
-        res = should_process_file(file_path, src_dir, [], excludes)
+        should_process_file(file_path, src_dir, [], excludes)
         if not any(file_path.name == e for e in excludes):  # Very rough check
             pass

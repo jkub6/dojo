@@ -9,7 +9,10 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 import pytest
 
@@ -76,10 +79,7 @@ tools:
     from dojo.cli import main
 
     # First build
-    try:
-        main(["build", "-c", str(config_path)])
-    except SystemExit as exc:
-        assert exc.code == 0
+    main(["build", "-c", str(config_path)])
 
     # Run ninja first time to populate cache
     subprocess.run(
@@ -89,10 +89,7 @@ tools:
     )
 
     # Second build (immediate re-run)
-    try:
-        main(["build", "-c", str(config_path)])
-    except SystemExit as exc:
-        assert exc.code == 0
+    main(["build", "-c", str(config_path)])
 
     # Run ninja second time - should do nothing
     result = subprocess.run(

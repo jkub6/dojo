@@ -9,7 +9,10 @@ from dojo.stages.render import RenderStage
 
 
 class TestRenderStage:
+    """Tests for the RenderStage class."""
+
     def test_standard_render_emits_correct_ninja_rule(self, mock_config, mock_emitter):
+        """Verify that a standard render call emits the correct Ninja build rule."""
         stage = RenderStage(
             config=mock_config,
             out_dir=Path("/out"),
@@ -39,14 +42,15 @@ class TestRenderStage:
         assert local_registry["my-output"] == Path("/out/pages/index.html")
 
     def test_derive_output_missing_tool_raises(self, mock_config, mock_emitter):
+        """Verify that missing a requested tool raises SourceRequiresToolError."""
         from dojo.exceptions import SourceRequiresToolError
 
-        stage = RenderStage(mock_config, Path("/out"), Path("/build"), mock_emitter, [])
         # source requires tool (pydantic validation)
         with pytest.raises(SourceRequiresToolError):
             OutputConfig(extension="pdf", source="html", tool=None, id="pdf")
 
     def test_derive_output_missing_source_in_registry_raises(self, mock_config, mock_emitter):
+        """Verify that referencing a missing source ID in the registry raises DependencyError."""
         from dojo.exceptions import DependencyError
 
         stage = RenderStage(mock_config, Path("/out"), Path("/build"), mock_emitter, [])
@@ -58,6 +62,7 @@ class TestRenderStage:
             stage.render(out_config, Path("any.json"), Path("any"), {})
 
     def test_derive_output_missing_tool_at_runtime_raises(self, mock_config, mock_emitter):
+        """Verify that a missing tool at runtime raises OutputToolMissingError."""
         from dojo.exceptions import OutputToolMissingError
 
         stage = RenderStage(mock_config, Path("/out"), Path("/build"), mock_emitter, [])
@@ -71,6 +76,7 @@ class TestRenderStage:
             stage.render(out_config, Path("any.json"), Path("any"), {"html": Path("in.html")})
 
     def test_standard_render_with_post_process(self, mock_config, mock_emitter):
+        """Verify that post-processing pipeline steps are correctly emitted as Ninja rules."""
         from dojo.config import PipelineStep
 
         stage = RenderStage(mock_config, Path("/out"), Path("/build"), mock_emitter, [])
@@ -85,12 +91,13 @@ class TestRenderStage:
             stage.render(out_config, Path("in.json"), Path("index"), {})
 
         # Should call emitter twice: once for RENDER, once for MINIFY
-        assert mock_emitter.build.call_count == 2
+        assert mock_emitter.build.call_count == 2  # noqa: PLR2004
         rules = [call.kwargs["rule"] for call in mock_emitter.build.call_args_list]
         assert "render" in rules
         assert "minify" in rules
 
     def test_standard_render_with_args(self, mock_config, mock_emitter):
+        """Verify that command line arguments are correctly passed to the render rule."""
         stage = RenderStage(mock_config, Path("/out"), Path("/build"), mock_emitter, [])
         out_config = OutputConfig(
             extension="html", args=["--mathjax", "--self-contained"], defaults=[]
@@ -101,6 +108,7 @@ class TestRenderStage:
         assert "--mathjax --self-contained" in call_args.kwargs["variables"]["args"]
 
     def test_derive_output_missing_source_raises(self, mock_config, mock_emitter):
+        """Verify that a missing source during output derivation raises OutputSourceMissingError."""
         from dojo.exceptions import OutputSourceMissingError
 
         stage = RenderStage(mock_config, Path("/out"), Path("/build"), mock_emitter, [])
@@ -113,7 +121,10 @@ class TestRenderStage:
 
 
 class TestAssetProcessor:
+    """Tests for the AssetProcessor class."""
+
     def test_asset_processor_skips_outside_src(self, mock_emitter, caplog):
+        """Verify that assets referenced outside the source directory are skipped with a warning."""
         processor = AssetProcessor(
             src=Path("/src"),
             out_dir=Path("/out"),
@@ -132,6 +143,7 @@ class TestAssetProcessor:
         mock_emitter.build.assert_not_called()
 
     def test_asset_processor_recursive_discovery(self, mock_emitter):
+        """Verify that assets (like CSS) are recursively scanned for dependencies (like images)."""
         processor = AssetProcessor(
             src=Path("/src"),
             out_dir=Path("/out"),
@@ -143,17 +155,20 @@ class TestAssetProcessor:
         style_css = Path("/src/style.css")
         bg_png = Path("/src/bg.png")
 
-        with patch("dojo.stages.assets.get_frontmatter_assets", return_value=[style_css]):
-            with patch("dojo.stages.assets.scan_css_dependencies", return_value=[bg_png]):
-                processor.process_assets(Path("/src/index.md"))
+        with (
+            patch("dojo.stages.assets.get_frontmatter_assets", return_value=[style_css]),
+            patch("dojo.stages.assets.scan_css_dependencies", return_value=[bg_png]),
+        ):
+            processor.process_assets(Path("/src/index.md"))
 
         # Should be called twice: once for CSS, once for PNG
-        assert mock_emitter.build.call_count == 2
+        assert mock_emitter.build.call_count == 2  # noqa: PLR2004
         outputs = [call.kwargs["outputs"] for call in mock_emitter.build.call_args_list]
         assert Path("/out/style.css") in outputs
         assert Path("/out/bg.png") in outputs
 
     def test_asset_processor_dependencies_glob(self, mock_emitter, tmp_path):
+        """Verify that glob patterns in frontmatter dependencies are correctly expanded and processed."""
         # We need a real path for parse_frontmatter to work or we mock it
         processor = AssetProcessor(
             src=tmp_path / "src",
@@ -179,6 +194,7 @@ class TestAssetProcessor:
         )
 
     def test_asset_processor_skips_self_reference(self, mock_emitter, tmp_path):
+        """Verify that the source file itself is not processed as an asset (cycle prevention)."""
         processor = AssetProcessor(
             src=tmp_path / "src",
             out_dir=tmp_path / "out",
@@ -197,6 +213,7 @@ class TestAssetProcessor:
         mock_emitter.build.assert_not_called()
 
     def test_asset_processor_scans_html(self, mock_emitter, tmp_path):
+        """Verify that HTML files are scanned for internal assets like <img> tags."""
         processor = AssetProcessor(
             src=tmp_path / "src",
             out_dir=tmp_path / "out",
@@ -213,9 +230,10 @@ class TestAssetProcessor:
             processor.process_assets(tmp_path / "src" / "index.md")
 
         # One for HTML, one for img.png
-        assert mock_emitter.build.call_count == 2
+        assert mock_emitter.build.call_count == 2  # noqa: PLR2004
 
     def test_asset_processor_deduplication(self, mock_emitter, tmp_path):
+        """Verify that multiple references to the same asset are deduplicated during processing."""
         # Test line 95: asset in processed_assets
         processor = AssetProcessor(
             src=tmp_path / "src",
@@ -234,6 +252,7 @@ class TestAssetProcessor:
         assert mock_emitter.build.call_count == 1
 
     def test_asset_processor_global_deduplication(self, mock_emitter, tmp_path):
+        """Verify that assets already processed in other stages are not re-processed."""
         # Test line 115: final_path in self.copied_assets
         copied = {Path(tmp_path / "out" / "style.css")}
         processor = AssetProcessor(
@@ -253,6 +272,7 @@ class TestAssetProcessor:
         mock_emitter.build.assert_not_called()
 
     def test_asset_processor_self_reference_resolve(self, mock_emitter, tmp_path):
+        """Verify that self-references are correctly identified after path resolution."""
         # Test line 95 specifically with resolved paths
         processor = AssetProcessor(
             src=tmp_path / "src",
@@ -295,7 +315,7 @@ class TestAssetProcessor:
             processor.process_assets(tmp_path / "src" / "index.md")
 
         # Should be called twice (a.css and b.css)
-        assert mock_emitter.build.call_count == 2
+        assert mock_emitter.build.call_count == 2  # noqa: PLR2004
         outputs = [call.kwargs["outputs"] for call in mock_emitter.build.call_args_list]
         assert (tmp_path / "out" / "a.css") in outputs
         assert (tmp_path / "out" / "b.css") in outputs

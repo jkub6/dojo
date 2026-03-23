@@ -92,16 +92,13 @@ class TestFullBuildPipeline:
         project, config_path = sample_project
 
         # Step 1: Run dojo build
-        try:
-            main(["build", "-c", str(config_path)])
-        except SystemExit as e:
-            assert e.code == 0
+        main(["build", "-c", str(config_path)])
 
         # Verify build.ninja was created
         build_ninja = project / "_build" / "build.ninja"
         assert build_ninja.exists(), "build.ninja not created"
 
-        # Snapshoting (Normalized)
+        # Verify build.ninja (Normalized)
         ninja_content = build_ninja.read_text()
 
         # Use shared normalization utility
@@ -133,14 +130,11 @@ class TestFullBuildPipeline:
         self,
         sample_project: tuple[Path, Path],
     ) -> None:
-        """Test that ninja correctly handles incremental builds."""
+        """Verify that Ninja correctly handles incremental builds (no-op when nothing changed)."""
         project, config_path = sample_project
 
         # First build
-        try:
-            main(["build", "-c", str(config_path)])
-        except SystemExit as e:
-            assert e.code == 0
+        main(["build", "-c", str(config_path)])
 
         build_ninja = project / "_build" / "build.ninja"
         subprocess.run(
@@ -164,14 +158,11 @@ class TestFullBuildPipeline:
         self,
         sample_project: tuple[Path, Path],
     ) -> None:
-        """Test that modifying source triggers rebuild."""
+        """Verify that modifying a source file triggers a rebuild in Ninja."""
         project, config_path = sample_project
 
         # Initial build
-        try:
-            main(["build", "-c", str(config_path)])
-        except SystemExit as e:
-            assert e.code == 0
+        main(["build", "-c", str(config_path)])
 
         build_ninja = project / "_build" / "build.ninja"
         subprocess.run(
@@ -196,13 +187,13 @@ class TestFullBuildPipeline:
 
 
 class TestAssetCopying:
-    """Tests for asset dependency handling."""
+    """Tests for asset dependency handling and copying."""
 
     def test_css_asset_copied(
         self,
         tmp_path: Path,
     ) -> None:
-        """Test that CSS referenced in frontmatter is copied to output."""
+        """Verify that CSS files referenced in frontmatter are correctly copied to the output."""
         project = tmp_path / "project"
         project.mkdir()
 
@@ -241,10 +232,7 @@ types:
 """)
 
         # Build
-        try:
-            main(["build", "-c", str(config_path)])
-        except SystemExit as e:
-            assert e.code == 0
+        main(["build", "-c", str(config_path)])
 
         subprocess.run(
             ["ninja", "-f", str(project / "_build" / "build.ninja")],
@@ -261,7 +249,7 @@ types:
         self,
         tmp_path: Path,
     ) -> None:
-        """Test that assets referenced within other assets (CSS -> Image) are copied."""
+        """Verify that assets referenced within other assets (e.g., Image in CSS) are recursively copied."""
         project = tmp_path / "project"
         project.mkdir()
 
@@ -304,10 +292,7 @@ types:
 """)
 
         # Build
-        try:
-            main(["build", "-c", str(config_path)])
-        except SystemExit as e:
-            assert e.code == 0
+        main(["build", "-c", str(config_path)])
 
         subprocess.run(
             ["ninja", "-f", str(project / "_build" / "build.ninja")],
@@ -321,13 +306,13 @@ types:
 
 
 class TestErrorHandling:
-    """Tests for error cases."""
+    """Tests for error cases and system-exit scenarios."""
 
     def test_missing_source_directory(
         self,
         tmp_path: Path,
     ) -> None:
-        """Test error when source directory doesn't exist."""
+        """Verify that a non-existent source directory causes a non-zero system exit."""
         config_path = tmp_path / "dojo.yaml"
         config_path.write_text("""\
 src_dir: nonexistent

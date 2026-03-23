@@ -2,6 +2,8 @@ import time
 
 from dojo.cli import main
 
+PERF_THRESHOLD_SECONDS = 2.0
+
 
 def test_generation_performance_large_project(tmp_path):
     """Verify that Ninja generation remains fast even for larger projects.
@@ -39,14 +41,11 @@ types:
 
     start_time = time.perf_counter()
 
-    try:
-        main(["--quiet", "build", "-c", str(config_path)])
-    except SystemExit as exc:
-        assert exc.code == 0
+    main(["--quiet", "build", "-c", str(config_path)])
 
     end_time = time.perf_counter()
     duration = end_time - start_time
 
     # Threshold: 100 files should easily be processed in under 1 second on modern hardware.
     # We use 2.0s as a conservative CI-friendly threshold.
-    assert duration < 2.0, f"Ninja generation took too long: {duration:.2f}s"
+    assert duration < PERF_THRESHOLD_SECONDS, f"Ninja generation took too long: {duration:.2f}s"

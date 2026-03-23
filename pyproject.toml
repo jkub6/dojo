@@ -98,8 +98,6 @@ select = [
     "G",      # Logging format
 ]
 ignore = [
-    "D100", "D103",  # Missing docstrings (enable gradually)
-
     "E501", # Line too long (handled by formatter)
     "D203", # One blank line before class (conflicts with D211)
     "D213", # Multi-line docstring summary at second line (conflicts with D212)
@@ -122,7 +120,8 @@ indent-style = "space"
 # - TRY301: Abstract raise to inner function (intentional for testing exceptions)
 # - PLC0415: Inline imports (common practice for test isolation)
 # - ANN: Annotations
-"tests/**/*.py" = ["S101", "ARG", "S603", "S607", "PT011", "TRY301", "PLC0415", "ANN"]
+# - D100, D103: Doc strings
+"tests/**/*.py" = ["S101", "ARG", "S603", "S607", "PT011", "TRY301", "PLC0415", "ANN", "D100", "D103"]
 
 # Stage modules have imports that TC rules incorrectly flag as type-hint-only.
 # NinjaEmitter and Path are used for both type hints AND runtime operations

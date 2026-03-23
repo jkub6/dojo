@@ -54,7 +54,7 @@ def test_emit_header(core_config):
 
 def test_get_merged_defaults(core_config):
     cfg, path = core_config
-    gen = NinjaGenerator(cfg, path)
+    NinjaGenerator(cfg, path)
 
     # Test None
     assert merge_defaults(None) == []

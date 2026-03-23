@@ -6,22 +6,13 @@ from .constants import RuleName
 from .paths import shell_quote
 
 
-def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
-    """Generate the standard built-in Ninja rules based on configuration.
+def _get_tool_path_prefix(config: Config) -> str:
+    """Generate the 'env PATH=...' prefix for shell commands.
 
-    Args:
-        config: The parsed configuration object
-        config_path: Path to the configuration file (for regeneration rule)
-
-    Returns:
-        List of CustomRule objects defining the standard build rules
-
+    This ensures that tools resolved during configuration loading are available
+    to subprocesses even if they are not in the system's global PATH.
     """
-    # Create a PATH environment variable string that includes all resolved tool directories
-    # This ensures that tools invoked by other tools (e.g. pandoc calling typst) work correctly
-    # even if they aren't in the global PATH but were resolved during config loading
     tool_dirs = []
-    # Cast to dict[str, str] to avoid Any in values()
     tools_dict = cast("dict[str, str]", config.tools.model_dump())
     for tool_path_raw in tools_dict.values():
         tool_path = str(tool_path_raw)
@@ -30,201 +21,167 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
             if parent_dir not in tool_dirs:
                 tool_dirs.append(parent_dir)
 
-    # Propagate tool PATH so tools invoked by other tools work correctly
-    env_vars: dict[str, str] = {}
-    if tool_dirs:
-        env_vars["PATH"] = f"{':'.join(tool_dirs)}:$$PATH"
+    if not tool_dirs:
+        return ""
 
-    path_prefix = ""
-    if env_vars:
-        # Sort keys for determinism in the generated ninja file
-        env_parts = []
-        for k, v in sorted(env_vars.items()):
-            if k == "PATH":
-                env_parts.append(f'{k}="{v}"')
-            else:
-                env_parts.append(f"{k}={shell_quote(v)}")
-        path_prefix = f"env {' '.join(env_parts)} "
+    # Sort keys for determinism
+    env_vars = {"PATH": f"{':'.join(tool_dirs)}:$$PATH"}
+    env_parts = [f'{k}="{v}"' for k, v in sorted(env_vars.items())]
+    return f"env {' '.join(env_parts)} "
 
-    rules = []
 
-    # REGENERATE Rule
-    # We use 'dojo build' directly to rely on the environment wrapper
-    # We include path_prefix to ensure the sub-run has the same tool environment
-    cmd_parts = [
-        "dojo",
-        "build",  # Explicitly use build command
-        "-c",
-        config_path.as_posix(),
-    ]
+def _get_pandoc_setup_vars(config: Config) -> str:
+    """Generate shell variables used in pandoc commands.
 
-    rules.append(
-        CustomRule(
-            name=RuleName.REGENERATE.value,
-            command=f"{path_prefix}{' '.join(cmd_parts)}",
-            description="⚙️  REGENERATE build.ninja",
-            generator=True,
-        ),
-    )
-
-    # Pandoc Command Construction Helpers
-    # We resolve inputs/outputs to absolute paths to support changing working directory
-    # root_val: The path of the root reference directory relative to the input file input directory
-    # Note: We use $$ for shell variables/substitution because Ninja uses $ for its own variables
-    setup_vars = (
+    This setup script establishes absolute paths for inputs and outputs and
+    calculates the relative path to the root reference directory to handle
+    working directory shifts in the build process.
+    """
+    return (
         "in_abs=$$(realpath $in_shell) && "
         "out_abs=$$(realpath -m $out_shell) && "
         f"root_val=$$(realpath -m --relative-to=$$(dirname $in_shell) {shell_quote(config.root_ref_dir)})"
     )
 
-    # Resolve build directory to absolute path
-    abs_build_dir = Path(config.build_dir).resolve().as_posix()
-    # Command prefix to run inside build directory
-    # We use mkdir -p to ensure it exists (though NinjaGenerator also creates it)
-    build_dir_cmd = f"mkdir -p {shell_quote(abs_build_dir)} && cd {shell_quote(abs_build_dir)}"
 
-    # Combine with path prefix
-    # path_prefix already ends with a space if not empty
-    # We prepend data_dir_env to the pandoc command execution
+def _get_typst_flags(config: Config, rel_src_dir_expr: str) -> list[str]:
+    """Generate Typst-specific Pandoc flags.
+
+    These flags address various compatibility issues with Pandoc's Typst writer,
+    including CSL resolution, font discovery, and root directory mapping.
+    """
+    flags = [f"-M dojo-rel-src-dir={rel_src_dir_expr}"]
+    abs_src = Path(config.src_dir).resolve()
+
+    if config.pandoc_data_dir:
+        abs_data = Path(config.pandoc_data_dir).resolve()
+        try:
+            rel_data = abs_data.relative_to(abs_src).as_posix()
+        except ValueError:
+            rel_data = abs_data.as_posix()
+        flags.append(f"-M dojo-data-dir={shell_quote(rel_data)}")
+
+    flags.append(f"--pdf-engine-opt=--root={shell_quote(abs_src.as_posix())}")
+
+    if config.pandoc_data_dir:
+        font_path = (Path(config.pandoc_data_dir).resolve() / "fonts").as_posix()
+        flags.append(f"--pdf-engine-opt=--font-path={shell_quote(font_path)}")
+
+    resources_dir = Path(__file__).parent / "resources"
+    typst_csl_filter = resources_dir / "fix_typst_csl.lua"
+    flags.append(f"--lua-filter {shell_quote(typst_csl_filter.as_posix())}")
+
+    return flags
+
+
+def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
+    """Generate the standard built-in Ninja rules based on configuration."""
+    path_prefix = _get_tool_path_prefix(config)
+    setup_vars = _get_pandoc_setup_vars(config)
+    abs_build_dir = Path(config.build_dir).resolve().as_posix()
+    build_dir_cmd = f"mkdir -p {shell_quote(abs_build_dir)} && cd {shell_quote(abs_build_dir)}"
     pandoc_wrapper = f"{path_prefix}{config.tools.pandoc}"
 
     base_flags = "-V root=$$root_val"
     if config.pandoc_data_dir:
-        # We assume the path is already resolved by the config validator
         base_flags += f" --data-dir={shell_quote(config.pandoc_data_dir)}"
 
-    # Helper to get pool for a rule
     def get_pool(rule_name: str) -> str | None:
         return config.rule_pools.get(rule_name)
 
-    # COMPILE Rule (Markdown -> JSON AST)
-    # We attach the dependencies.lua filter at the end to track all assets
+    rules = []
+
+    # REGENERATE
+    rules.append(
+        CustomRule(
+            name=RuleName.REGENERATE.value,
+            command=f"{path_prefix}dojo build -c {config_path.as_posix()}",
+            description="⚙️  REGENERATE build.ninja",
+            generator=True,
+        )
+    )
+
+    # COMPILE
     resources_dir = Path(__file__).parent / "resources"
     dep_filter = resources_dir / "dependencies.lua"
-
-    # Compile Flags: Input is source file, so dirname is source dir
     compile_flags = base_flags
     if config.add_resource_path:
-        compile_rp = ".:$$(dirname $$in_abs)"
-        compile_flags += f" --resource-path={compile_rp}"
-
-    # Note: We use $in_abs and $out_abs which are established in the setup_vars
-    # We change directory to build_dir BEFORE executing pandoc
-    compile_cmd = (
-        f"{setup_vars} && {build_dir_cmd} && "
-        f"{pandoc_wrapper} $$in_abs $defaults -t json -o $$out_abs "
-        f"-M depfile=$$out_abs.d -M target=$$out_abs "
-        f"{compile_flags} "
-        f"--lua-filter {dep_filter}"
-    )
+        compile_flags += " --resource-path=.:$$(dirname $$in_abs)"
 
     rules.append(
         CustomRule(
             name=RuleName.COMPILE.value,
-            command=compile_cmd,
+            command=(
+                f"{setup_vars} && {build_dir_cmd} && "
+                f"{pandoc_wrapper} $$in_abs $defaults -t json -o $$out_abs "
+                f"-M depfile=$$out_abs.d -M target=$$out_abs {compile_flags} "
+                f"--lua-filter {dep_filter}"
+            ),
             description="🧠 COMPILE $in",
             depfile="$out.d",
             deps="gcc",
             pool=get_pool(RuleName.COMPILE.value),
-        ),
+        )
     )
 
-    # -------------------------------------------------------------------------
-    # RENDER Flags (JSON AST -> Output Format)
-    # -------------------------------------------------------------------------
+    # RENDER
     render_flags = [base_flags]
-
     abs_src = Path(config.src_dir).resolve().as_posix()
     abs_build = Path(config.build_dir).resolve().as_posix()
-
-    # We need to map back to the source directory for resource lookups
-    # rel_src_dir_expr: path from build_dir to the directory containing the JSON AST
     rel_src_dir_expr = (
         f"$$(realpath -m --relative-to={shell_quote(abs_build)} $$(dirname $$in_abs))"
     )
     src_dir_val = f"$$(realpath -m {shell_quote(abs_src)}/{rel_src_dir_expr})"
 
-    # 1. Typst Special Handling
-    # These flags fix various issues with Pandoc's Typst writer (CSL, citations, root paths)
-    render_flags.append(f"-M dojo-rel-src-dir={rel_src_dir_expr}")
+    render_flags.extend(_get_typst_flags(config, rel_src_dir_expr))
 
-    if config.pandoc_data_dir:
-        # Typst requires paths relative to the project root (src_dir)
-        abs_data = Path(config.pandoc_data_dir).resolve()
-        abs_src_path = Path(config.src_dir).resolve()
-        try:
-            rel_data = abs_data.relative_to(abs_src_path).as_posix()
-        except ValueError:
-            rel_data = abs_data.as_posix()
-        render_flags.append(f"-M dojo-data-dir={shell_quote(rel_data)}")
-
-    # Typst engine options for root and font discovery
-    render_flags.append(f"--pdf-engine-opt=--root={shell_quote(abs_src)}")
-    if config.pandoc_data_dir:
-        font_path = (Path(config.pandoc_data_dir).resolve() / "fonts").as_posix()
-        render_flags.append(f"--pdf-engine-opt=--font-path={shell_quote(font_path)}")
-
-    # Typst CSL fix filter
-    typst_csl_filter = resources_dir / "fix_typst_csl.lua"
-    render_flags.append(f"--lua-filter {shell_quote(typst_csl_filter.as_posix())}")
-
-    # 2. General Render Flags
     if config.add_resource_path:
-        render_rp = f".:$$(dirname $$in_abs):{src_dir_val}"
-        render_flags.append(f"--resource-path={render_rp}")
-
-    render_cmd = (
-        f"{setup_vars} && {build_dir_cmd} && "
-        f"{pandoc_wrapper} $$in_abs $defaults -o $$out_abs {' '.join(render_flags)}"
-    )
+        render_flags.append(f"--resource-path=.:$$(dirname $$in_abs):{src_dir_val}")
 
     rules.append(
         CustomRule(
             name=RuleName.RENDER.value,
-            command=render_cmd,
+            command=(
+                f"{setup_vars} && {build_dir_cmd} && "
+                f"{pandoc_wrapper} $$in_abs $defaults -o $$out_abs {' '.join(render_flags)}"
+            ),
             description="🎨 RENDER $out",
             pool=get_pool(RuleName.RENDER.value),
-        ),
+        )
     )
 
-    # COPY Rule
-    rules.append(
-        CustomRule(
-            name=RuleName.COPY.value,
-            command="cp $in_shell $out_shell",
-            description="📂 COPY $out",
-            pool=get_pool(RuleName.COPY.value),
-        ),
-    )
-
-    # MINIFY Rule
-    rules.append(
-        CustomRule(
-            name=RuleName.MINIFY.value,
-            command=f"{path_prefix}{config.tools.minify} $args -o $out_shell $in_shell",
-            description="⚡ MINIFY $out",
-            pool=get_pool(RuleName.MINIFY.value),
-        ),
-    )
-
-    # GHOSTSCRIPT Rule
-    rules.append(
-        CustomRule(
-            name=RuleName.GHOSTSCRIPT.value,
-            command=f"{path_prefix}{config.tools.ghostscript} -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET -dBATCH -dSAFER $args -sOutputFile=$out_shell $in_shell",
-            description="🗜️  COMPRESS $out",
-            pool=get_pool(RuleName.GHOSTSCRIPT.value),
-        ),
-    )
-
-    # DECKTAPE Rule
-    rules.append(
-        CustomRule(
-            name=RuleName.DECKTAPE.value,
-            command=f"{path_prefix}{config.tools.decktape} reveal $args $in_shell $out_shell",
-            description="📸 DECKTAPE $out",
-            pool=get_pool(RuleName.DECKTAPE.value),
-        ),
+    # Standard Tools
+    rules.extend(
+        [
+            CustomRule(
+                name=RuleName.COPY.value,
+                command="cp $in_shell $out_shell",
+                description="📂 COPY $out",
+                pool=get_pool(RuleName.COPY.value),
+            ),
+            CustomRule(
+                name=RuleName.MINIFY.value,
+                command=f"{path_prefix}{config.tools.minify} $args -o $out_shell $in_shell",
+                description="⚡ MINIFY $out",
+                pool=get_pool(RuleName.MINIFY.value),
+            ),
+            CustomRule(
+                name=RuleName.GHOSTSCRIPT.value,
+                command=(
+                    f"{path_prefix}{config.tools.ghostscript} -sDEVICE=pdfwrite "
+                    "-dCompatibilityLevel=1.4 -dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET "
+                    "-dBATCH -dSAFER $args -sOutputFile=$out_shell $in_shell"
+                ),
+                description="🗜️  COMPRESS $out",
+                pool=get_pool(RuleName.GHOSTSCRIPT.value),
+            ),
+            CustomRule(
+                name=RuleName.DECKTAPE.value,
+                command=f"{path_prefix}{config.tools.decktape} reveal $args $in_shell $out_shell",
+                description="📸 DECKTAPE $out",
+                pool=get_pool(RuleName.DECKTAPE.value),
+            ),
+        ]
     )
 
     return rules

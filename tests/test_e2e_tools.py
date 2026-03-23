@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 import pytest
 
@@ -66,14 +69,12 @@ types:
         defaults: "{defaults_file}"
         post_process:
           - tool: minify
-            
       - id: pdf_slides
         extension: pdf
         source: html_slides
         tool: decktape
         # Essential for running headless chromium inside isolated Nix builders
         args: ["--chrome-arg=--no-sandbox", "--size=1920x1080"]
-        
       - id: pdf_compressed
         extension: compressed.pdf
         source: pdf_slides
@@ -96,10 +97,7 @@ class TestOptionalToolsPipeline:
         project, config_path = tools_project
 
         # Step 1: Run dojo build (In-process for coverage)
-        try:
-            main(["build", "-c", str(config_path)])
-        except SystemExit as e:
-            assert e.code == 0
+        main(["build", "-c", str(config_path)])
 
         # Verify build.ninja was created
         build_ninja = project / "_build" / "build.ninja"

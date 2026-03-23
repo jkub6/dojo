@@ -9,13 +9,13 @@ from dojo.emitter import NinjaEmitter
 
 @pytest.fixture
 def mock_emitter():
-    """Provides a MagicMock specialized for NinjaEmitter."""
+    """Provide a MagicMock specialized for NinjaEmitter."""
     return MagicMock(spec=NinjaEmitter)
 
 
 @pytest.fixture
 def mock_config():
-    """Provides a mocked Config object with standard paths."""
+    """Provide a mocked Config object with standard paths."""
     config = MagicMock(spec=Config)
     config.src_dir = Path("/src")
     config.output_dir = Path("/out")
@@ -26,7 +26,7 @@ def mock_config():
 
 @pytest.fixture
 def minimal_config(tmp_path):
-    """Provides a minimal valid Dojo configuration."""
+    """Provide a minimal valid Dojo configuration."""
     src = tmp_path / "src"
     src.mkdir()
     out = tmp_path / "out"
@@ -53,7 +53,7 @@ def minimal_config(tmp_path):
 
 @pytest.fixture
 def sample_project_dir(tmp_path):
-    """Creates a sample project directory structure."""
+    """Create a sample project directory structure."""
     project = tmp_path / "sample_project"
     project.mkdir()
 
@@ -69,7 +69,7 @@ def sample_project_dir(tmp_path):
 
 @pytest.fixture
 def normalize_ninja():
-    """Provides a function to normalize Ninja output for snapshots.
+    """Provide a function to normalize Ninja output for snapshots.
 
     Replaces absolute project and dojo paths with placeholders to keep
     snapshots stable across different environments.
@@ -80,10 +80,8 @@ def normalize_ninja():
         content = content.replace(str(project_root.resolve()), "[PROJECT_ROOT]")
         content = content.replace(str(project_root), "[PROJECT_ROOT]")
 
-        # Normalize dojo root
-        content = content.replace(str(dojo_root.resolve()), "[DOJO_ROOT]")
         content = content.replace(str(dojo_root), "[DOJO_ROOT]")
 
-        return content
+        return content.replace(str(dojo_root.resolve()), "[DOJO_ROOT]")
 
     return _normalize

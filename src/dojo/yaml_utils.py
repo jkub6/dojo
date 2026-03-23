@@ -310,5 +310,3 @@ def _resolve_assets(assets: list[str], deps: list[Path]) -> None:
         # The original code checked .exists().
         if asset_path.exists():
             deps.append(asset_path)
-
-    return deps
