@@ -1,5 +1,3 @@
-import os
-import sys
 from pathlib import Path
 from typing import cast
 
@@ -32,8 +30,8 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
             if parent_dir not in tool_dirs:
                 tool_dirs.append(parent_dir)
 
-    # Propagate DOJO_ environment variables and set PATH
-    env_vars = {k: v for k, v in os.environ.items() if k.startswith("DOJO_")}
+    # Propagate tool PATH so tools invoked by other tools work correctly
+    env_vars: dict[str, str] = {}
     if tool_dirs:
         env_vars["PATH"] = f"{':'.join(tool_dirs)}:$$PATH"
 
@@ -51,11 +49,9 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     rules = []
 
     # REGENERATE Rule
-    # We use sys.executable -m dojo to ensure we run the same package context
+    # We use 'dojo build' directly to rely on the environment wrapper
     # We include path_prefix to ensure the sub-run has the same tool environment
     cmd_parts = [
-        sys.executable,
-        "-m",
         "dojo",
         "build",  # Explicitly use build command
         "-c",

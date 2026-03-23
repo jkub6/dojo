@@ -1,4 +1,3 @@
-import os
 import subprocess
 import sys
 
@@ -46,22 +45,10 @@ def test_build_command_subprocess(temp_project):
     """Test the full build command execution via subprocess (Integration)."""
     project_dir, config_path = temp_project
 
-    # Run dojo build
-    # We use sys.executable to ensure we use the same python interpreter
-    # We assume 'dojo' package is in PYTHONPATH (e.g. src)
-    env = os.environ.copy()
-    # Add src to PYTHONPATH if not already potentially set by test runner
-    src_path = os.path.abspath("src")
-    if "PYTHONPATH" in env:
-        env["PYTHONPATH"] = f"{src_path}:{env['PYTHONPATH']}"
-    else:
-        env["PYTHONPATH"] = src_path
-
     result = subprocess.run(
         [sys.executable, "-m", "dojo", "build", "-c", str(config_path)],
         capture_output=True,
         text=True,
-        env=env,
         cwd=str(project_dir),
         check=False,
     )
@@ -80,18 +67,10 @@ def test_build_command_subprocess(temp_project):
 
 def test_cli_version_subprocess():
     """Test version command via subprocess."""
-    env = os.environ.copy()
-    src_path = os.path.abspath("src")
-    if "PYTHONPATH" in env:
-        env["PYTHONPATH"] = f"{src_path}:{env['PYTHONPATH']}"
-    else:
-        env["PYTHONPATH"] = src_path
-
     result = subprocess.run(
         [sys.executable, "-m", "dojo", "--version"],
         capture_output=True,
         text=True,
-        env=env,
         check=False,
     )
 
@@ -101,19 +80,11 @@ def test_cli_version_subprocess():
 
 def test_build_no_config_subprocess(tmp_path):
     """Test failure when no config found via subprocess."""
-    env = os.environ.copy()
-    src_path = os.path.abspath("src")
-    if "PYTHONPATH" in env:
-        env["PYTHONPATH"] = f"{src_path}:{env['PYTHONPATH']}"
-    else:
-        env["PYTHONPATH"] = src_path
-
     # Run in empty temp dir
     result = subprocess.run(
         [sys.executable, "-m", "dojo", "build"],
         capture_output=True,
         text=True,
-        env=env,
         cwd=str(tmp_path),
         check=False,
     )

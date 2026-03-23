@@ -1,7 +1,6 @@
 # Justfile for Dojo
 
 set shell := ["bash", "-c"]
-export PYTHONPATH := "src"
 
 # List available recipes
 default:
@@ -11,8 +10,6 @@ default:
 fix:
     ruff format .
     ruff check --fix-only .
-    alejandra .
-    statix fix
 
 # Run all static analysis checks
 check:
@@ -20,18 +17,11 @@ check:
     ruff format --check .
     mypy src
     vulture
-    uv-secure
     typos .
-    statix check
-    nix flake check --all-systems
 
 # Run tests with coverage
 test:
     pytest
-
-# Update lockfile safely using Nix python
-lock:
-    uv lock --python $(which python)
 
 # Build the project (requires config file)
 build config="dojo.yaml":

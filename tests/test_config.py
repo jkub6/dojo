@@ -24,15 +24,14 @@ from dojo.exceptions import (
 
 def test_tool_paths_defaults():
     tp = ToolPaths()
-    assert tp.python.endswith("python3")
     assert tp.pandoc.endswith("pandoc")
 
 
 @patch("shutil.which")
 def test_tool_paths_resolution(mock_which):
-    mock_which.return_value = "/usr/bin/custom_python"
-    tp = ToolPaths(python="python_alias")
-    assert tp.python == "/usr/bin/custom_python"
+    mock_which.return_value = "/usr/bin/custom_pandoc"
+    tp = ToolPaths(pandoc="pandoc_alias")
+    assert tp.pandoc == "/usr/bin/custom_pandoc"
 
 
 @patch("shutil.which")
@@ -41,19 +40,19 @@ def test_tool_paths_missing_essential(mock_which):
     # Pydantic wraps validation errors
     with pytest.raises(EssentialToolNotFoundError) as excinfo:
         ToolPaths(pandoc="missing_pandoc")
-    assert "Essential tool 'python' not found" in str(excinfo.value)
+    assert "Essential tool 'pandoc' not found" in str(excinfo.value)
 
 
 def test_tool_paths_missing_optional():
-    # Minify is optional in strict sense. config.py checks python, pandoc.
+    # Minify is optional
     with patch("shutil.which") as mock_which:
         # Mock essential tools to be found, but minify missing
         mock_which.side_effect = lambda x: (
-            "/bin/found" if x in ["python", "python3", "pandoc"] else None
+            "/bin/found" if x in ["pandoc"] else None
         )
 
         tp = ToolPaths(minify="nonexistent")
-        # should not raise, just keep default or what was passed
+        # should not raise, just keep what was passed
         assert tp.minify == "nonexistent"
 
 

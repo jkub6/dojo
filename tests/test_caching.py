@@ -6,7 +6,7 @@ which would trigger Ninja to rebuild unchanged targets.
 
 from __future__ import annotations
 
-import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -16,28 +16,12 @@ import pytest
 
 def ninja_available() -> bool:
     """Check if ninja is available in PATH."""
-    import shutil
-
     return shutil.which("ninja") is not None
-
-
-@pytest.fixture
-def env_with_pythonpath() -> dict[str, str]:
-    """Create environment dict with PYTHONPATH set to src."""
-    env = os.environ.copy()
-    src_path = str(Path(__file__).parent.parent / "src")
-    env["PYTHONPATH"] = src_path
-
-    # Ensure current environment PATH is preserved for tools in nix shell
-    if "PATH" not in env:
-        env["PATH"] = os.environ.get("PATH", "")
-
-    return env
 
 
 @pytest.mark.skipif(not ninja_available(), reason="ninja not available")
 def test_ninja_file_stability_with_format_links(
-    tmp_path: Path, env_with_pythonpath: dict[str, str]
+    tmp_path: Path,
 ) -> None:
     """Test that build.ninja content and defaults are stable across identical builds."""
     project = tmp_path / "project"
@@ -92,7 +76,6 @@ tools:
     # First build
     subprocess.run(
         [sys.executable, "-m", "dojo", "build", "-c", str(config_path)],
-        env=env_with_pythonpath,
         cwd=str(project),
         check=True,
     )
@@ -107,7 +90,6 @@ tools:
     # Second build (immediate re-run)
     subprocess.run(
         [sys.executable, "-m", "dojo", "build", "-c", str(config_path)],
-        env=env_with_pythonpath,
         cwd=str(project),
         check=True,
     )

@@ -52,7 +52,6 @@ class ToolPaths(BaseModel):
     """Configurable paths to external tools."""
 
     pandoc: str = Field(default="pandoc", description="Pandoc executable path")
-    python: str = Field(default="python3", description="Python interpreter path")
     minify: str = Field(default="minify", description="Minify executable path")
     ghostscript: str = Field(default="gs", description="Ghostscript executable path")
     decktape: str = Field(default="decktape", description="Decktape executable path")
@@ -61,23 +60,13 @@ class ToolPaths(BaseModel):
     @model_validator(mode="after")
     def resolve_tool_paths(self) -> ToolPaths:
         """Resolve all tool paths to absolute paths and verify existence."""
-        essential_tools = ["python", "pandoc"]
-        for tool in ["python", "pandoc", "minify", "ghostscript", "decktape", "typst"]:
+        essential_tools = ["pandoc"]
+        for tool in ["pandoc", "minify", "ghostscript", "decktape", "typst"]:
             current = cast("str", getattr(self, tool))
             if not current:
                 continue
 
-            # 1. Check for Environment Variable Override (e.g., DOJO_PANDOC)
-            # We prioritize this if the current value is the default
-            env_var = f"DOJO_{tool.upper()}"
-            env_path = os.environ.get(env_var)
-
-            resolved: str | None
-            if env_path and current == cast("object", self.model_fields[tool].default):
-                resolved = env_path
-            else:
-                # 2. Regular resolution via PATH
-                resolved = shutil.which(current)
+            resolved = shutil.which(current)
 
             if resolved:
                 setattr(self, tool, resolved)

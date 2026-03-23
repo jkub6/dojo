@@ -6,7 +6,6 @@ to verify the complete workflow from Markdown source to final output.
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 import sys
@@ -79,22 +78,12 @@ types:
     return project, config_path
 
 
-@pytest.fixture
-def env_with_pythonpath() -> dict[str, str]:
-    """Create environment dict with PYTHONPATH set to src."""
-    env = os.environ.copy()
-    src_path = str(Path(__file__).parent.parent / "src")
-    env["PYTHONPATH"] = src_path
-    return env
-
-
 class TestFullBuildPipeline:
     """Tests for complete build + ninja execution."""
 
     def test_generates_and_builds_html(
         self,
         sample_project: tuple[Path, Path],
-        env_with_pythonpath: dict[str, str],
     ) -> None:
         """Test that dojo generates build.ninja and ninja produces HTML output."""
         project, config_path = sample_project
@@ -104,7 +93,6 @@ class TestFullBuildPipeline:
             [sys.executable, "-m", "dojo", "build", "-c", str(config_path)],
             capture_output=True,
             text=True,
-            env=env_with_pythonpath,
             cwd=str(project),
             check=False,
         )
@@ -135,7 +123,6 @@ class TestFullBuildPipeline:
     def test_incremental_build(
         self,
         sample_project: tuple[Path, Path],
-        env_with_pythonpath: dict[str, str],
     ) -> None:
         """Test that ninja correctly handles incremental builds."""
         project, config_path = sample_project
@@ -143,7 +130,6 @@ class TestFullBuildPipeline:
         # First build
         subprocess.run(
             [sys.executable, "-m", "dojo", "build", "-c", str(config_path)],
-            env=env_with_pythonpath,
             cwd=str(project),
             check=True,
         )
@@ -168,7 +154,6 @@ class TestFullBuildPipeline:
     def test_rebuild_on_source_change(
         self,
         sample_project: tuple[Path, Path],
-        env_with_pythonpath: dict[str, str],
     ) -> None:
         """Test that modifying source triggers rebuild."""
         project, config_path = sample_project
@@ -176,7 +161,6 @@ class TestFullBuildPipeline:
         # Initial build
         subprocess.run(
             [sys.executable, "-m", "dojo", "build", "-c", str(config_path)],
-            env=env_with_pythonpath,
             cwd=str(project),
             check=True,
         )
@@ -208,7 +192,6 @@ class TestAssetCopying:
     def test_css_asset_copied(
         self,
         tmp_path: Path,
-        env_with_pythonpath: dict[str, str],
     ) -> None:
         """Test that CSS referenced in frontmatter is copied to output."""
         project = tmp_path / "project"
@@ -251,7 +234,6 @@ types:
         # Build
         subprocess.run(
             [sys.executable, "-m", "dojo", "build", "-c", str(config_path)],
-            env=env_with_pythonpath,
             cwd=str(project),
             check=True,
         )
@@ -273,7 +255,6 @@ class TestErrorHandling:
     def test_missing_source_directory(
         self,
         tmp_path: Path,
-        env_with_pythonpath: dict[str, str],
     ) -> None:
         """Test error when source directory doesn't exist."""
         config_path = tmp_path / "dojo.yaml"
@@ -291,7 +272,6 @@ types:
             [sys.executable, "-m", "dojo", "build", "-c", str(config_path)],
             capture_output=True,
             text=True,
-            env=env_with_pythonpath,
             cwd=str(tmp_path),
             check=False,
         )
