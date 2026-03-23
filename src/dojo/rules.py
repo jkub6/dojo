@@ -132,14 +132,38 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     # RENDER Rule (JSON AST -> Output Format)
     # Render Flags: Input is build file (JSON), need to map back to source dir
     render_flags = base_flags
+    
+    abs_src = Path(config.src_dir).resolve().as_posix()
+    abs_build = Path(config.build_dir).resolve().as_posix()
+    rel_src_dir_expr = f"$$(realpath -m --relative-to={shell_quote(abs_build)} $$(dirname $$in_abs))"
+    src_dir_val = f"$$(realpath -m {shell_quote(abs_src)}/{rel_src_dir_expr})"
+    
+    # Inject custom metadata for Typst native citations fix
+    render_flags += f" -M dojo-rel-src-dir={rel_src_dir_expr}"
+    if config.pandoc_data_dir:
+        # Typst requires paths relative to the project root (src_dir)
+        abs_data = Path(config.pandoc_data_dir).resolve()
+        abs_src_path = Path(config.src_dir).resolve()
+        try:
+            rel_data = abs_data.relative_to(abs_src_path).as_posix()
+        except ValueError:
+            rel_data = abs_data.as_posix()
+        render_flags += f" -M dojo-data-dir={shell_quote(rel_data)}"
+
     if config.add_resource_path:
-        render_rp = "."
-        abs_src = Path(config.src_dir).resolve().as_posix()
-        abs_build = Path(config.build_dir).resolve().as_posix()
-        # Calculate source path relative to build path mapping
-        src_dir_val = f"$$(realpath -m {shell_quote(abs_src)}/$$(realpath -m --relative-to={shell_quote(abs_build)} $$(dirname $$in_abs)))"
-        render_rp += f":$$(dirname $$in_abs):{src_dir_val}"
+        render_rp = f".:$$(dirname $$in_abs):{src_dir_val}"
         render_flags += f" --resource-path={render_rp}"
+
+    # Inject Typst-specific engine options natively into Dojo
+    # This shields the user from needing to hardcode 'dojo' build paths in their typst.yaml
+    render_flags += f" --pdf-engine-opt=--root={shell_quote(abs_src)}"
+    if config.pandoc_data_dir:
+        font_path = (Path(config.pandoc_data_dir).resolve() / "fonts").as_posix()
+        render_flags += f" --pdf-engine-opt=--font-path={shell_quote(font_path)}"
+
+    # Always add Typst CSL fix filter during render (it checks FORMAT == "typst")
+    typst_csl_filter = resources_dir / "fix_typst_csl.lua"
+    render_flags += f" --lua-filter {typst_csl_filter.as_posix()}"
 
     render_cmd = f"{setup_vars} && {build_dir_cmd} && {pandoc_wrapper} $$in_abs $defaults -o $$out_abs {render_flags}"
 
