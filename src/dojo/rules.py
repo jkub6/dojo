@@ -1,3 +1,9 @@
+"""Built-in Ninja build rule definitions.
+
+Defines the standard set of rules for compilation, rendering,
+asset processing, and tool invocation provided by default.
+"""
+
 from pathlib import Path
 from typing import cast
 

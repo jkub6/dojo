@@ -1,3 +1,9 @@
+"""Plugin system and dynamic tool integration.
+
+Handles the discovery and invocation of external tools and
+post-processing filters.
+"""
+
 from __future__ import annotations
 
 import importlib.util

@@ -1,3 +1,9 @@
+"""Custom exception classes for the Dojo project.
+
+Provides a structured hierarchy of errors for configuration failures,
+missing tools, and internal processing issues.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

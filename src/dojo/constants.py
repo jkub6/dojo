@@ -1,3 +1,9 @@
+"""Global constants and enumerations for the Dojo project.
+
+Defines shared identifiers for build rules, configuration defaults,
+and internal system paths.
+"""
+
 from enum import StrEnum
 
 

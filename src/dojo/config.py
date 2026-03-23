@@ -1,3 +1,9 @@
+"""Configuration management for Dojo.
+
+This module defines the schema, validation logic, and loading utilities
+for the `dojo.yaml` configuration file using Pydantic.
+"""
+
 from __future__ import annotations
 
 import os

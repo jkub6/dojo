@@ -1,3 +1,9 @@
+"""Ninja file emission and syntax generation.
+
+Provides the underlying mechanisms for writing Ninja build rules,
+variables, and build edges to the final `build.ninja` file.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

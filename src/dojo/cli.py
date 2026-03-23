@@ -1,3 +1,9 @@
+"""Command-line interface for the Dojo build generator.
+
+This module defines the CLI entry points, argument parsing, and command
+dispatching for build configuration, validation, and initialization.
+"""
+
 import argparse
 import logging
 import sys
@@ -282,6 +288,11 @@ def main(argv: list[str] | None = None) -> None:
 
 
 def entry_point() -> None:
+    """Provide the main binary entry point for the dojo command.
+
+    This function wraps main() with a global exception handler for
+    KeyboardInterrupt to provide clean exit behavior.
+    """
     try:
         main()
     except KeyboardInterrupt:

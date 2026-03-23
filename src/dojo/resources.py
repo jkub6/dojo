@@ -1,3 +1,9 @@
+"""Internal resource and template management.
+
+Provides utilities for locating and loading embedded assets,
+Lua filters, and default configurations bundled with Dojo.
+"""
+
 from __future__ import annotations
 
 import functools
