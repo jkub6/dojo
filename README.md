@@ -1,6 +1,6 @@
 # Dojo 🥷
 
-Professional Ninja Build Generator for Static Site Generation.
+Ninja Build Generator for Static Site Generation.
 
 ## Quick Start (Nix — Recommended)
 

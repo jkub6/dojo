@@ -5,8 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from dojo.paths import ninja_escape
-
-
 from dojo.yaml_utils import get_recursive_yaml_deps
 
 

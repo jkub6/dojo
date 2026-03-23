@@ -150,7 +150,6 @@ def test_plugin_integration(core_config, tmp_path):
     ninja_content = gen.ninja_file.read_text()
     assert "# Plugin was here" in ninja_content
 
-
     assert format_defaults_var([]) == ""
 
 

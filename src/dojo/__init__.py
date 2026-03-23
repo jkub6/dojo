@@ -1,4 +1,4 @@
-"""Professional Ninja Build Generator for Static Site Generation."""
+"""Ninja Build Generator for Static Site Generation."""
 
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _get_version

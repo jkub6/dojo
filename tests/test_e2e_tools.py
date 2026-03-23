@@ -8,16 +8,17 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
 from dojo.cli import main
 
+
 def tool_available(name: str) -> bool:
     """Check if a tool is available in PATH."""
     return shutil.which(name) is not None
+
 
 # Skip all tests in this module if ninja, pandoc, or the specific tools are not available
 pytestmark = [
@@ -27,6 +28,7 @@ pytestmark = [
     pytest.mark.skipif(not tool_available("minify"), reason="minify not available"),
     pytest.mark.skipif(not tool_available("gs"), reason="ghostscript not available"),
 ]
+
 
 @pytest.fixture
 def tools_project(tmp_path: Path) -> tuple[Path, Path]:
@@ -45,14 +47,16 @@ def tools_project(tmp_path: Path) -> tuple[Path, Path]:
     defaults_file.write_text("standalone: true\nto: revealjs\n")
 
     # Create sample content
-    (content / "index.md").write_text("---\ntitle: Presentation\n---\n# Slide 1\n\nContent\n\n---\n\n# Slide 2\n")
+    (content / "index.md").write_text(
+        "---\ntitle: Presentation\n---\n# Slide 1\n\nContent\n\n---\n\n# Slide 2\n"
+    )
 
     # Create config utilizing decktape, minify, and ghostscript
     config_path = project / "dojo.yaml"
     config_content = f"""\
 src_dir: "{content}"
-output_dir: "{project / '_site'}"
-build_dir: "{project / '_build'}"
+output_dir: "{project / "_site"}"
+build_dir: "{project / "_build"}"
 default_type: presentation
 types:
   presentation:
@@ -100,7 +104,7 @@ class TestOptionalToolsPipeline:
         # Verify build.ninja was created
         build_ninja = project / "_build" / "build.ninja"
         assert build_ninja.exists(), "build.ninja not created"
-        
+
         # Verify ninja config contains the explicitly mapped tools
         ninja_content = build_ninja.read_text()
         assert "rule minify" in ninja_content
@@ -115,7 +119,9 @@ class TestOptionalToolsPipeline:
             cwd=str(project),
             check=False,
         )
-        assert ninja_result.returncode == 0, f"ninja failed: {ninja_result.stderr}\n{ninja_result.stdout}"
+        assert ninja_result.returncode == 0, (
+            f"ninja failed: {ninja_result.stderr}\n{ninja_result.stdout}"
+        )
 
         # Verify HTML was created and minified (should have very few newlines)
         output_html = project / "_site" / "index.html"

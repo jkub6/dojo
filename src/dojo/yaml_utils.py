@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import cast
 
 import yaml
+
 from dojo.constants import ASSET_KEYS
 
 from .exceptions import CircularDependencyError
@@ -105,7 +106,7 @@ def parse_frontmatter(md_path: Path) -> dict[str, object] | None:
             line = f.readline()
             while line and not line.strip():
                 line = f.readline()
-            
+
             if not line or line.strip() != "---":
                 return None
 
@@ -311,6 +312,3 @@ def _resolve_assets(assets: list[str], deps: list[Path]) -> None:
             deps.append(asset_path)
 
     return deps
-
-
-

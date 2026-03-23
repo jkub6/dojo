@@ -8,7 +8,7 @@
 
   outputs = { self, nixpkgs, flake-utils }:
     let
-      # Export a professional Nixpkgs Overlay so consumers can compile Dojo
+      # Export a Nixpkgs Overlay so consumers can compile Dojo
       # transparently against whatever custom Python derivation they require.
       overlay = final: prev: {
         pythonPackagesExtensions = prev.pythonPackagesExtensions ++ [
@@ -69,6 +69,7 @@
             decktape
             minify
             ghostscript
+            typos
             (python-to-use.withPackages (p: [
                p.pyyaml
                p.pydantic

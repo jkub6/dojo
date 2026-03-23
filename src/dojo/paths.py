@@ -22,7 +22,7 @@ def ninja_escape(path: Path | str) -> str:
     - Dollar signs → '$$'
     - Always forward slashes
     """
-    s = path.as_posix() if isinstance(path, Path) else path
+    s = path.as_posix() if isinstance(path, Path) else str(path).replace("\\", "/")
     s = s.replace("$", "$$")
     s = s.replace(" ", "$ ")
     return s.replace(":", "$:")

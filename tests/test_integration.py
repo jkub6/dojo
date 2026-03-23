@@ -1,5 +1,3 @@
-import sys
-from pathlib import Path
 
 import pytest
 
@@ -51,7 +49,7 @@ def test_build_command_in_process(temp_project, capsys):
         main(["build", "-c", str(config_path)])
     except SystemExit as exc:
         assert exc.code == 0
-    
+
     captured = capsys.readouterr()
     assert "Build configuration generated successfully" in captured.out
 
@@ -78,6 +76,7 @@ def test_build_no_config_in_process(tmp_path, capsys):
     """Test failure when no config found in-process."""
     # Run in empty temp dir
     import os
+
     old_cwd = os.getcwd()
     os.chdir(tmp_path)
     try:

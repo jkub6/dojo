@@ -1,27 +1,11 @@
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from dojo.config import Config, OutputConfig
-from dojo.emitter import NinjaEmitter
+from dojo.config import OutputConfig
 from dojo.stages.assets import AssetProcessor
 from dojo.stages.render import RenderStage
-
-
-@pytest.fixture
-def mock_emitter():
-    return MagicMock(spec=NinjaEmitter)
-
-
-@pytest.fixture
-def mock_config():
-    config = MagicMock(spec=Config)
-    config.src_dir = Path("/src")
-    config.output_dir = Path("/out")
-    config.build_dir = Path("/build")
-    config.pandoc_data_dir = None
-    return config
 
 
 class TestRenderStage:
@@ -56,6 +40,7 @@ class TestRenderStage:
 
     def test_derive_output_missing_tool_raises(self, mock_config, mock_emitter):
         from dojo.exceptions import SourceRequiresToolError
+
         stage = RenderStage(mock_config, Path("/out"), Path("/build"), mock_emitter, [])
         # source requires tool (pydantic validation)
         with pytest.raises(SourceRequiresToolError):
@@ -63,61 +48,69 @@ class TestRenderStage:
 
     def test_derive_output_missing_source_in_registry_raises(self, mock_config, mock_emitter):
         from dojo.exceptions import DependencyError
+
         stage = RenderStage(mock_config, Path("/out"), Path("/build"), mock_emitter, [])
-        out_config = OutputConfig(extension="pdf", source="missing_id", tool="decktape", id="pdf", defaults=["d.yaml"])
-        
+        out_config = OutputConfig(
+            extension="pdf", source="missing_id", tool="decktape", id="pdf", defaults=["d.yaml"]
+        )
+
         with pytest.raises(DependencyError):
             stage.render(out_config, Path("any.json"), Path("any"), {})
 
     def test_derive_output_missing_tool_at_runtime_raises(self, mock_config, mock_emitter):
         from dojo.exceptions import OutputToolMissingError
+
         stage = RenderStage(mock_config, Path("/out"), Path("/build"), mock_emitter, [])
-        out_config = OutputConfig(extension="pdf", source="html", tool="decktape", id="pdf", defaults=["d.yaml"])
+        out_config = OutputConfig(
+            extension="pdf", source="html", tool="decktape", id="pdf", defaults=["d.yaml"]
+        )
         # Manually set tool to None AFTER pydantic validation to trigger runtime check
-        out_config.tool = None # type: ignore
-        
+        out_config.tool = None  # type: ignore
+
         with pytest.raises(OutputToolMissingError):
             stage.render(out_config, Path("any.json"), Path("any"), {"html": Path("in.html")})
 
     def test_standard_render_with_post_process(self, mock_config, mock_emitter):
         from dojo.config import PipelineStep
+
         stage = RenderStage(mock_config, Path("/out"), Path("/build"), mock_emitter, [])
-        
+
         out_config = OutputConfig(
             extension="html",
             defaults=["d.yaml"],
-            post_process=[PipelineStep(tool="minify", args=["--fast"])]
+            post_process=[PipelineStep(tool="minify", args=["--fast"])],
         )
-        
+
         with patch("dojo.stages._defaults.get_recursive_yaml_deps", return_value=[]):
             stage.render(out_config, Path("in.json"), Path("index"), {})
-            
+
         # Should call emitter twice: once for RENDER, once for MINIFY
         assert mock_emitter.build.call_count == 2
         rules = [call.kwargs["rule"] for call in mock_emitter.build.call_args_list]
         assert "render" in rules
         assert "minify" in rules
+
     def test_standard_render_with_args(self, mock_config, mock_emitter):
         stage = RenderStage(mock_config, Path("/out"), Path("/build"), mock_emitter, [])
         out_config = OutputConfig(
-            extension="html",
-            args=["--mathjax", "--self-contained"],
-            defaults=[]
+            extension="html", args=["--mathjax", "--self-contained"], defaults=[]
         )
         stage.render(out_config, Path("in.json"), Path("idx"), {})
-        
+
         call_args = mock_emitter.build.call_args
         assert "--mathjax --self-contained" in call_args.kwargs["variables"]["args"]
 
     def test_derive_output_missing_source_raises(self, mock_config, mock_emitter):
         from dojo.exceptions import OutputSourceMissingError
+
         stage = RenderStage(mock_config, Path("/out"), Path("/build"), mock_emitter, [])
         out_config = OutputConfig(extension="pdf", source="html", tool="decktape")
         # Manually break it
-        out_config.source = None # type: ignore
+        out_config.source = None  # type: ignore
         # Call private method directly for coverage of the safety check
         with pytest.raises(OutputSourceMissingError):
             stage._derive_output(out_config, Path("idx"), {})
+
 
 class TestAssetProcessor:
     def test_asset_processor_skips_outside_src(self, mock_emitter, caplog):
@@ -131,7 +124,7 @@ class TestAssetProcessor:
 
         # Asset outside /src
         external_asset = Path("/outside/style.css")
-        
+
         with patch("dojo.stages.assets.get_frontmatter_assets", return_value=[external_asset]):
             processor.process_assets(Path("/src/index.md"))
 
@@ -173,14 +166,17 @@ class TestAssetProcessor:
         (tmp_path / "out").mkdir()
         (tmp_path / "src" / "data").mkdir()
         (tmp_path / "src" / "data" / "file.txt").touch()
-        
+
         md_file = tmp_path / "src" / "index.md"
         md_file.write_text("---\ndependencies:\n  - data/*.txt\n---\n", encoding="utf-8")
-        
+
         processor.process_assets(md_file)
-        
+
         mock_emitter.build.assert_called_once()
-        assert mock_emitter.build.call_args.kwargs["inputs"] == (tmp_path / "src" / "data" / "file.txt").resolve()
+        assert (
+            mock_emitter.build.call_args.kwargs["inputs"]
+            == (tmp_path / "src" / "data" / "file.txt").resolve()
+        )
 
     def test_asset_processor_skips_self_reference(self, mock_emitter, tmp_path):
         processor = AssetProcessor(
@@ -193,11 +189,11 @@ class TestAssetProcessor:
         (tmp_path / "src").mkdir()
         md_file = tmp_path / "src" / "index.md"
         md_file.touch()
-        
+
         # If glob somehow includes the md file itself
         with patch("dojo.stages.assets.get_frontmatter_assets", return_value=[md_file]):
             processor.process_assets(md_file)
-            
+
         mock_emitter.build.assert_not_called()
 
     def test_asset_processor_scans_html(self, mock_emitter, tmp_path):
@@ -212,10 +208,10 @@ class TestAssetProcessor:
         html_file = tmp_path / "src" / "index.html"
         html_file.write_text('<img src="img.png">')
         (tmp_path / "src" / "img.png").touch()
-        
+
         with patch("dojo.stages.assets.get_frontmatter_assets", return_value=[html_file]):
             processor.process_assets(tmp_path / "src" / "index.md")
-            
+
         # One for HTML, one for img.png
         assert mock_emitter.build.call_count == 2
 
@@ -231,10 +227,10 @@ class TestAssetProcessor:
         (tmp_path / "src").mkdir()
         asset = tmp_path / "src" / "style.css"
         asset.touch()
-        
+
         with patch("dojo.stages.assets.get_frontmatter_assets", return_value=[asset, asset]):
             processor.process_assets(tmp_path / "src" / "index.md")
-            
+
         assert mock_emitter.build.call_count == 1
 
     def test_asset_processor_global_deduplication(self, mock_emitter, tmp_path):
@@ -250,10 +246,10 @@ class TestAssetProcessor:
         (tmp_path / "src").mkdir()
         asset = tmp_path / "src" / "style.css"
         asset.touch()
-        
+
         with patch("dojo.stages.assets.get_frontmatter_assets", return_value=[asset]):
             processor.process_assets(tmp_path / "src" / "index.md")
-            
+
         mock_emitter.build.assert_not_called()
 
     def test_asset_processor_self_reference_resolve(self, mock_emitter, tmp_path):
@@ -268,9 +264,96 @@ class TestAssetProcessor:
         (tmp_path / "src").mkdir()
         md_file = tmp_path / "src" / "index.md"
         md_file.touch()
-        
+
         # Reference the same file via a different path string that resolves to the same path
         with patch("dojo.stages.assets.get_frontmatter_assets", return_value=[Path(str(md_file))]):
             processor.process_assets(md_file)
-            
+
         mock_emitter.build.assert_not_called()
+
+    def test_asset_processor_circular_css(self, mock_emitter, tmp_path):
+        """Verify that circular CSS @import references are handled correctly without hanging."""
+        processor = AssetProcessor(
+            src=tmp_path / "src",
+            out_dir=tmp_path / "out",
+            emitter=mock_emitter,
+            copied_assets=set(),
+            all_outputs=[],
+        )
+        (tmp_path / "src").mkdir()
+        (tmp_path / "out").mkdir()
+
+        css_a = tmp_path / "src" / "a.css"
+        css_b = tmp_path / "src" / "b.css"
+
+        css_a.write_text("@import url('b.css');", encoding="utf-8")
+        css_b.write_text("@import url('a.css');", encoding="utf-8")
+
+        # This should complete and not hang, as it uses processed_assets set
+        # We patch to return css_a as the initial discovered asset
+        with patch("dojo.stages.assets.get_frontmatter_assets", return_value=[css_a]):
+            processor.process_assets(tmp_path / "src" / "index.md")
+
+        # Should be called twice (a.css and b.css)
+        assert mock_emitter.build.call_count == 2
+        outputs = [call.kwargs["outputs"] for call in mock_emitter.build.call_args_list]
+        assert (tmp_path / "out" / "a.css") in outputs
+        assert (tmp_path / "out" / "b.css") in outputs
+
+    def test_asset_processor_query_strings(self, mock_emitter, tmp_path):
+        """Verify that assets with query strings in CSS are discovered correctly."""
+        processor = AssetProcessor(
+            src=tmp_path / "src",
+            out_dir=tmp_path / "out",
+            emitter=mock_emitter,
+            copied_assets=set(),
+            all_outputs=[],
+        )
+        (tmp_path / "src").mkdir()
+        (tmp_path / "out").mkdir()
+
+        # CSS with query strings (e.g. for cache busting)
+        css_file = tmp_path / "src" / "style.css"
+        css_file.write_text("body { background: url('bg.png?v=1.2'); }", encoding="utf-8")
+        (tmp_path / "src" / "bg.png").touch()
+
+        with patch("dojo.stages.assets.get_frontmatter_assets", return_value=[css_file]):
+            processor.process_assets(tmp_path / "src" / "index.md")
+
+        # bg.png should be discovered and copied (stripping query string for path)
+        outputs = [call.kwargs["outputs"] for call in mock_emitter.build.call_args_list]
+        assert (tmp_path / "out" / "style.css") in outputs
+        assert (tmp_path / "out" / "bg.png") in outputs
+
+    def test_asset_processor_symlinks(self, mock_emitter, tmp_path):
+        """Verify that symlinked assets are correctly handled and resolved."""
+        src = tmp_path / "src"
+        src.mkdir()
+        out = tmp_path / "out"
+        out.mkdir()
+
+        external_dir = tmp_path / "external"
+        external_dir.mkdir()
+        real_file = external_dir / "real.jpg"
+        real_file.touch()
+
+        # Symlink inside src to external file
+        link_file = src / "link.jpg"
+        link_file.symlink_to(real_file)
+
+        processor = AssetProcessor(
+            src=src,
+            out_dir=out,
+            emitter=mock_emitter,
+            copied_assets=set(),
+            all_outputs=[],
+        )
+
+        with patch("dojo.stages.assets.get_frontmatter_assets", return_value=[link_file]):
+            processor.process_assets(src / "index.md")
+
+        # The link should be copied to output
+        mock_emitter.build.assert_called_once()
+        assert mock_emitter.build.call_args.kwargs["outputs"] == out / "link.jpg"
+        # The input should be the symlink itself (let Ninja/cp handle it)
+        assert mock_emitter.build.call_args.kwargs["inputs"] == link_file

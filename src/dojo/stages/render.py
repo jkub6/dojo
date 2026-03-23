@@ -113,10 +113,12 @@ class RenderStage:
         if defaults_var:
             variables["defaults"] = defaults_var
 
-        variables.update({
-            "in_shell": shell_quote(json_node),
-            "out_shell": shell_quote(render_target),
-        })
+        variables.update(
+            {
+                "in_shell": shell_quote(json_node),
+                "out_shell": shell_quote(render_target),
+            }
+        )
 
         if out_config.args:
             variables["args"] = " ".join(out_config.args)

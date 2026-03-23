@@ -47,9 +47,7 @@ def test_tool_paths_missing_optional():
     # Minify is optional
     with patch("shutil.which") as mock_which:
         # Mock essential tools to be found, but minify missing
-        mock_which.side_effect = lambda x: (
-            "/bin/found" if x in ["pandoc"] else None
-        )
+        mock_which.side_effect = lambda x: "/bin/found" if x in ["pandoc"] else None
 
         tp = ToolPaths(minify="nonexistent")
         # should not raise, just keep what was passed

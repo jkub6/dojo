@@ -20,6 +20,12 @@ def is_remote_url(url: str) -> bool:
     return url.lower().startswith(("http:", "https:", "data:", "mailto:", "tel:", "//"))
 
 
+def strip_url_params(url: str) -> str:
+    """Remove query strings and hash fragments from a URL."""
+    url = url.split("?", maxsplit=1)[0]
+    return url.split("#")[0]
+
+
 def resolve_glob_dependencies(
     base_dir: Path,
     patterns: list[str],
@@ -89,7 +95,9 @@ def scan_css_dependencies(css_path: Path) -> list[Path]:
             continue
 
         # Resolve relative to CSS file
-        asset_path = css_path.parent / url_val
+        # Strip query strings and hashes
+        clean_url = strip_url_params(url_val)
+        asset_path = css_path.parent / clean_url
         try:
             asset_path = asset_path.resolve()
             if asset_path.exists() and asset_path.is_file():
@@ -134,7 +142,9 @@ def scan_html_dependencies(html_path: Path) -> list[Path]:
             continue
 
         # Resolve relative to HTML file
-        asset_path = html_path.parent / url_val
+        # Strip query strings and hashes
+        clean_url = strip_url_params(url_val)
+        asset_path = html_path.parent / clean_url
         try:
             asset_path = asset_path.resolve()
             if asset_path.exists() and asset_path.is_file():

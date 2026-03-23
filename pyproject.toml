@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "dojo"
 version = "0.1.0"
-description = "Professional Ninja Build Generator for Static Site Generation"
+description = "Ninja Build Generator for Static Site Generation"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"

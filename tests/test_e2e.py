@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -87,6 +86,7 @@ class TestFullBuildPipeline:
         self,
         sample_project: tuple[Path, Path],
         file_regression,
+        normalize_ninja,
     ) -> None:
         """Test that dojo generates build.ninja and ninja produces HTML output."""
         project, config_path = sample_project
@@ -101,17 +101,13 @@ class TestFullBuildPipeline:
         build_ninja = project / "_build" / "build.ninja"
         assert build_ninja.exists(), "build.ninja not created"
 
-        # Professional Snapshoting (Normalized)
+        # Snapshoting (Normalized)
         ninja_content = build_ninja.read_text()
-        
-        # Normalize absolute paths to keep snapshots stable
-        # 1. Project-specific paths
-        normalized_content = ninja_content.replace(str(project), "[PROJECT_ROOT]")
-        
-        # 2. Dojo-internal resource paths
+
+        # Use shared normalization utility
         dojo_root = Path(__file__).parent.parent.resolve()
-        normalized_content = normalized_content.replace(str(dojo_root), "[DOJO_ROOT]")
-        
+        normalized_content = normalize_ninja(ninja_content, project, dojo_root)
+
         # Verify entire build graph via snapshot
         file_regression.check(normalized_content, extension=".ninja")
 

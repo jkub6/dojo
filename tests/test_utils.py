@@ -5,11 +5,11 @@ import pytest
 
 from dojo.exceptions import CircularDependencyError, SecurityError
 from dojo.utils import (
+    get_frontmatter_assets,
     get_recursive_yaml_deps,
     ninja_escape,
     parse_frontmatter,
     parse_frontmatter_type,
-    get_frontmatter_assets,
     sanitize_path,
 )
 
@@ -143,7 +143,7 @@ def test_parse_frontmatter_no_end(tmp_path):
     """Test markdown with a starting --- but no end delimiter."""
     f = tmp_path / "test.md"
     f.write_text("---\ntitle: unterminated\nContent starts here", encoding="utf-8")
-    
+
     # Implementation should return None if no closing --- is found
     assert parse_frontmatter(f) is None
 
@@ -153,10 +153,10 @@ def test_get_frontmatter_assets(tmp_path):
     f = tmp_path / "test.md"
     css_file = tmp_path / "style.css"
     css_file.touch()
-    
+
     # Relative path in frontmatter should resolve relative to md file
     f.write_text("---\ncss:\n  - style.css\n---\n", encoding="utf-8")
-    
+
     assets = get_frontmatter_assets(f)
     assert css_file.resolve() in assets
     assert len(assets) == 1
@@ -169,9 +169,9 @@ def test_get_frontmatter_assets_nested(tmp_path):
     f = subdir / "test.md"
     css_file = tmp_path / "style.css"
     css_file.touch()
-    
+
     # Reference parent dir asset
     f.write_text("---\ncss:\n  - ../style.css\n---\n", encoding="utf-8")
-    
+
     assets = get_frontmatter_assets(f)
     assert css_file.resolve() in assets

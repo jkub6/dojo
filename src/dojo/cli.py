@@ -193,7 +193,7 @@ def main(argv: list[str] | None = None) -> None:
     """CLI entry point for dojo."""
     parser = argparse.ArgumentParser(
         prog="dojo",
-        description="Professional Ninja Build Generator (Dojo)",
+        description="Ninja Build Generator (Dojo)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 

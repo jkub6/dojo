@@ -1,6 +1,6 @@
 # Dojo Architecture
 
-> Professional Ninja Build Generator for Static Site Generation
+> Ninja Build Generator for Static Site Generation
 
 ## Overview
 

@@ -133,19 +133,21 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     # RENDER Flags (JSON AST -> Output Format)
     # -------------------------------------------------------------------------
     render_flags = [base_flags]
-    
+
     abs_src = Path(config.src_dir).resolve().as_posix()
     abs_build = Path(config.build_dir).resolve().as_posix()
-    
+
     # We need to map back to the source directory for resource lookups
     # rel_src_dir_expr: path from build_dir to the directory containing the JSON AST
-    rel_src_dir_expr = f"$$(realpath -m --relative-to={shell_quote(abs_build)} $$(dirname $$in_abs))"
+    rel_src_dir_expr = (
+        f"$$(realpath -m --relative-to={shell_quote(abs_build)} $$(dirname $$in_abs))"
+    )
     src_dir_val = f"$$(realpath -m {shell_quote(abs_src)}/{rel_src_dir_expr})"
-    
+
     # 1. Typst Special Handling
     # These flags fix various issues with Pandoc's Typst writer (CSL, citations, root paths)
     render_flags.append(f"-M dojo-rel-src-dir={rel_src_dir_expr}")
-    
+
     if config.pandoc_data_dir:
         # Typst requires paths relative to the project root (src_dir)
         abs_data = Path(config.pandoc_data_dir).resolve()

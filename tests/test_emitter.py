@@ -1,6 +1,7 @@
 import io
-from pathlib import Path
+
 from dojo.emitter import NinjaEmitter
+
 
 def test_emitter_comment():
     fp = io.StringIO()
@@ -8,11 +9,13 @@ def test_emitter_comment():
     emitter.comment("Test comment")
     assert fp.getvalue() == "# Test comment\n"
 
+
 def test_emitter_newline():
     fp = io.StringIO()
     emitter = NinjaEmitter(fp)
     emitter.newline()
     assert fp.getvalue() == "\n"
+
 
 def test_emitter_variable():
     fp = io.StringIO()
@@ -20,6 +23,7 @@ def test_emitter_variable():
     emitter.variable("name", "value")
     emitter.variable("indented", "val", indent=1)
     assert fp.getvalue() == "name = value\n  indented = val\n"
+
 
 def test_emitter_rule_full():
     fp = io.StringIO()
@@ -44,12 +48,14 @@ def test_emitter_rule_full():
     assert "  generator = 1\n" in output
     assert "  custom = val\n" in output
 
+
 def test_emitter_basic_build():
     fp = io.StringIO()
     emitter = NinjaEmitter(fp)
     emitter.build(outputs="out.html", rule="pandoc", inputs="in.md")
     content = fp.getvalue()
     assert "build out.html: pandoc in.md\n" in content
+
 
 def test_emitter_escaping_spaces():
     fp = io.StringIO()
@@ -59,6 +65,7 @@ def test_emitter_escaping_spaces():
     # Ninja uses $ to escape spaces
     assert "build out$ folder/file.html: pandoc in$ folder/file.md\n" in content
 
+
 def test_emitter_variables():
     fp = io.StringIO()
     emitter = NinjaEmitter(fp)
@@ -66,11 +73,12 @@ def test_emitter_variables():
         outputs="out.html",
         rule="pandoc",
         inputs="in.md",
-        variables={"args": "--standalone", "path": "some$path"}
+        variables={"args": "--standalone", "path": "some$path"},
     )
     content = fp.getvalue()
     assert "  args = --standalone\n" in content
     assert "  path = some$path\n" in content
+
 
 def test_emitter_implicit_order_deps():
     fp = io.StringIO()
@@ -80,10 +88,11 @@ def test_emitter_implicit_order_deps():
         rule="pandoc",
         inputs="in.md",
         implicit="style.css",
-        order_only="config.yaml"
+        order_only="config.yaml",
     )
     content = fp.getvalue()
     assert "build out.html: pandoc in.md | style.css || config.yaml\n" in content
+
 
 def test_emitter_multiple_outputs():
     fp = io.StringIO()

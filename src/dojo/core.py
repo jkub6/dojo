@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 from .paths import should_process_file
 from .plugins import PluginInterface, load_plugin
 from .rules import get_builtin_rules
-from .stages import AssetProcessor, CompileStage, RenderStage, format_defaults_var, merge_defaults
+from .stages import AssetProcessor, CompileStage, RenderStage
 from .yaml_utils import parse_frontmatter_type
 
 logger = logging.getLogger(__name__)
@@ -121,7 +121,6 @@ class NinjaGenerator:
 
         # Format link defaults: populated by _generate_format_link_defaults()
         self._format_link_defaults: dict[tuple[str, str], Path] = {}
-
 
     def _generate_format_link_defaults(self) -> None:
         """Generate Pandoc defaults files for cross-format links.

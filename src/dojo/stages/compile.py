@@ -75,10 +75,12 @@ class CompileStage:
         if defaults_var:
             variables["defaults"] = defaults_var
 
-        variables.update({
-            "in_shell": shell_quote(md_path),
-            "out_shell": shell_quote(json_node),
-        })
+        variables.update(
+            {
+                "in_shell": shell_quote(md_path),
+                "out_shell": shell_quote(json_node),
+            }
+        )
 
         self.emitter.build(
             outputs=json_node,

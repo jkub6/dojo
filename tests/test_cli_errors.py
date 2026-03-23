@@ -13,6 +13,7 @@ import yaml
 
 from dojo.cli import main
 
+
 class TestCLIErrors:
     """Tests for CLI error handling."""
 
@@ -27,7 +28,7 @@ class TestCLIErrors:
         """Test error when config file contains invalid YAML."""
         config_path = tmp_path / "bad.yaml"
         config_path.write_text("invalid: [unclosed bracket")
-        
+
         with pytest.raises(SystemExit) as exc:
             main(["build", "-c", str(config_path)])
         assert exc.value.code != 0
@@ -37,7 +38,7 @@ class TestCLIErrors:
         config_path = tmp_path / "invalid_schema.yaml"
         # Missing required src_dir and other fields
         config_path.write_text("debug: true")
-        
+
         with pytest.raises(SystemExit) as exc:
             main(["build", "-c", str(config_path)])
         assert exc.value.code != 0
@@ -45,14 +46,18 @@ class TestCLIErrors:
     def test_missing_source_directory(self, tmp_path: Path) -> None:
         """Test error when src_dir doesn't exist."""
         config_path = tmp_path / "dojo.yaml"
-        config_path.write_text(yaml.dump({
-            "src_dir": str(tmp_path / "missing_src"),
-            "output_dir": str(tmp_path / "site"),
-            "build_dir": str(tmp_path / "build"),
-            "default_type": "page",
-            "types": {"page": {"outputs": []}}
-        }))
-        
+        config_path.write_text(
+            yaml.dump(
+                {
+                    "src_dir": str(tmp_path / "missing_src"),
+                    "output_dir": str(tmp_path / "site"),
+                    "build_dir": str(tmp_path / "build"),
+                    "default_type": "page",
+                    "types": {"page": {"outputs": []}},
+                }
+            )
+        )
+
         with pytest.raises(SystemExit) as exc:
             main(["build", "-c", str(config_path)])
         assert exc.value.code != 0
@@ -63,23 +68,27 @@ class TestCLIErrors:
         src.mkdir()
         defaults = tmp_path / "defaults.yaml"
         defaults.touch()
-        
+
         config_path = tmp_path / "dojo.yaml"
-        config_path.write_text(yaml.dump({
-            "src_dir": str(src),
-            "output_dir": str(tmp_path / "site"),
-            "build_dir": str(tmp_path / "build"),
-            "default_type": "page",
-            "types": {
-                "page": {
-                    "outputs": [
-                        {"id": "out1", "extension": "html", "defaults": str(defaults)},
-                        {"id": "out1", "extension": "pdf", "defaults": str(defaults)}
-                    ]
+        config_path.write_text(
+            yaml.dump(
+                {
+                    "src_dir": str(src),
+                    "output_dir": str(tmp_path / "site"),
+                    "build_dir": str(tmp_path / "build"),
+                    "default_type": "page",
+                    "types": {
+                        "page": {
+                            "outputs": [
+                                {"id": "out1", "extension": "html", "defaults": str(defaults)},
+                                {"id": "out1", "extension": "pdf", "defaults": str(defaults)},
+                            ]
+                        }
+                    },
                 }
-            }
-        }))
-        
+            )
+        )
+
         with pytest.raises(SystemExit) as exc:
             main(["build", "-c", str(config_path)])
         assert exc.value.code != 0
@@ -101,7 +110,7 @@ class TestCLIErrors:
         config_path = tmp_path / "dojo.yaml"
         # Invalid config to trigger an error and see the log
         config_path.write_text("invalid: [")
-        
+
         with pytest.raises(SystemExit) as exc:
             main(["build", "-c", str(config_path), "--json"])
         assert exc.value.code != 0
@@ -110,7 +119,7 @@ class TestCLIErrors:
         """Test that --verbose flag shows full traceback on error."""
         config_path = tmp_path / "dojo.yaml"
         config_path.write_text("invalid: [")
-        
+
         with pytest.raises(SystemExit) as exc:
             main(["build", "-c", str(config_path), "--verbose"])
         assert exc.value.code != 0
@@ -124,7 +133,7 @@ class TestCLIErrors:
         """Test that check command with --verbose hits error path."""
         config_path = tmp_path / "bad.yaml"
         config_path.write_text("invalid: [")
-        
+
         with pytest.raises(SystemExit) as exc:
             main(["check", "-c", str(config_path), "--verbose"])
         assert exc.value.code != 0
@@ -142,7 +151,7 @@ class TestCLIErrors:
         mocker.patch("dojo.cli.setup_cli_logging", side_effect=RuntimeError("Internal Crash"))
         # We need to catch sys.exit
         with pytest.raises(SystemExit) as exc:
-             main(["--version"])
+            main(["--version"])
         assert exc.value.code == 1
 
     def test_build_unexpected_error(self, tmp_path, mocker) -> None:
