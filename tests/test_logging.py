@@ -5,7 +5,6 @@ import sys
 
 from dojo.logging import JsonFormatter, setup_logging
 
-
 # Test constants
 EXPECTED_DURATION_MS = 42
 EXPECTED_OUTPUT_COUNT = 5

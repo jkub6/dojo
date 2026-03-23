@@ -2,6 +2,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from dojo.config import Config, OutputConfig
 from dojo.constants import RuleName
 from dojo.core import NinjaGenerator

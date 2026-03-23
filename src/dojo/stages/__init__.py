@@ -14,7 +14,6 @@ from .assets import AssetProcessor
 from .compile import CompileStage
 from .render import RenderStage
 
-
 __all__ = [
     "AssetProcessor",
     "CompileStage",

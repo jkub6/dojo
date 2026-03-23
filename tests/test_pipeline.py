@@ -1,4 +1,5 @@
 import pytest
+
 from dojo.config import Config
 from dojo.core import NinjaGenerator
 

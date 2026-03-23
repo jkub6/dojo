@@ -1,11 +1,12 @@
 from pathlib import Path
 
 import pytest
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
+
 from dojo.exceptions import SecurityError
 from dojo.paths import ninja_escape, sanitize_path, shell_quote
 from dojo.stages._defaults import merge_defaults
-from hypothesis import HealthCheck, given, settings
-from hypothesis import strategies as st
 
 
 @given(st.text())

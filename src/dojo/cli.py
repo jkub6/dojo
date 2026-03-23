@@ -19,7 +19,6 @@ from .core import NinjaGenerator
 from .logging import setup_logging as setup_json_logging
 from .schema import print_schema, write_schema
 
-
 console = Console()
 
 logger = logging.getLogger("dojo")

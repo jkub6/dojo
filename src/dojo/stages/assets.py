@@ -17,7 +17,6 @@ from dojo.emitter import NinjaEmitter
 from dojo.paths import sanitize_path, shell_quote
 from dojo.yaml_utils import _extract_paths, get_frontmatter_assets, parse_frontmatter
 
-
 logger = logging.getLogger(__name__)
 
 

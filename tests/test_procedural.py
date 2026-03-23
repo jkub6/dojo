@@ -1,10 +1,11 @@
 from pathlib import Path
 
 import pytest
-from dojo.exceptions import SecurityError
-from dojo.paths import sanitize_path, should_process_file
 from hypothesis import given
 from hypothesis import strategies as st
+
+from dojo.exceptions import SecurityError
+from dojo.paths import sanitize_path, should_process_file
 
 
 @st.composite

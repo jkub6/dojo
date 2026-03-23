@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+
 from dojo.exceptions import UnknownResourceCategoryError
 from dojo.resources import clear_resource_cache, find_resource, get_pandoc_data_dirs
 

@@ -2,6 +2,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
 from dojo.config import OutputConfig
 from dojo.stages.assets import AssetProcessor
 from dojo.stages.render import RenderStage

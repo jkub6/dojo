@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+
 from dojo.config import Config
 from dojo.core import NinjaGenerator
 from dojo.exceptions import DefaultsRequiredError

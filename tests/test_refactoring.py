@@ -2,6 +2,7 @@ import io
 from pathlib import Path
 
 import pytest
+
 from dojo.config import Config
 from dojo.emitter import NinjaEmitter
 from dojo.exceptions import DirectoryConflictError, DuplicateOutputIdError

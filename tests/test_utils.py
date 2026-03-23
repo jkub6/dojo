@@ -2,6 +2,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
 from dojo.exceptions import CircularDependencyError, SecurityError
 from dojo.utils import (
     get_frontmatter_assets,

@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 import pytest
 import yaml
+
 from dojo.config import Config, OutputConfig, ToolPaths, load_config
 from dojo.exceptions import (
     ConfigError,
@@ -17,7 +18,6 @@ from dojo.exceptions import (
     SourceDirNotFoundError,
     SourceRequiresToolError,
 )
-
 
 # --- ToolPaths Tests ---
 

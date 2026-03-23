@@ -29,7 +29,6 @@ from .yaml_utils import (
     parse_frontmatter_type,
 )
 
-
 __all__ = [
     "get_frontmatter_assets",
     "get_recursive_yaml_deps",

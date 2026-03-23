@@ -14,7 +14,6 @@ from dojo.emitter import NinjaEmitter
 from dojo.paths import sanitize_path, shell_quote
 from dojo.stages._defaults import resolve_stage_dependencies
 
-
 if TYPE_CHECKING:
     from dojo.config import Config, TypeConfig
 
