@@ -11,8 +11,12 @@ import sys
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from rich.logging import RichHandler
+
 if TYPE_CHECKING:
     from typing import TextIO
+
+from rich.console import Console
 
 
 class JsonFormatter(logging.Formatter):
@@ -76,22 +80,32 @@ def setup_logging(
     if stream is None:
         stream = sys.stdout
 
-    # Remove existing handlers to avoid duplicates
-    root_logger = logging.getLogger()
-    for handler in root_logger.handlers[:]:
-        root_logger.removeHandler(handler)
+    # Scope logging to the 'dojo' hierarchy
+    # We don't use logging.basicConfig as it configures the root logger.
+    # Instead, we configure the 'dojo' logger directly and disable propagation
+    # so it doesn't double-log if the root logger also has handlers.
+    dojo_logger = logging.getLogger("dojo")
+    dojo_logger.setLevel(level)
+    dojo_logger.propagate = False
 
-    handler = logging.StreamHandler(stream)
+    # Clear existing handlers to allow multiple calls to setup_logging
+    # while keeping it clean (e.g., during tests).
+    for h in list(dojo_logger.handlers):
+        dojo_logger.removeHandler(h)
 
     if json_output:
-        handler.setFormatter(JsonFormatter())
+        json_handler = logging.StreamHandler(stream)
+        json_handler.setFormatter(JsonFormatter())
+        dojo_logger.addHandler(json_handler)
     else:
-        handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+        # Standard Rich-based human-readable logging
+        rich_handler = RichHandler(
+            rich_tracebacks=True,
+            show_time=False,
+            show_path=False,
+            markup=True,
+            console=Console(),
+        )
+        dojo_logger.addHandler(rich_handler)
 
-    logging.basicConfig(
-        level=level,
-        handlers=[handler],
-        force=True,
-    )
-
-    return logging.getLogger("dojo")
+    return dojo_logger

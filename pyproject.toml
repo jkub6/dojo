@@ -24,10 +24,10 @@ classifiers = [
     "Topic :: Text Processing :: Markup",
 ]
 dependencies = [
-  "pyyaml",
-  "pydantic>=2.0",
-  "tqdm",
-  "rich>=10.0.0",
+  "pyyaml>=6.0,<7",
+  "pydantic>=2.0,<3",
+  "tqdm>=4.0,<5",
+  "rich>=10.0.0,<14",
 ]
 
 [dependency-groups]
@@ -47,10 +47,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/example/dojo"
-Documentation = "https://github.com/example/dojo#readme"
-Repository = "https://github.com/example/dojo.git"
-Issues = "https://github.com/example/dojo/issues"
+Homepage = "https://github.com/jkub6/dojo"
+Documentation = "https://github.com/jkub6/dojo#readme"
+Repository = "https://github.com/jkub6/dojo.git"
+Issues = "https://github.com/jkub6/dojo/issues"
 
 [project.scripts]
 dojo = "dojo.cli:entry_point"

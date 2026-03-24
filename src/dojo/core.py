@@ -44,6 +44,17 @@ class NinjaGenerator:
     - CompileStage: Handles Markdown to JSON AST conversion
     - RenderStage: Handles JSON to output format rendering
     - AssetProcessor: Handles dependency tracking and asset copying
+
+    Ninja Rules and Variables Convention:
+    -----------------------------------
+    Dojo uses several Ninja variables to ensure shell-quoted path safety:
+    - $in, $out: Standard Ninja input/output variables.
+    - $in_shell, $out_shell: Shell-quoted variants of $in and $out, safe for
+      use in command lines.
+    - $args: Extra command-line arguments passed to the tool.
+    - $defaults: Space-separated list of Pandoc defaults files.
+
+    All paths emitted as variables are pre-quoted using `shlex.quote`.
     """
 
     def __init__(
@@ -73,7 +84,7 @@ class NinjaGenerator:
         # Buffer and Emitter
         if emitter:
             self.emitter = emitter
-            self._buffer = io.StringIO()  # Dummy buffer if emitter is external
+            self._buffer = None  # Plugins requiring buffer will be disabled
         else:
             self._buffer = io.StringIO()
             self.emitter = NinjaEmitter(self._buffer)
@@ -386,18 +397,23 @@ class NinjaGenerator:
                 logger.exception("Failed to process %s", md_file)
                 raise
 
-        ninja_content = self._buffer.getvalue()
+        # Stage 3: Post-process the final content via plugins
+        # If an external emitter was used, we don't have a buffer to post-process.
+        if self._buffer is None:
+            logger.debug("Skipping plugin post-processing (external emitter in use)")
+        else:
+            ninja_content = self._buffer.getvalue()
 
-        # Plugin Hook: Post-process Ninja content
-        for plugin in self.plugins:
-            ninja_content = plugin.post_process_ninja(ninja_content)
+            # Plugin Hook: Post-process Ninja content
+            for plugin in self.plugins:
+                ninja_content = plugin.post_process_ninja(ninja_content)
 
-        # Dry-run mode: show plan without writing
-        if self.dry_run:
-            self._log_dry_run_summary(len(filtered_files))
-            return
+            # Dry-run mode: show plan without writing
+            if self.dry_run:
+                self._log_dry_run_summary(len(filtered_files))
+                return
 
-        self._write_ninja_file(ninja_content)
+            self._write_ninja_file(ninja_content)
         self._log_completion_summary()
 
     def _log_dry_run_summary(self, source_count: int) -> None:

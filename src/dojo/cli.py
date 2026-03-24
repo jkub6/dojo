@@ -12,11 +12,10 @@ from importlib.metadata import version as get_pkg_version
 from pathlib import Path
 
 from rich.console import Console
-from rich.logging import RichHandler
 
 from .config import load_config
 from .core import NinjaGenerator
-from .logging import setup_logging as setup_json_logging
+from .logging import setup_logging
 from .schema import print_schema, write_schema
 
 console = Console()
@@ -62,19 +61,8 @@ def setup_cli_logging(*, verbose: bool, quiet: bool, json_output: bool = False) 
     else:
         level = logging.INFO
 
-    # Use JSON formatter for machine-parseable output
-    if json_output:
-        setup_json_logging(level=level, json_output=True)
-        return
-
-    # Use Rich for human-readable output
-    logging.basicConfig(
-        level=level,
-        format="%(message)s",
-        datefmt="[%X]",
-        handlers=[RichHandler(rich_tracebacks=True, show_path=False)],
-        force=True,
-    )
+    # Setup logging scoped to 'dojo'
+    setup_logging(level=level, json_output=json_output)
 
 
 def cmd_build(

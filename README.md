@@ -1,51 +1,57 @@
-# Dojo 🥷
+# Dojo
 
-Ninja Build Generator for Static Site Generation.
+[![CI](https://github.com/jkub6/dojo/actions/workflows/ci.yml/badge.svg)](https://github.com/jkub6/dojo/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Quick Start (Nix — Recommended)
+**Dojo** is a professional-grade static site and document generator powered by [Ninja](https://ninja-build.org/) and [Pandoc](https://pandoc.org/). It combines the flexibility of Pandoc's document conversion with the extreme speed of Ninja's incremental build system.
 
-This project uses a `flake.nix` that provides all necessary tools (Python, Pandoc, Decktape, etc.) in a reproducible environment.
+## Key Features
+
+- **Blazing Fast**: Uses Ninja to track dependencies and perform minimal incremental rebuilds.
+- **Format Agnostic**: Support for HTML, PDF (via Decktape), and any other format Pandoc supports.
+- **Smart Assets**: Recursively discovers and copies CSS, images, and other dependencies.
+- **Pipeline Processing**: Built-in support for Ghostscript optimization, minification, and multi-step post-processing.
+- **Strict Configuration**: Pydantic-powered `dojo.yaml` with rigorous validation and ID discovery.
+- **Extensible**: Fully featured Python-based plugin system to modify Ninja rules and build orchestration.
+- **Reproducible**: Bundled with a Nix flake for consistent environments across development and CI.
+
+## Why Dojo?
+
+Traditional static site generators (SSGs) often struggle with complex document pipelines (like generating high-quality PDFs from HTML slides) or deep asset dependency trees. Dojo treats your website as a build graph, ensuring that changing a single CSS variable or a nested image only rebuilds what is strictly necessary, while providing the full power of Pandoc for document transformation.
+
+## Quick Start
+
+1. **Initialize a project**:
+   ```bash
+   dojo init
+   ```
+
+2. **Build your site**:
+   ```bash
+   dojo build
+   ```
+
+3. **Run Ninja**:
+   Dojo generates a `_build/build.ninja` file. Run ninja to finalize the build:
+   ```bash
+   ninja -C _build
+   ```
+
+## Documentation
+
+- [Architecture Guide](docs/ARCHITECTURE.md)
+- [Plugin Development](docs/plugins.md)
+- [Configuration Schema](dojo schema)
+
+## Contributing
+
+Dojo uses `just` for development tasks. See the `justfile` for available commands:
 
 ```bash
-# Enter the development environment
-nix develop
-
-# Generate the build plan and execute it
-dojo build -c dojo.yaml && ninja -f _build/build.ninja
+just check  # Run linting and type checking
+just test   # Run the full test suite
 ```
 
-## Installation (pip)
+## License
 
-```bash
-# Install the package in editable mode
-pip install -e .
-
-# Install development dependencies
-pip install -e ".[dev]"
-```
-
-## Usage
-
-### 1. Create Configuration
-Create a `dojo.yaml` file to define your site structure, tools, and resource pools. Use `dojo init` to generate a starter config, or see the [Architecture Guide](docs/ARCHITECTURE.md) for the full schema.
-
-### 2. Generate the Build Plan
-```bash
-dojo build -c dojo.yaml
-```
-
-### 3. Build the Site
-```bash
-ninja -f _build/build.ninja
-```
-
-## Development
-
-Common tasks are defined in the `justfile`:
-
-```bash
-just check   # Run all static analysis (ruff, mypy, vulture, etc.)
-just test    # Run tests with coverage
-just fix     # Auto-format and fix linting issues
-just clean   # Remove build artifacts
-```
+MIT © 2026 Jake

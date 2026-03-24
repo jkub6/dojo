@@ -159,9 +159,22 @@ Use `dojo schema` to export the full JSON Schema for IDE integration.
 
 See [Plugin Development Guide](plugins.md) for plugin authoring guide.
 
-## Incremental Build Support
+## Ninja Variables
 
-Ninja provides fast incremental builds by:
+Dojo uses a specific convention for Ninja rule variables to ensure build correctness and shell safety:
+
+| Variable | Purpose | Description |
+|----------|---------|-------------|
+| `$in` | Universal | Input file(s) (Ninja internal) |
+| `$out` | Universal | Output file(s) (Ninja internal) |
+| `$in_shell` | Safety | Shell-quoted input path for use in command templates |
+| `$out_shell` | Safety | Shell-quoted output path for use in command templates |
+| `$args` | Tooling | Extra command-line arguments from `OutputConfig` |
+| `$defaults` | Pandoc | Space-separated list of Pandoc defaults files |
+
+The `_shell` variants are pre-quoted using `shlex.quote` by the `NinjaGenerator` to prevent issues with paths containing spaces or special characters.
+
+## Incremental Build Support
 - Tracking file modification times
 - Using `depfile` for dynamic dependencies discovered during compilation
 - Minimizing rebuild scope to only changed files

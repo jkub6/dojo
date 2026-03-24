@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -5,6 +6,20 @@ import pytest
 
 from dojo.config import Config
 from dojo.emitter import NinjaEmitter
+
+
+@pytest.fixture(autouse=True)
+def enable_logging_propagation():
+    """Enable logging propagation for 'dojo' logger during tests.
+
+    This ensures that pytest's caplog fixture can capture logs even when
+    the 'dojo' logger has propagate=False (the production default).
+    """
+    logger = logging.getLogger("dojo")
+    previous_propagate = logger.propagate
+    logger.propagate = True
+    yield
+    logger.propagate = previous_propagate
 
 
 @pytest.fixture

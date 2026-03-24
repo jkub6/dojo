@@ -63,26 +63,33 @@ class ToolPaths(BaseModel):
     decktape: str = Field(default="decktape", description="Decktape executable path")
     typst: str = Field(default="typst", description="Typst executable path")
 
-    @model_validator(mode="after")
-    def resolve_tool_paths(self) -> ToolPaths:
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_tool_paths(cls, data: object) -> object:
         """Resolve all tool paths to absolute paths and verify existence."""
-        essential_tools = ["pandoc"]
-        for tool in ["pandoc", "minify", "ghostscript", "decktape", "typst"]:
-            current = cast("str", getattr(self, tool))
-            if not current:
+        if not isinstance(data, dict):
+            return data
+
+        essential_tools = {"pandoc"}
+
+        # Resolve all fields defined in the model
+        data_dict = cast("dict[str, object]", data)
+        for field_name, field_info in cls.model_fields.items():
+            # Get from input data or use the field's default
+            current = data_dict.get(field_name, field_info.default)  # type: ignore[misc]
+
+            if not isinstance(current, str) or not current:
                 continue
 
             resolved = shutil.which(current)
 
             if resolved:
-                setattr(self, tool, resolved)
-            elif tool in essential_tools:
-                raise EssentialToolNotFoundError(tool, current)
-            else:
-                # Optional tool not found
-                # We accept this but if it is used later, it will fail at runtime
-                pass
-        return self
+                data[field_name] = resolved
+            elif field_name in essential_tools:
+                # Only raise for essential tools if they are missing
+                raise EssentialToolNotFoundError(field_name, current)
+
+        return data
 
 
 class PipelineStep(BaseModel):

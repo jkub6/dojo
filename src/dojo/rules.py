@@ -81,7 +81,13 @@ def _get_typst_flags(config: Config, rel_src_dir_expr: str) -> list[str]:
 
 
 def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
-    """Generate the standard built-in Ninja rules based on configuration."""
+    """Generate the standard built-in Ninja rules based on configuration.
+
+    Dojo Rules Convention:
+    - Rules should use `$in_shell` and `$out_shell` for path safety.
+    - `$args` is used for caller-provided tool flags.
+    - `$defaults` is used for Pandoc defaults files.
+    """
     path_prefix = _get_tool_path_prefix(config)
     setup_vars = _get_pandoc_setup_vars(config)
     abs_build_dir = Path(config.build_dir).resolve().as_posix()

@@ -55,7 +55,7 @@ def _expand_value(value: str, yaml_path: Path) -> str:
     return pattern.sub(repl, value)
 
 
-def _extract_paths(data: dict[str, object], keys: list[str]) -> list[str]:
+def extract_paths(data: dict[str, object], keys: list[str]) -> list[str]:
     """Extract a list of paths from a dict for given keys."""
     paths = []
     for key in keys:
@@ -170,7 +170,7 @@ def get_frontmatter_assets(md_path: Path) -> list[Path]:
     # But files referenced in `css` definitely need to be served.
     asset_keys = ASSET_KEYS
 
-    raw_assets = _extract_paths(frontmatter, asset_keys)
+    raw_assets = extract_paths(frontmatter, asset_keys)
 
     assets = []
     for asset_ref in raw_assets:
@@ -249,13 +249,13 @@ def get_recursive_yaml_deps(
             current_data_dirs = [data_dir_override]
 
         # 1. Handle Recursive Defaults
-        defaults = _extract_paths(data, ["defaults"])
+        defaults = extract_paths(data, ["defaults"])
         _resolve_default_deps(defaults, yaml_path, current_data_dirs, deps, visited, stack)
 
         # 2. Handle Leaf Assets (CSS, templates, etc)
         # Pandoc behavior: relative paths are relative to CWD (executable location).
         asset_keys = ASSET_KEYS
-        assets = _extract_paths(data, asset_keys)
+        assets = extract_paths(data, asset_keys)
         _resolve_assets(assets, deps)
 
     finally:

@@ -9,7 +9,6 @@ from __future__ import annotations
 import functools
 import os
 from pathlib import Path
-from typing import Literal
 
 from .exceptions import UnknownResourceCategoryError
 
@@ -126,9 +125,9 @@ def _find_resource_impl(
 
     # 1. Exact Path Check
     # If it looks like a path, try it directly first
-    path_check = _check_path_reference(name, root_contexts)
-    if path_check is not False:
-        return path_check  # Returns Path or None (if absolute and missing)
+    is_path, resolved = _check_path_reference(name, root_contexts)
+    if is_path:
+        return resolved  # Returns Path or None (if absolute and missing)
 
     # 2. Resource Name Resolution
     potential_names = _get_potential_names(name, category)
@@ -149,34 +148,33 @@ def _find_resource_impl(
 def _check_path_reference(
     name: str,
     root_contexts: list[Path] | None,
-) -> Path | None | Literal[False]:
+) -> tuple[bool, Path | None]:
     """Check if name is an explicit path reference.
 
     Returns:
-        Path: Found resource.
-        None: Explicit failure (absolute path not found).
-        False: Not a path reference or not found relative (continue search).
+        A tuple of (is_path_reference, resolved_path).
+        If is_path_reference is True, the name is an explicit path.
 
     """
     path_obj = Path(name)
     if path_obj.is_absolute():
         if path_obj.exists():
-            return path_obj
-        return None
+            return True, path_obj
+        return True, None
 
     if len(path_obj.parts) > 1:
         # Relative path with separators (e.g. "foo/bar.yaml")
         cwd_path = Path.cwd() / path_obj
         if cwd_path.exists():
-            return cwd_path.resolve()
+            return True, cwd_path.resolve()
 
         if root_contexts:
             for root in root_contexts:
                 rel_path = root / path_obj
                 if rel_path.exists():
-                    return rel_path.resolve()
+                    return True, rel_path.resolve()
 
-    return False
+    return False, None
 
 
 def _get_potential_names(name: str, category: str) -> list[str]:

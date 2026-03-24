@@ -15,7 +15,7 @@ from dojo.constants import RuleName
 from dojo.deps import resolve_glob_dependencies, scan_css_dependencies, scan_html_dependencies
 from dojo.emitter import NinjaEmitter
 from dojo.paths import sanitize_path, shell_quote
-from dojo.yaml_utils import _extract_paths, get_frontmatter_assets, parse_frontmatter
+from dojo.yaml_utils import extract_paths, get_frontmatter_assets, parse_frontmatter
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ class AssetProcessor:
         # 2. Get assets from 'dependencies' glob patterns
         frontmatter = parse_frontmatter(md_path)
         if frontmatter and "dependencies" in frontmatter:
-            dep_patterns = _extract_paths(frontmatter, ["dependencies"])
+            dep_patterns = extract_paths(frontmatter, ["dependencies"])
             glob_assets = resolve_glob_dependencies(md_path.parent, dep_patterns)
             pending_assets.update(glob_assets)
 
