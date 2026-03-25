@@ -9,46 +9,53 @@ set shell := ["bash", "-c", "-u", "-o", "pipefail"]
 default:
     @just --list
 
-# --- Linting & Formatting ---
+# =============================================================================
+# Quality
+# =============================================================================
 
-# Apply automatic fixes (formatting and linting)
+[group('Quality')]
+[doc('Apply automatic fixes (formatting and linting)')]
 fix:
-    ruff format .
-    ruff check --fix-only .
+  ruff format .
+  ruff check --fix-only .
+  alejandra .
+  statix fix .
 
-# Alias for fix
-fmt: fix
+[group('Quality')]
+[doc('Alias for fix')]
+format: fix
 
-# Run all static analysis checks
+[group('Quality')]
+[doc('Run all static analysis checks')]
 check:
-    ruff check .
-    ruff format --check .
-    mypy src
-    vulture
-    typos .
+  ruff format --check .
+  ruff check .
+  mypy src
+  vulture --min-confidence 80
+  alejandra --check .
+  statix check .
+  nix flake check --all-systems .
+  typos --config .typos.toml .
 
-# Alias for check
+[group('Quality')]
+[doc('Alias for check')]
 lint: check
 
-# --- Testing ---
-
-# Run tests with coverage and parallel execution
+[group('Quality')]
+[doc('Run all tests')]
 test:
-    pytest
+  pytest
 
-# Run tests continuously on file changes
-watch:
-    watchexec -e py,yaml,toml -- just test
+[group('Quality')]
+[doc('Run full CI pipeline: check, test')]
+ci: check test
 
-# --- Building ---
+# =============================================================================
+# Maintenance
+# =============================================================================
 
-# Build the project (requires config file)
-build config="dojo.yaml":
-    python -m dojo build -c {{config}} && ninja -f _build/build.ninja
-
-# --- Maintenance ---
-
-# Clean build artifacts and temporary files
+[group('Maintenance')]
+[doc('Clean build artifacts and caches')]
 clean:
     rm -rf _build _site .pytest_cache .coverage .hypothesis .mypy_cache .ruff_cache
     find . -type d -name "__pycache__" -exec rm -rf {} +

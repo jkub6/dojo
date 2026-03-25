@@ -53,7 +53,7 @@
         ];
     };
   in
-    flake-utils.lib.eachDefaultSystem (
+    flake-utils.lib.eachSystem ["x86_64-linux" "aarch64-linux"] (
       system: let
         # Apply the overlay locally to construct the isolated development shell
         pkgs = import nixpkgs {
@@ -71,7 +71,6 @@
             ninja
             pandoc
             typst
-            decktape
             minify
             ghostscript
             typos
