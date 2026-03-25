@@ -57,5 +57,5 @@ ci: check test
 [group('Maintenance')]
 [doc('Clean build artifacts and caches')]
 clean:
-    rm -rf _build _site .pytest_cache .coverage .hypothesis .mypy_cache .ruff_cache
+    rm -rf _build _site _cache .pytest_cache .ruff_cache .mypy_cache .hypothesis .coverage coverage.xml htmlcov result node_modules
     find . -type d -name "__pycache__" -exec rm -rf {} +
