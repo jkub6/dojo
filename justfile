@@ -32,10 +32,10 @@ check:
   ruff check .
   mypy src
   vulture --min-confidence 80
+  typos --config .typos.toml .
   alejandra --check .
   statix check .
   nix flake check --all-systems .
-  typos --config .typos.toml .
 
 [group('Quality')]
 [doc('Alias for check')]
