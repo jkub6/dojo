@@ -24,10 +24,10 @@ classifiers = [
     "Topic :: Text Processing :: Markup",
 ]
 dependencies = [
-  "pyyaml>=6.0,<7",
-  "pydantic>=2.0,<3",
-  "tqdm>=4.0,<5",
-  "rich>=10.0.0,<14",
+  "pyyaml>=6.0",
+  "pydantic>=2.0",
+  "tqdm>=4.0",
+  "rich>=10.0.0",
 ]
 
 [dependency-groups]
