@@ -155,7 +155,8 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
             name=RuleName.RENDER.value,
             command=(
                 f"{setup_vars} && {build_dir_cmd} && "
-                f"{pandoc_wrapper} $$in_abs $defaults -o $$out_abs {' '.join(render_flags)}"
+                f"{pandoc_wrapper} $$in_abs $defaults -o $$out_abs {' '.join(render_flags)} "
+                "-M dojo-document-stem=$dojo_stem"
             ),
             description="🎨 RENDER $out",
             pool=get_pool(RuleName.RENDER.value),
@@ -173,7 +174,11 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
             ),
             CustomRule(
                 name=RuleName.MINIFY.value,
-                command=f"{path_prefix}{config.tools.minify} $args -o $out_shell $in_shell",
+                command=(
+                    f"{path_prefix}{config.tools.minify} "
+                    "--html-keep-document-tags --html-keep-end-tags "
+                    "$args -o $out_shell $in_shell"
+                ),
                 description="⚡ MINIFY $out",
                 pool=get_pool(RuleName.MINIFY.value),
             ),

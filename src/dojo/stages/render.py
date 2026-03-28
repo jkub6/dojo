@@ -117,6 +117,7 @@ class RenderStage:
             {
                 "in_shell": shell_quote(json_node),
                 "out_shell": shell_quote(render_target),
+                "dojo_stem": shell_quote(rel_stem.name),
             }
         )
 

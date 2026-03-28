@@ -58,8 +58,13 @@ function Pandoc(doc)
     return
   end
 
-  -- Remove extension to get the stem
-  local stem = base:match("^(.+)%.[^.]+$") or base
+  -- Use the explicit document stem if provided by dojo (via -M),
+  -- falling back to derivations from the output filename.
+  local stem = pandoc.utils.stringify(doc.meta["dojo-document-stem"] or "")
+  if stem == "" then
+    -- Remove extension to get the stem
+    stem = base:match("^(.+)%.[^.]+$") or base
+  end
 
   -- Strip the current output's suffix to recover the "pure" document stem
   -- e.g., "article-slides" with suffix "-slides" → "article"

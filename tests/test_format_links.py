@@ -321,6 +321,7 @@ def _run_pandoc_with_filter(
     current_suffix: str = "",
     siblings: list[dict[str, str]] | None = None,
     output_name: str = "article.html",
+    document_stem: str | None = None,
 ) -> dict:
     """Run Pandoc with format_links.lua and return the AST metadata.
 
@@ -352,6 +353,8 @@ def _run_pandoc_with_filter(
             "dojo-sibling-formats": siblings,
         },
     }
+    if document_stem:
+        defaults_data["metadata"]["dojo-document-stem"] = document_stem
     defaults_file = tmp_path / "format-links.yaml"
     with open(defaults_file, "w", encoding="utf-8") as f:
         yaml.dump(defaults_data, f, default_flow_style=False, allow_unicode=True)
@@ -428,6 +431,26 @@ def test_lua_filter_suffix_stripping(tmp_path):
 
     # Suffix "-slides" should be stripped, giving base stem "article"
     assert hrefs["HTML"] == "article.html"
+    assert hrefs["PDF"] == "article.pdf"
+
+
+def test_lua_filter_intermediate_filename(tmp_path):
+    """When an intermediate filename is used, the dojo-document-stem metadata should be honored."""
+    meta = _run_pandoc_with_filter(
+        tmp_path,
+        output_name="article.html.0.html",
+        document_stem="article",
+        siblings=[
+            {"label": "PDF", "suffix": "", "extension": "pdf"},
+        ],
+    )
+
+    links = meta["format-links"]["c"]
+    hrefs = {
+        _meta_str(link["c"]["label"]): _meta_str(link["c"]["href"]) for link in links
+    }
+
+    # Should use the explicit "article" stem, NOT "article.html.0"
     assert hrefs["PDF"] == "article.pdf"
 
 
