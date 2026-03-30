@@ -43,10 +43,11 @@ def _get_pandoc_setup_vars(config: Config) -> str:
     calculates the relative path to the root reference directory to handle
     working directory shifts in the build process.
     """
+    abs_out = Path(config.output_dir).resolve().as_posix()
     return (
         "in_abs=$$(realpath $in_shell) && "
         "out_abs=$$(realpath -m $out_shell) && "
-        f"root_val=$$(realpath -m --relative-to=$$(dirname $in_shell) {shell_quote(config.root_ref_dir)})"
+        f"root_val=$$(realpath -m --relative-to=$$(dirname $$out_abs) {shell_quote(abs_out)})"
     )
 
 
@@ -69,9 +70,14 @@ def _get_typst_flags(config: Config, rel_src_dir_expr: str) -> list[str]:
 
     flags.append(f"--pdf-engine-opt=--root={shell_quote(abs_src.as_posix())}")
 
-    if config.pandoc_data_dir:
+    if config.font_paths:
+        for font_dir in config.font_paths:
+            font_path = Path(font_dir).resolve().as_posix()
+            flags.append(f"--pdf-engine-opt=--font-path={shell_quote(font_path)}")
+    elif config.pandoc_data_dir:
         font_path = (Path(config.pandoc_data_dir).resolve() / "fonts").as_posix()
-        flags.append(f"--pdf-engine-opt=--font-path={shell_quote(font_path)}")
+        if Path(font_path).exists():
+            flags.append(f"--pdf-engine-opt=--font-path={shell_quote(font_path)}")
 
     resources_dir = Path(__file__).parent / "resources"
     typst_csl_filter = resources_dir / "fix_typst_csl.lua"
@@ -94,7 +100,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     build_dir_cmd = f"mkdir -p {shell_quote(abs_build_dir)} && cd {shell_quote(abs_build_dir)}"
     pandoc_wrapper = f"{path_prefix}{config.tools.pandoc}"
 
-    base_flags = "-V root=$$root_val"
+    base_flags = "-V root=$$root_val -M root=$$root_val"
     if config.pandoc_data_dir:
         base_flags += f" --data-dir={shell_quote(config.pandoc_data_dir)}"
 
@@ -150,11 +156,15 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     if config.add_resource_path:
         render_flags.append(f"--resource-path=.:$$(dirname $$in_abs):{src_dir_val}")
 
+    # Media Extraction for generated diagrams (diagram.lua)
+    # Using relative media dir while CD'd into the output directory creates cleanly relative src="" tags
+    render_flags.append('--extract-media=media')
+
     rules.append(
         CustomRule(
             name=RuleName.RENDER.value,
             command=(
-                f"{setup_vars} && {build_dir_cmd} && "
+                f"{setup_vars} && out_abs_dir=$$(dirname $$out_abs) && mkdir -p \"$$out_abs_dir\" && cd \"$$out_abs_dir\" && "
                 f"{pandoc_wrapper} $$in_abs $defaults -o $$out_abs {' '.join(render_flags)} "
                 "-M dojo-document-stem=$dojo_stem"
             ),
@@ -176,7 +186,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
                 name=RuleName.MINIFY.value,
                 command=(
                     f"{path_prefix}{config.tools.minify} "
-                    "--html-keep-document-tags --html-keep-end-tags "
+                    "--html-keep-document-tags --html-keep-end-tags -q "
                     "$args -o $out_shell $in_shell"
                 ),
                 description="⚡ MINIFY $out",

@@ -202,6 +202,8 @@ class Config(BaseModel):
     tools: ToolPaths = Field(default_factory=ToolPaths, description="External tool paths")
     custom_rules: list[CustomRule] = Field(default_factory=list, description="Custom Ninja rules")
     plugins: list[str] = Field(default_factory=list, description="Plugin script paths")
+    font_paths: list[str] = Field(default_factory=list, description="Paths to font directories")
+    static_dirs: list[str] = Field(default_factory=list, description="Paths to static directories copied to output")
     exclude: list[str] = Field(default_factory=list, description="Glob patterns to exclude")
     include: list[str] = Field(default_factory=list, description="Glob patterns to include")
 

@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from .config import Config, CustomRule, OutputConfig
 
-from .paths import should_process_file
+from .paths import sanitize_path, shell_quote, should_process_file
 from .plugins import PluginInterface, load_plugin
 from .rules import get_builtin_rules
 from .stages import AssetProcessor, CompileStage, RenderStage
@@ -397,7 +397,31 @@ class NinjaGenerator:
                 logger.exception("Failed to process %s", md_file)
                 raise
 
-        # Stage 3: Post-process the final content via plugins
+        # Stage 4: Static assets
+        for static_dir in self.config.static_dirs:
+            static_path = Path(self.src / static_dir).resolve() if not Path(static_dir).is_absolute() else Path(static_dir).resolve()
+            if not static_path.exists(): continue
+            for file in static_path.rglob("*"):
+                if file.is_file():
+                    try:
+                        rel_file = file.relative_to(static_path)
+                    except ValueError:
+                        continue
+                    final_path = sanitize_path(self.out_dir, rel_file)
+                    if final_path not in self.copied_assets:
+                        self.emitter.build(
+                            outputs=final_path,
+                            rule=RuleName.COPY.value,
+                            inputs=file,
+                            variables={
+                                "in_shell": shell_quote(file),
+                                "out_shell": shell_quote(final_path),
+                            },
+                        )
+                        self.copied_assets.add(final_path)
+                        self.all_outputs.append(final_path)
+
+        # Stage 5: Post-process the final content via plugins
         # If an external emitter was used, we don't have a buffer to post-process.
         if self._buffer is None:
             logger.debug("Skipping plugin post-processing (external emitter in use)")
