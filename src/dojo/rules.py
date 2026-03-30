@@ -202,13 +202,21 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
                 description="🗜️  COMPRESS $out",
                 pool=get_pool(RuleName.GHOSTSCRIPT.value),
             ),
-            CustomRule(
-                name=RuleName.DECKTAPE.value,
-                command=f"{path_prefix}{config.tools.decktape} reveal $args $in_shell $out_shell",
-                description="📸 DECKTAPE $out",
-                pool=get_pool(RuleName.DECKTAPE.value),
-            ),
         ]
+    )
+
+    decktape_cmd = f"{path_prefix}{config.tools.decktape} reveal $args $in_shell $out_shell"
+    if config.log_file:
+        log_path = Path(config.log_file).resolve().as_posix()
+        decktape_cmd += f" >> {shell_quote(log_path)} 2>&1"
+
+    rules.append(
+        CustomRule(
+            name=RuleName.DECKTAPE.value,
+            command=decktape_cmd,
+            description="📸 DECKTAPE $out",
+            pool=get_pool(RuleName.DECKTAPE.value),
+        )
     )
 
     return rules

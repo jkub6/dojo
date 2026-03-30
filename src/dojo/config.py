@@ -204,6 +204,7 @@ class Config(BaseModel):
     plugins: list[str] = Field(default_factory=list, description="Plugin script paths")
     font_paths: list[str] = Field(default_factory=list, description="Paths to font directories")
     static_dirs: list[str] = Field(default_factory=list, description="Paths to static directories copied to output")
+    log_file: str = Field(default="", description="Path to a log file for silencing verbose command output")
     exclude: list[str] = Field(default_factory=list, description="Glob patterns to exclude")
     include: list[str] = Field(default_factory=list, description="Glob patterns to include")
 
