@@ -16,14 +16,14 @@ rule regenerate
 build [PROJECT_ROOT]/_build/build.ninja: regenerate [PROJECT_ROOT]/dojo.yaml
 
 rule compile
-  command = in_abs=$$(realpath $in_shell) && out_abs=$$(realpath -m $out_shell) && root_val=$$(realpath -m --relative-to=$$(dirname $in_shell) .) && mkdir -p [PROJECT_ROOT]/_build && cd [PROJECT_ROOT]/_build && env PATH="/nix/store/mh97fwdn44xxr851cghcs8pxg8l9iqxm-pandoc-cli-3.7.0.2/bin:/nix/store/z1844paz2apcss3i1yzbw39kgj73xd8j-minify-2.24.10/bin:/nix/store/khkmm49lwzyy63s2qbhhfhxyh703fmq9-ghostscript-with-X-10.06.0/bin:/nix/store/5a72fh50w98vj3zggrgcvghkwscsnzvg-decktape-3.15.0/bin:/nix/store/4i02pbs7a1vydqyk1k948kxrfg5yr005-typst-0.14.2/bin:$$PATH" /nix/store/mh97fwdn44xxr851cghcs8pxg8l9iqxm-pandoc-cli-3.7.0.2/bin/pandoc $$in_abs $defaults -t json -o $$out_abs -M depfile=$$out_abs.d -M target=$$out_abs -V root=$$root_val --resource-path=.:$$(dirname $$in_abs) --lua-filter [DOJO_ROOT]/src/dojo/resources/dependencies.lua
+  command = in_abs=$$(realpath $in_shell) && out_abs=$$(realpath -m $out_shell) && root_val=$$(realpath -m --relative-to=$$(dirname $$out_abs) [PROJECT_ROOT]/_site) && mkdir -p [PROJECT_ROOT]/_build && cd [PROJECT_ROOT]/_build && env PATH="/nix/store/mh97fwdn44xxr851cghcs8pxg8l9iqxm-pandoc-cli-3.7.0.2/bin:/nix/store/z1844paz2apcss3i1yzbw39kgj73xd8j-minify-2.24.10/bin:/nix/store/khkmm49lwzyy63s2qbhhfhxyh703fmq9-ghostscript-with-X-10.06.0/bin:/nix/store/5a72fh50w98vj3zggrgcvghkwscsnzvg-decktape-3.15.0/bin:/nix/store/4i02pbs7a1vydqyk1k948kxrfg5yr005-typst-0.14.2/bin:$$PATH" /nix/store/mh97fwdn44xxr851cghcs8pxg8l9iqxm-pandoc-cli-3.7.0.2/bin/pandoc $$in_abs $defaults -t json -o $$out_abs -M depfile=$$out_abs.d -M target=$$out_abs -V root=$$root_val -M root=$$root_val --resource-path=.:$$(dirname $$in_abs) --lua-filter [DOJO_ROOT]/src/dojo/resources/dependencies.lua
   description = 🧠 COMPILE $in
   pool = test_pool
   depfile = $out.d
   deps = gcc
 
 rule render
-  command = in_abs=$$(realpath $in_shell) && out_abs=$$(realpath -m $out_shell) && root_val=$$(realpath -m --relative-to=$$(dirname $in_shell) .) && mkdir -p [PROJECT_ROOT]/_build && cd [PROJECT_ROOT]/_build && env PATH="/nix/store/mh97fwdn44xxr851cghcs8pxg8l9iqxm-pandoc-cli-3.7.0.2/bin:/nix/store/z1844paz2apcss3i1yzbw39kgj73xd8j-minify-2.24.10/bin:/nix/store/khkmm49lwzyy63s2qbhhfhxyh703fmq9-ghostscript-with-X-10.06.0/bin:/nix/store/5a72fh50w98vj3zggrgcvghkwscsnzvg-decktape-3.15.0/bin:/nix/store/4i02pbs7a1vydqyk1k948kxrfg5yr005-typst-0.14.2/bin:$$PATH" /nix/store/mh97fwdn44xxr851cghcs8pxg8l9iqxm-pandoc-cli-3.7.0.2/bin/pandoc $$in_abs $defaults -o $$out_abs -V root=$$root_val -M dojo-rel-src-dir=$$(realpath -m --relative-to=[PROJECT_ROOT]/_build $$(dirname $$in_abs)) --pdf-engine-opt=--root=[PROJECT_ROOT]/content --lua-filter [DOJO_ROOT]/src/dojo/resources/fix_typst_csl.lua --resource-path=.:$$(dirname $$in_abs):$$(realpath -m [PROJECT_ROOT]/content/$$(realpath -m --relative-to=[PROJECT_ROOT]/_build $$(dirname $$in_abs)))
+  command = in_abs=$$(realpath $in_shell) && out_abs=$$(realpath -m $out_shell) && root_val=$$(realpath -m --relative-to=$$(dirname $$out_abs) [PROJECT_ROOT]/_site) && out_abs_dir=$$(dirname $$out_abs) && mkdir -p "$$out_abs_dir" && cd "$$out_abs_dir" && env PATH="/nix/store/mh97fwdn44xxr851cghcs8pxg8l9iqxm-pandoc-cli-3.7.0.2/bin:/nix/store/z1844paz2apcss3i1yzbw39kgj73xd8j-minify-2.24.10/bin:/nix/store/khkmm49lwzyy63s2qbhhfhxyh703fmq9-ghostscript-with-X-10.06.0/bin:/nix/store/5a72fh50w98vj3zggrgcvghkwscsnzvg-decktape-3.15.0/bin:/nix/store/4i02pbs7a1vydqyk1k948kxrfg5yr005-typst-0.14.2/bin:$$PATH" /nix/store/mh97fwdn44xxr851cghcs8pxg8l9iqxm-pandoc-cli-3.7.0.2/bin/pandoc $$in_abs $defaults -o $$out_abs -V root=$$root_val -M root=$$root_val -M dojo-rel-src-dir=$$(realpath -m --relative-to=[PROJECT_ROOT]/_build $$(dirname $$in_abs)) --pdf-engine-opt=--root=[PROJECT_ROOT]/content --lua-filter [DOJO_ROOT]/src/dojo/resources/fix_typst_csl.lua --resource-path=.:$$(dirname $$in_abs):$$(realpath -m [PROJECT_ROOT]/content/$$(realpath -m --relative-to=[PROJECT_ROOT]/_build $$(dirname $$in_abs))) --extract-media=media -M dojo-document-stem=$dojo_stem
   description = 🎨 RENDER $out
 
 rule copy
@@ -31,7 +31,7 @@ rule copy
   description = 📂 COPY $out
 
 rule minify
-  command = env PATH="/nix/store/mh97fwdn44xxr851cghcs8pxg8l9iqxm-pandoc-cli-3.7.0.2/bin:/nix/store/z1844paz2apcss3i1yzbw39kgj73xd8j-minify-2.24.10/bin:/nix/store/khkmm49lwzyy63s2qbhhfhxyh703fmq9-ghostscript-with-X-10.06.0/bin:/nix/store/5a72fh50w98vj3zggrgcvghkwscsnzvg-decktape-3.15.0/bin:/nix/store/4i02pbs7a1vydqyk1k948kxrfg5yr005-typst-0.14.2/bin:$$PATH" /nix/store/z1844paz2apcss3i1yzbw39kgj73xd8j-minify-2.24.10/bin/minify $args -o $out_shell $in_shell
+  command = env PATH="/nix/store/mh97fwdn44xxr851cghcs8pxg8l9iqxm-pandoc-cli-3.7.0.2/bin:/nix/store/z1844paz2apcss3i1yzbw39kgj73xd8j-minify-2.24.10/bin:/nix/store/khkmm49lwzyy63s2qbhhfhxyh703fmq9-ghostscript-with-X-10.06.0/bin:/nix/store/5a72fh50w98vj3zggrgcvghkwscsnzvg-decktape-3.15.0/bin:/nix/store/4i02pbs7a1vydqyk1k948kxrfg5yr005-typst-0.14.2/bin:$$PATH" /nix/store/z1844paz2apcss3i1yzbw39kgj73xd8j-minify-2.24.10/bin/minify --html-keep-document-tags --html-keep-end-tags -q $args -o $out_shell $in_shell
   description = ⚡ MINIFY $out
 
 rule ghostscript
@@ -51,4 +51,5 @@ build [PROJECT_ROOT]/_site/index.html: render [PROJECT_ROOT]/_build/index.json |
   defaults = -d [PROJECT_ROOT]/defaults/page.yaml
   in_shell = [PROJECT_ROOT]/_build/index.json
   out_shell = [PROJECT_ROOT]/_site/index.html
+  dojo_stem = index
 

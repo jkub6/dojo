@@ -375,21 +375,31 @@ class NinjaGenerator:
 
         self.emit_header()
 
+        filtered_files = self._get_filtered_files()
+        if not filtered_files:
+            logger.warning("No Markdown files found in %s", self.src)
+        else:
+            logger.info("Found %d Markdown file(s)", len(filtered_files))
+            self._process_markdown_files(filtered_files)
+
+        # Stage 4: Static assets
+        self._process_static_assets()
+
+        # Stage 5: Post-process the final content via plugins
+        self._post_process_and_write(len(filtered_files))
+
+    def _get_filtered_files(self) -> list[Path]:
+        """Scan and filter Markdown source files."""
         md_files = sorted(self.src.rglob("*.md"))
-        filtered_files = [
+        return [
             f
             for f in md_files
             if should_process_file(f, self.src, self.config.include, self.config.exclude)
         ]
 
-        if not filtered_files:
-            logger.warning("No Markdown files found in %s", self.src)
-        else:
-            logger.info("Found %d Markdown file(s)", len(filtered_files))
-
-        progress: Iterable[Path] = tqdm(
-            filtered_files, desc="Processing", unit="file", disable=self.quiet
-        )
+    def _process_markdown_files(self, files: list[Path]) -> None:
+        """Iterate over and process multiple Markdown files."""
+        progress: Iterable[Path] = tqdm(files, desc="Processing", unit="file", disable=self.quiet)
         for md_file in progress:
             try:
                 self.process_content(md_file)
@@ -397,47 +407,60 @@ class NinjaGenerator:
                 logger.exception("Failed to process %s", md_file)
                 raise
 
-        # Stage 4: Static assets
+    def _process_static_assets(self) -> None:
+        """Handle Stage 4: Copy static assets to output directory."""
         for static_dir in self.config.static_dirs:
-            static_path = Path(self.src / static_dir).resolve() if not Path(static_dir).is_absolute() else Path(static_dir).resolve()
-            if not static_path.exists(): continue
-            for file in static_path.rglob("*"):
-                if file.is_file():
-                    try:
-                        rel_file = file.relative_to(static_path)
-                    except ValueError:
-                        continue
-                    final_path = sanitize_path(self.out_dir, rel_file)
-                    if final_path not in self.copied_assets:
-                        self.emitter.build(
-                            outputs=final_path,
-                            rule=RuleName.COPY.value,
-                            inputs=file,
-                            variables={
-                                "in_shell": shell_quote(file),
-                                "out_shell": shell_quote(final_path),
-                            },
-                        )
-                        self.copied_assets.add(final_path)
-                        self.all_outputs.append(final_path)
+            static_path = (
+                Path(self.src / static_dir).resolve()
+                if not Path(static_dir).is_absolute()
+                else Path(static_dir).resolve()
+            )
+            if not static_path.exists():
+                continue
 
-        # Stage 5: Post-process the final content via plugins
+            for file in static_path.rglob("*"):
+                if not file.is_file():
+                    continue
+
+                try:
+                    rel_file = file.relative_to(static_path)
+                except ValueError:
+                    continue
+
+                final_path = sanitize_path(self.out_dir, rel_file)
+                if final_path not in self.copied_assets:
+                    self.emitter.build(
+                        outputs=final_path,
+                        rule=RuleName.COPY.value,
+                        inputs=file,
+                        variables={
+                            "in_shell": shell_quote(file),
+                            "out_shell": shell_quote(final_path),
+                        },
+                    )
+                    self.copied_assets.add(final_path)
+                    self.all_outputs.append(final_path)
+
+    def _post_process_and_write(self, source_count: int) -> None:
+        """Handle Stage 5: Plugin post-processing and actual file output."""
         # If an external emitter was used, we don't have a buffer to post-process.
         if self._buffer is None:
             logger.debug("Skipping plugin post-processing (external emitter in use)")
-        else:
-            ninja_content = self._buffer.getvalue()
+            self._log_completion_summary()
+            return
 
-            # Plugin Hook: Post-process Ninja content
-            for plugin in self.plugins:
-                ninja_content = plugin.post_process_ninja(ninja_content)
+        ninja_content = self._buffer.getvalue()
 
-            # Dry-run mode: show plan without writing
-            if self.dry_run:
-                self._log_dry_run_summary(len(filtered_files))
-                return
+        # Plugin Hook: Post-process Ninja content
+        for plugin in self.plugins:
+            ninja_content = plugin.post_process_ninja(ninja_content)
 
-            self._write_ninja_file(ninja_content)
+        # Dry-run mode: show plan without writing
+        if self.dry_run:
+            self._log_dry_run_summary(source_count)
+            return
+
+        self._write_ninja_file(ninja_content)
         self._log_completion_summary()
 
     def _log_dry_run_summary(self, source_count: int) -> None:

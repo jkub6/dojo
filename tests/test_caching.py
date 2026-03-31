@@ -44,10 +44,14 @@ def test_ninja_file_stability_with_format_links(
     mock_minify.write_text(f"""#!{sys.executable}
 import sys
 import shutil
-# Args: [script] -o [output] [input]
-if len(sys.argv) >= 4 and sys.argv[1] == '-o':
-    shutil.copy2(sys.argv[3], sys.argv[2])
-else:
+# Args: [script] [flags...] -o [output] [input]
+args = sys.argv[1:]
+try:
+    o_idx = args.index('-o')
+    output = args[o_idx + 1]
+    input_file = args[-1]
+    shutil.copy2(input_file, output)
+except (ValueError, IndexError):
     sys.exit(1)
 """)
     mock_minify.chmod(0o755)

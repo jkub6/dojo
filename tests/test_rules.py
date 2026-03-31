@@ -23,7 +23,12 @@ def test_builtin_rules_basic():
 
     # Check for setup variables (Ninja uses $$ for literal $)
     assert "in_abs=$$(realpath $in_shell)" in compile_rule.command
-    assert "root_val=$$(realpath -m --relative-to=$$(dirname $in_shell) .)" in compile_rule.command
+    abs_out = Path("site").resolve().as_posix()
+    assert (
+        f"root_val=$$(realpath -m --relative-to=$$(dirname $$out_abs) {abs_out})"
+        in compile_rule.command
+    )
+    assert "-V root=$$root_val -M root=$$root_val" in compile_rule.command
 
 
 def test_builtin_rules_with_custom_tool_paths(tmp_path):

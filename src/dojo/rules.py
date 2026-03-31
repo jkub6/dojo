@@ -158,13 +158,13 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
 
     # Media Extraction for generated diagrams (diagram.lua)
     # Using relative media dir while CD'd into the output directory creates cleanly relative src="" tags
-    render_flags.append('--extract-media=media')
+    render_flags.append("--extract-media=media")
 
     rules.append(
         CustomRule(
             name=RuleName.RENDER.value,
             command=(
-                f"{setup_vars} && out_abs_dir=$$(dirname $$out_abs) && mkdir -p \"$$out_abs_dir\" && cd \"$$out_abs_dir\" && "
+                f'{setup_vars} && out_abs_dir=$$(dirname $$out_abs) && mkdir -p "$$out_abs_dir" && cd "$$out_abs_dir" && '
                 f"{pandoc_wrapper} $$in_abs $defaults -o $$out_abs {' '.join(render_flags)} "
                 "-M dojo-document-stem=$dojo_stem"
             ),
