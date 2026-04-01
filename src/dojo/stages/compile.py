@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from dojo.constants import RuleName
 from dojo.emitter import NinjaEmitter
-from dojo.paths import sanitize_path, shell_quote
+from dojo.paths import ninja_escape, sanitize_path, shell_quote
 from dojo.stages._defaults import resolve_stage_dependencies
 
 if TYPE_CHECKING:
@@ -77,8 +77,8 @@ class CompileStage:
 
         variables.update(
             {
-                "in_shell": shell_quote(md_path),
-                "out_shell": shell_quote(json_node),
+                "in_shell": ninja_escape(shell_quote(md_path)),
+                "out_shell": ninja_escape(shell_quote(json_node)),
             }
         )
 

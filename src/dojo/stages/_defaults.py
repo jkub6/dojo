@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dojo.paths import ninja_escape
+from dojo.paths import ninja_escape, shell_quote
 from dojo.yaml_utils import get_recursive_yaml_deps
 
 
@@ -25,7 +25,10 @@ def format_defaults_var(defaults: list[Path]) -> str:
     """Format list of defaults into ninja variable string."""
     if not defaults:
         return ""
-    return "-d " + " -d ".join(ninja_escape(d) for d in defaults)
+    # Each defaults file must be shell-quoted, then the whole string ninja-escaped
+    # to be safe for Ninja variable value.
+    cmd_parts = [f"-d {shell_quote(d)}" for d in defaults]
+    return " ".join(ninja_escape(p) for p in cmd_parts)
 
 
 def resolve_stage_dependencies(

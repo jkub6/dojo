@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from dojo.constants import RuleName
 from dojo.emitter import NinjaEmitter
 from dojo.exceptions import DependencyError, OutputSourceMissingError, OutputToolMissingError
-from dojo.paths import sanitize_path, shell_quote
+from dojo.paths import ninja_escape, sanitize_path, shell_quote
 from dojo.stages._defaults import resolve_stage_dependencies
 
 if TYPE_CHECKING:
@@ -115,9 +115,9 @@ class RenderStage:
 
         variables.update(
             {
-                "in_shell": shell_quote(json_node),
-                "out_shell": shell_quote(render_target),
-                "dojo_stem": shell_quote(rel_stem.name),
+                "in_shell": ninja_escape(shell_quote(json_node)),
+                "out_shell": ninja_escape(shell_quote(render_target)),
+                "dojo_stem": ninja_escape(shell_quote(rel_stem.name)),
             }
         )
 
@@ -183,8 +183,8 @@ class RenderStage:
             render_target = final_path
 
         variables = {
-            "in_shell": " ".join(shell_quote(p) for p in source_paths),
-            "out_shell": shell_quote(render_target),
+            "in_shell": ninja_escape(" ".join(shell_quote(p) for p in source_paths)),
+            "out_shell": ninja_escape(shell_quote(render_target)),
         }
         if out_config.args:
             variables["args"] = " ".join(out_config.args)
@@ -234,8 +234,8 @@ class RenderStage:
                 )
 
             variables = {
-                "in_shell": shell_quote(current_input),
-                "out_shell": shell_quote(step_output),
+                "in_shell": ninja_escape(shell_quote(current_input)),
+                "out_shell": ninja_escape(shell_quote(step_output)),
             }
             if step.args:
                 variables["args"] = " ".join(step.args)

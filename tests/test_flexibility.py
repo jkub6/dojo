@@ -50,8 +50,12 @@ def test_multiple_defaults_generation(flex_config):
     ninja_content = generator.ninja_file.read_text()
 
     # Check that defaults variable contains both files joined by -d
-    # d1.yaml -d d2.yaml
-    expected_flag_part = f"{path.parent}/d1.yaml -d {path.parent}/d2.yaml"
+    # -d 'd1.yaml' -d 'd2.yaml'
+    from dojo.paths import ninja_escape, shell_quote
+
+    d1_flag = f"-d {shell_quote(Path(config.src_dir).parent / 'd1.yaml')}"
+    d2_flag = f"-d {shell_quote(Path(config.src_dir).parent / 'd2.yaml')}"
+    expected_flag_part = f"{ninja_escape(d1_flag)} {ninja_escape(d2_flag)}"
     assert expected_flag_part in ninja_content
 
 

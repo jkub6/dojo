@@ -185,6 +185,61 @@ class TestFullBuildPipeline:
         output_html = project / "_site" / "index.html"
         assert "Updated Content" in output_html.read_text()
 
+    def test_build_with_spaces_in_filenames(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Verify that a project with spaces in filenames builds successfully."""
+        project = tmp_path / "project with spaces"
+        project.mkdir()
+
+        content = project / "content with spaces"
+        content.mkdir()
+
+        defaults = project / "defaults"
+        defaults.mkdir()
+        defaults_file = defaults / "page.yaml"
+        defaults_file.write_text("standalone: true\n")
+
+        # Create markdown with space in name
+        md_file = content / "hello world.md"
+        md_file.write_text("---\ntitle: Space Test\n---\n# Space Test\n")
+
+        # Create config
+        config_path = project / "dojo.yaml"
+        config_path.write_text(f"""\
+src_dir: "{content}"
+output_dir: "{project / "_site"}"
+build_dir: "{project / "_build"}"
+default_type: page
+types:
+  page:
+    outputs:
+      - id: html
+        extension: html
+        defaults: "{defaults_file}"
+""")
+
+        # Build
+        main(["build", "-c", str(config_path)])
+
+        build_ninja = project / "_build" / "build.ninja"
+        assert build_ninja.exists()
+
+        # Run ninja
+        subprocess.run(
+            ["ninja", "-f", str(build_ninja)],
+            cwd=str(project),
+            check=True,
+        )
+
+        # Verify output
+        output_html = project / "_site" / "hello world.html"
+        assert output_html.exists()
+        assert "Space Test" in output_html.read_text()
+        assert output_html.exists()
+        assert "Space Test" in output_html.read_text()
+
 
 class TestAssetCopying:
     """Tests for asset dependency handling and copying."""

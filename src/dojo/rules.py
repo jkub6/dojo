@@ -47,7 +47,7 @@ def _get_pandoc_setup_vars(config: Config) -> str:
     return (
         "in_abs=$$(realpath $in_shell) && "
         "out_abs=$$(realpath -m $out_shell) && "
-        f"root_val=$$(realpath -m --relative-to=$$(dirname $$out_abs) {shell_quote(abs_out)})"
+        f'root_val=$$(realpath -m --relative-to="$$(dirname "$$out_abs")" {shell_quote(abs_out)})'
     )
 
 
@@ -124,16 +124,16 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     dep_filter = resources_dir / "dependencies.lua"
     compile_flags = base_flags
     if config.add_resource_path:
-        compile_flags += " --resource-path=.:$$(dirname $$in_abs)"
+        compile_flags += ' --resource-path=.:"$$(dirname "$$in_abs")"'
 
     rules.append(
         CustomRule(
             name=RuleName.COMPILE.value,
             command=(
                 f"{setup_vars} && {build_dir_cmd} && "
-                f"{pandoc_wrapper} $$in_abs $defaults -t json -o $$out_abs "
-                f"-M depfile=$$out_abs.d -M target=$$out_abs {compile_flags} "
-                f"--lua-filter {dep_filter}"
+                f'{pandoc_wrapper} "$$in_abs" $defaults -t json -o "$$out_abs" '
+                f'-M depfile="$$out_abs.d" -M target="$$out_abs" {compile_flags} '
+                f"--lua-filter {shell_quote(dep_filter.as_posix())}"
             ),
             description="🧠 COMPILE $in",
             depfile="$out.d",
@@ -147,14 +147,14 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     abs_src = Path(config.src_dir).resolve().as_posix()
     abs_build = Path(config.build_dir).resolve().as_posix()
     rel_src_dir_expr = (
-        f"$$(realpath -m --relative-to={shell_quote(abs_build)} $$(dirname $$in_abs))"
+        f'"$$(realpath -m --relative-to={shell_quote(abs_build)} "$$(dirname "$$in_abs")")"'
     )
-    src_dir_val = f"$$(realpath -m {shell_quote(abs_src)}/{rel_src_dir_expr})"
+    src_dir_val = f'"$$(realpath -m {shell_quote(abs_src)}/{rel_src_dir_expr})"'
 
     render_flags.extend(_get_typst_flags(config, rel_src_dir_expr))
 
     if config.add_resource_path:
-        render_flags.append(f"--resource-path=.:$$(dirname $$in_abs):{src_dir_val}")
+        render_flags.append(f'--resource-path=.:"$$(dirname "$$in_abs")":{src_dir_val}')
 
     # Media Extraction for generated diagrams (diagram.lua)
     # Using relative media dir while CD'd into the output directory creates cleanly relative src="" tags
@@ -164,8 +164,8 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
         CustomRule(
             name=RuleName.RENDER.value,
             command=(
-                f'{setup_vars} && out_abs_dir=$$(dirname $$out_abs) && mkdir -p "$$out_abs_dir" && cd "$$out_abs_dir" && '
-                f"{pandoc_wrapper} $$in_abs $defaults -o $$out_abs {' '.join(render_flags)} "
+                f'{setup_vars} && out_abs_dir=$$(dirname "$$out_abs") && mkdir -p "$$out_abs_dir" && cd "$$out_abs_dir" && '
+                f'{pandoc_wrapper} "$$in_abs" $defaults -o "$$out_abs" {" ".join(render_flags)} '
                 "-M dojo-document-stem=$dojo_stem"
             ),
             description="🎨 RENDER $out",

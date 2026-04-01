@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from .config import Config, CustomRule, OutputConfig
 
-from .paths import sanitize_path, shell_quote, should_process_file
+from .paths import ninja_escape, sanitize_path, shell_quote, should_process_file
 from .plugins import PluginInterface, load_plugin
 from .rules import get_builtin_rules
 from .stages import AssetProcessor, CompileStage, RenderStage
@@ -434,8 +434,8 @@ class NinjaGenerator:
                         rule=RuleName.COPY.value,
                         inputs=file,
                         variables={
-                            "in_shell": shell_quote(file),
-                            "out_shell": shell_quote(final_path),
+                            "in_shell": ninja_escape(shell_quote(file)),
+                            "out_shell": ninja_escape(shell_quote(final_path)),
                         },
                     )
                     self.copied_assets.add(final_path)
