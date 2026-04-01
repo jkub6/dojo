@@ -97,6 +97,7 @@
           ghostscript
           typos
           alejandra
+          statix
           (python.withPackages (p: [
             # Runtime
             p.pyyaml
