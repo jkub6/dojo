@@ -17,9 +17,17 @@ def enable_logging_propagation():
     """
     logger = logging.getLogger("dojo")
     previous_propagate = logger.propagate
+    previous_level = logger.level
+    previous_handlers = list(logger.handlers)
+    
     logger.propagate = True
+    logger.setLevel(logging.NOTSET)
+    
     yield
+    
     logger.propagate = previous_propagate
+    logger.setLevel(previous_level)
+    logger.handlers = previous_handlers
 
 
 @pytest.fixture
