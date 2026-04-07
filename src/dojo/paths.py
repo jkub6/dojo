@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import fnmatch
 import shlex
+import subprocess
+import sys
 from pathlib import Path
 
 from .exceptions import SecurityError
@@ -31,9 +33,11 @@ def ninja_escape(path: Path | str) -> str:
 def shell_quote(path: Path | str) -> str:
     """Quote a path for use in shell commands.
 
-    Uses shlex.quote to safely escape the path for POSIX shells.
+    Uses OS-aware quoting to safely escape the path for POSIX or Windows shells.
     """
     s = path.as_posix() if isinstance(path, Path) else path
+    if sys.platform == "win32":
+        return subprocess.list2cmdline([s])
     return shlex.quote(s)
 
 

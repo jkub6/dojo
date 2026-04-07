@@ -108,12 +108,21 @@ def normalize_ninja():
         content = content.replace(str(dojo_root), "[DOJO_ROOT]")
 
         # Normalize the dynamic PATH env variable injected by Dojo
-        content = re.sub(r'env PATH="[^"]+"', 'env PATH="[TOOL_PATHS]:$$PATH"', content)
+        content = re.sub(r"--path-env \S+", '--path-env "[TOOL_PATHS]"', content)
+        content = re.sub(r'--path-env "[^"]+"', '--path-env "[TOOL_PATHS]"', content)
 
-        # Normalize tool paths, whether they are absolute paths or naked names
-        content = re.sub(r'\S*pandoc "\$\$in_abs"', '[TOOL_PANDOC] "$$in_abs"', content)
+        # Normalize the dojo wrap prefix which includes sys.executable and wrap.py path
+        # e.g. /path/to/python3 /path/to/dojo/wrap.py
+        content = re.sub(r"\S*python\S* \S*dojo/wrap.py", "[DOJO_WRAP]", content)
+
+        # Normalize any Nix store hash to prevent snapshot drift
+        content = re.sub(r"/nix/store/[a-z0-9]{32}-", "/nix/store/[HASH]-", content)
+
+        # Normalize tool paths and commands
+        content = re.sub(r"\S*pandoc {in_abs}", "[TOOL_PANDOC] {in_abs}", content)
         content = re.sub(r"\S*minify --html-keep", "[TOOL_MINIFY] --html-keep", content)
         content = re.sub(r"\S*gs -sDEVICE", "[TOOL_GS] -sDEVICE", content)
+        content = re.sub(r"--copy -- ", "[PY_COPY] ", content)
         return re.sub(r"\S*decktape reveal", "[TOOL_DECKTAPE] reveal", content)
 
     return _normalize

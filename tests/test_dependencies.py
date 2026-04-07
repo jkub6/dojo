@@ -80,7 +80,7 @@ def test_scan_css_dependencies(tmp_path):
     assert tmp_path / "fonts.css" in assets
     assert tmp_path / "bg.png" in assets
     assert tmp_path / "icon.svg" in assets
-    assert len(assets) == 3  # noqa: PLR2004
+    assert len(assets) == 3
 
 
 def test_scan_css_dependencies_missing_file_ignored(tmp_path):
@@ -128,7 +128,7 @@ def test_scan_html_dependencies(tmp_path):
     assert tmp_path / "favicon.ico" in assets
     assert tmp_path / "image.jpg" in assets
     assert tmp_path / "script.js" in assets
-    assert len(assets) == 4  # noqa: PLR2004
+    assert len(assets) == 4
 
 
 def test_scan_html_dependencies_malformed_ignored(tmp_path, caplog):
@@ -200,7 +200,7 @@ def test_get_recursive_yaml_deps_list_defaults(tmp_path):
     deps = get_recursive_yaml_deps(root)
     assert d1.resolve() in deps
     assert d2.resolve() in deps
-    assert len(deps) == 2  # noqa: PLR2004
+    assert len(deps) == 2
 
 
 def test_get_recursive_yaml_deps_assets_extraction(tmp_path, monkeypatch):

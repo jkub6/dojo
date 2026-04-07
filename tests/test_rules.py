@@ -21,14 +21,10 @@ def test_builtin_rules_basic():
     rules = get_builtin_rules(c, Path("config.yaml"))
     compile_rule = next(r for r in rules if r.name == "compile")
 
-    # Check for setup variables (Ninja uses $$ for literal $)
-    assert "in_abs=$$(realpath $in_shell)" in compile_rule.command
-    abs_out = Path("site").resolve().as_posix()
-    assert (
-        f'root_val=$$(realpath -m --relative-to="$$(dirname "$$out_abs")" {abs_out})'
-        in compile_rule.command
-    )
-    assert "-V root=$$root_val -M root=$$root_val" in compile_rule.command
+    # Verify dojo wrap injection
+    assert "wrap.py" in compile_rule.command
+    assert "--in-file $in_shell --out-file $out_shell" in compile_rule.command
+    assert "-V root={root_val} -M root={root_val}" in compile_rule.command
 
 
 def test_builtin_rules_with_custom_tool_paths(tmp_path):
@@ -53,8 +49,8 @@ def test_builtin_rules_with_custom_tool_paths(tmp_path):
 
     rules = get_builtin_rules(config, Path(tmp_path / "build" / "dojo.yaml"))
 
-    regen_rule = next(r for r in rules if r.name == "regenerate")
-    assert f'PATH="{bin_dir}:' in regen_rule.command
+    compile_rule = next(r for r in rules if r.name == "compile")
+    assert f"--path-env {bin_dir.as_posix()}" in compile_rule.command
 
     compile_rule = next(r for r in rules if r.name == "compile")
     assert compile_rule.pool == "heavy"
@@ -79,7 +75,8 @@ def test_builtin_rules_data_dir_relative_to_src(tmp_path):
     rules = get_builtin_rules(config, Path(tmp_path / "build" / "dojo.yaml"))
     render_rule = next(r for r in rules if r.name == "render")
 
-    assert "dojo-data-dir=assets/pandoc" in render_rule.command
+    assert "dojo-data-dir=" in render_rule.command
+    assert str(data_dir.resolve()) in render_rule.command
 
 
 def test_builtin_rules_no_tools(tmp_path):
@@ -94,4 +91,5 @@ def test_builtin_rules_no_tools(tmp_path):
 
     rules = get_builtin_rules(config, Path("dojo.yaml"))
     regen_rule = next(r for r in rules if r.name == "regenerate")
-    assert regen_rule.command.startswith("dojo build")
+    assert "dojo build" in regen_rule.command
+    assert "PYTHONPATH=" in regen_rule.command

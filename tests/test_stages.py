@@ -91,7 +91,7 @@ class TestRenderStage:
             stage.render(out_config, Path("in.json"), Path("index"), {})
 
         # Should call emitter twice: once for RENDER, once for MINIFY
-        assert mock_emitter.build.call_count == 2  # noqa: PLR2004
+        assert mock_emitter.build.call_count == 2
         rules = [call.kwargs["rule"] for call in mock_emitter.build.call_args_list]
         assert "render" in rules
         assert "minify" in rules
@@ -162,7 +162,7 @@ class TestAssetProcessor:
             processor.process_assets(Path("/src/index.md"))
 
         # Should be called twice: once for CSS, once for PNG
-        assert mock_emitter.build.call_count == 2  # noqa: PLR2004
+        assert mock_emitter.build.call_count == 2
         outputs = [call.kwargs["outputs"] for call in mock_emitter.build.call_args_list]
         assert Path("/out/style.css") in outputs
         assert Path("/out/bg.png") in outputs
@@ -230,7 +230,7 @@ class TestAssetProcessor:
             processor.process_assets(tmp_path / "src" / "index.md")
 
         # One for HTML, one for img.png
-        assert mock_emitter.build.call_count == 2  # noqa: PLR2004
+        assert mock_emitter.build.call_count == 2
 
     def test_asset_processor_deduplication(self, mock_emitter, tmp_path):
         """Verify that multiple references to the same asset are deduplicated during processing."""
@@ -315,7 +315,7 @@ class TestAssetProcessor:
             processor.process_assets(tmp_path / "src" / "index.md")
 
         # Should be called twice (a.css and b.css)
-        assert mock_emitter.build.call_count == 2  # noqa: PLR2004
+        assert mock_emitter.build.call_count == 2
         outputs = [call.kwargs["outputs"] for call in mock_emitter.build.call_args_list]
         assert (tmp_path / "out" / "a.css") in outputs
         assert (tmp_path / "out" / "b.css") in outputs

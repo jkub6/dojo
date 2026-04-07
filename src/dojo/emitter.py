@@ -41,7 +41,7 @@ class NinjaEmitter:
         self.variable("depth", str(depth), indent=1)
         self.newline()
 
-    def rule(  # noqa: PLR0913
+    def rule(
         self,
         name: str,
         command: str,
@@ -71,7 +71,7 @@ class NinjaEmitter:
                 self.variable(key, value, indent=1)
         self.newline()
 
-    def build(  # noqa: PLR0913
+    def build(
         self,
         outputs: Path | list[Path],
         rule: str,

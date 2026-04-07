@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
@@ -185,11 +186,19 @@ def get_frontmatter_assets(md_path: Path) -> list[Path]:
     return assets
 
 
+@dataclass
+class _ScannerState:
+    """Internal state for recursive YAML scanning."""
+
+    visited: set[Path] = field(default_factory=set)
+    stack: list[Path] = field(default_factory=list)
+    deps: list[Path] = field(default_factory=list)
+
+
 def get_recursive_yaml_deps(
     yaml_path: Path,
     data_dir_override: Path | None = None,
-    visited: set[Path] | None = None,
-    stack: list[Path] | None = None,
+    _state: _ScannerState | None = None,
 ) -> list[Path]:
     """Recursively scans YAML files for dependencies to build dependency lists for Ninja.
 
@@ -201,32 +210,28 @@ def get_recursive_yaml_deps(
     Args:
         yaml_path: Path to the root YAML file
         data_dir_override: Directory to use as data-dir for this file's direct references
-        visited: Already processed files
-        stack: Current recursion stack for cycle detection
+        _state: Internal recursion state (don't pass this in external calls)
 
     Returns:
         Deduplicated list of absolute Paths
 
     """
-    if visited is None:
-        visited = set()
-    if stack is None:
-        stack = []
+    if _state is None:
+        _state = _ScannerState()
 
     # Path should be absolute for reliable visiting/stack checks
     yaml_path = yaml_path.resolve()
 
     # Circular dependency detection
-    if yaml_path in stack:
-        cycle = " -> ".join(str(p) for p in [*stack, yaml_path])
+    if yaml_path in _state.stack:
+        cycle = " -> ".join(str(p) for p in [*_state.stack, yaml_path])
         raise CircularDependencyError(cycle)
 
-    if yaml_path in visited:
+    if yaml_path in _state.visited:
         return []
 
-    deps: list[Path] = []
-    visited.add(yaml_path)
-    stack.append(yaml_path)
+    _state.visited.add(yaml_path)
+    _state.stack.append(yaml_path)
 
     try:
         data = _load_and_validate_yaml_dict(yaml_path)
@@ -234,13 +239,6 @@ def get_recursive_yaml_deps(
             return []
 
         # Determine the data-dir for this file's references
-        # 1. 'data-dir' variable in the file itself (highest priority)
-        # 2. data_dir_override (from Dojo config or parent) - wait, user says:
-        #    "each default file even when 'imported' by another will go back to XDG_DATA_DIR
-        #     unless it has it's own data-dir variable set"
-        # This means we DO NOT inherit data_dir_override for nested search of children.
-        # But we DO use it for resolving refs IN this file if this file doesn't have its own.
-
         local_data_dir_val = cast("str | None", data.get("data-dir"))
         current_data_dirs = []
         if local_data_dir_val:
@@ -250,27 +248,24 @@ def get_recursive_yaml_deps(
 
         # 1. Handle Recursive Defaults
         defaults = extract_paths(data, ["defaults"])
-        _resolve_default_deps(defaults, yaml_path, current_data_dirs, deps, visited, stack)
+        _resolve_default_deps(defaults, yaml_path, current_data_dirs, _state)
 
         # 2. Handle Leaf Assets (CSS, templates, etc)
-        # Pandoc behavior: relative paths are relative to CWD (executable location).
         asset_keys = ASSET_KEYS
         assets = extract_paths(data, asset_keys)
-        _resolve_assets(assets, deps)
+        _resolve_assets(assets, _state.deps)
 
     finally:
-        stack.pop()
+        _state.stack.pop()
 
-    return sorted(set(deps))
+    return sorted(set(_state.deps))
 
 
-def _resolve_default_deps(  # noqa: PLR0913
+def _resolve_default_deps(
     defaults: list[str],
     yaml_path: Path,
     current_data_dirs: list[Path],
-    deps: list[Path],
-    visited: set[Path],
-    stack: list[Path],
+    state: _ScannerState,
 ) -> None:
     """Resolve default dependencies."""
     for default_ref in defaults:
@@ -285,9 +280,9 @@ def _resolve_default_deps(  # noqa: PLR0913
         )
 
         if found:
-            deps.append(found)
+            state.deps.append(found)
             # Recurse. Nested files do NOT inherit our data_dir_override.
-            deps.extend(get_recursive_yaml_deps(found, visited=visited, stack=stack[:]))
+            state.deps.extend(get_recursive_yaml_deps(found, _state=state))
         else:
             logger.warning(
                 "Default file referenced in %s not found: %s",

@@ -3,7 +3,7 @@ import json
 import logging
 import sys
 
-from dojo.logging import JsonFormatter, setup_logging
+from dojo.log_config import JsonFormatter, setup_logging
 
 # Test constants
 EXPECTED_DURATION_MS = 42

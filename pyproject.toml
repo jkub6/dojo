@@ -121,7 +121,7 @@ indent-style = "space"
 # - PLC0415: Inline imports (common practice for test isolation)
 # - ANN: Annotations
 # - D100, D103: Doc strings
-"tests/**/*.py" = ["S101", "ARG", "S603", "S607", "PT011", "TRY301", "PLC0415", "ANN", "D100", "D103"]
+"tests/**/*.py" = ["S101", "ARG", "S603", "S607", "PT011", "TRY301", "PLC0415", "ANN", "D100", "D103", "PLR2004"]
 
 # Stage modules have imports that TC rules incorrectly flag as type-hint-only.
 # NinjaEmitter and Path are used for both type hints AND runtime operations
@@ -129,6 +129,7 @@ indent-style = "space"
 # cause NameError at runtime. This is a known limitation of static TC analysis.
 "src/dojo/stages/*.py" = ["TC001", "TC003"]
 "src/dojo/schema.py" = ["TC003"]  # Path used at runtime for write_text()
+"src/dojo/emitter.py" = ["PLR0913"] # Ninja build format has many optional fields
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

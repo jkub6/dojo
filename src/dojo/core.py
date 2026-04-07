@@ -145,9 +145,10 @@ class NinjaGenerator:
 
         filter_path = (Path(__file__).parent / "resources" / "format_links.lua").resolve()
 
+        # Only generate for types with multiple outputs
+        minimum_multiple_outputs = 2
         for type_name, type_config in self.config.types.items():
-            # Only generate for types with multiple outputs
-            if len(type_config.outputs) < 2:  # noqa: PLR2004
+            if len(type_config.outputs) < minimum_multiple_outputs:
                 continue
 
             for out_config in type_config.outputs:

@@ -15,7 +15,7 @@ from rich.console import Console
 from . import __version__
 from .config import load_config
 from .core import NinjaGenerator
-from .logging import setup_logging
+from .log_config import setup_logging
 from .schema import print_schema, write_schema
 
 console = Console()

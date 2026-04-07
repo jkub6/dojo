@@ -159,7 +159,7 @@ def _check_path_reference(
     path_obj = Path(name)
     if path_obj.is_absolute():
         if path_obj.exists():
-            return True, path_obj
+            return True, path_obj.resolve()
         return True, None
 
     if len(path_obj.parts) > 1:
