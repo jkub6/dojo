@@ -54,6 +54,13 @@
                 final.ghostscript
               ];
 
+              preCheck = ''
+                export HOME=$(mktemp -d)
+                export XDG_CONFIG_HOME=$HOME/.config
+                export XDG_CACHE_HOME=$HOME/.cache
+                export XDG_DATA_HOME=$HOME/.local/share
+              '';
+
               meta = with final.lib; {
                 description = "A static site and document generator built on Pandoc and Typst";
                 homepage = "https://github.com/jkub6/dojo";
