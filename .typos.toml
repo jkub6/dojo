@@ -1,0 +1,18 @@
+# Configuration for the 'typos' spell checker.
+# https://github.com/crate-ci/typos
+
+[default.extend-words]
+# Ninja uses $$ for literal dollar signs — not a typo
+# Pandoc/Typst domain-specific terms
+csl = "csl"
+
+[files]
+extend-exclude = [
+  # Auto-generated files
+  "_build/",
+  "_site/",
+  # Snapshot regression files
+  "*.ninja",
+  # Nix lock file
+  "flake.lock",
+]

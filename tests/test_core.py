@@ -216,6 +216,64 @@ def test_plugin_loading_failure(core_config):
     cfg, path = core_config
     cfg.plugins = ["bad_plugin"]
 
-    with patch("dojo.core.load_plugin", return_value=None):
-        gen = NinjaGenerator(cfg, path)
-        assert len(gen.plugins) == 0
+    from dojo.exceptions import PluginLoadError
+
+    with (
+        patch("dojo.core.load_plugin", side_effect=PluginLoadError("bad_plugin", "not found")),
+        pytest.raises(PluginLoadError),
+    ):
+        NinjaGenerator(cfg, path)
+
+
+def test_process_static_assets_missing_dir(core_config):
+    cfg, path = core_config
+    cfg.static_dirs = ["nonexistent_dir"]
+    gen = NinjaGenerator(cfg, path)
+    # Shouldn't raise any error, should silently ignore missing dir
+    gen._process_static_assets()
+    assert len(gen.copied_assets) == 0
+
+
+def test_process_static_assets_normal(core_config, tmp_path):
+    cfg, path = core_config
+    # Create static dir with file
+    static_dir = tmp_path / "static"
+    static_dir.mkdir()
+    (static_dir / "test.jpg").touch()
+
+    cfg.static_dirs = [str(static_dir)]
+    gen = NinjaGenerator(cfg, path)
+    gen._process_static_assets()
+
+    expected_out = Path(cfg.output_dir) / "test.jpg"
+    assert expected_out in gen.copied_assets
+
+
+def test_external_emitter_path(core_config):
+    cfg, path = core_config
+    gen = NinjaGenerator(cfg, path)
+
+    # Inject external emitter logic
+    # (assuming plugin hooks could swap it, but here we just manually clear _buffer)
+    gen._buffer = None
+
+    # post_process_and_write should gracefully return without crashing or writing a ninja file
+    gen._post_process_and_write(1)
+
+    assert not gen.ninja_file.exists()
+
+
+def test_dry_run_many_outputs(core_config, caplog):
+    import logging
+
+    cfg, path = core_config
+    gen = NinjaGenerator(cfg, path, dry_run=True, quiet=False)
+
+    # Mocking many outputs to hit the `> max_display` branch
+    for i in range(15):
+        gen.all_outputs.append(Path(f"out_{i}.txt"))
+
+    with caplog.at_level(logging.INFO):
+        gen._log_dry_run_summary(5)
+
+    assert "and 5 more" in caplog.text

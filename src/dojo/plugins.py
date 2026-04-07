@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, cast
 if TYPE_CHECKING:
     from .config import CustomRule, OutputConfig
 
+from .exceptions import PluginLoadError
+
 logger = logging.getLogger(__name__)
 
 
@@ -70,45 +72,42 @@ class PluginInterface:
         return ninja_content
 
 
-def load_plugin(plugin_path: str) -> PluginInterface | None:
+def load_plugin(plugin_path: str) -> PluginInterface:
     """Dynamically load a plugin from a Python file.
 
     Args:
         plugin_path: Path to plugin Python file
 
     Returns:
-        Plugin instance or None if loading fails
+        Plugin instance
+
+    Raises:
+        PluginLoadError: If the plugin cannot be loaded for any reason
 
     """
+    path = Path(plugin_path).resolve()
+    if not path.exists():
+        raise PluginLoadError(plugin_path, f"file not found: {path}")
+
+    spec = importlib.util.spec_from_file_location("plugin", path)
+    if spec is None or spec.loader is None:
+        raise PluginLoadError(plugin_path, f"failed to create import spec: {path}")
+
+    module = importlib.util.module_from_spec(spec)
     try:
-        path = Path(plugin_path).resolve()
-        if not path.exists():
-            logger.error("Plugin file not found: %s", path)
-            return None
-
-        spec = importlib.util.spec_from_file_location("plugin", path)
-        if spec is None or spec.loader is None:
-            logger.error("Failed to load plugin spec: %s", path)
-            return None
-
-        module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
+    except Exception as e:
+        raise PluginLoadError(plugin_path, str(e)) from e
 
-        # Look for a class that inherits from PluginInterface
-        for item_name in dir(module):
-            item = cast("object", getattr(module, item_name))
-            if (
-                isinstance(item, type)  # type: ignore[misc]
-                and issubclass(item, PluginInterface)
-                and item is not PluginInterface
-            ):
-                logger.info("Loaded plugin: %s from %s", item_name, path)
-                return item()
+    # Look for a class that inherits from PluginInterface
+    for item_name in dir(module):
+        item = cast("object", getattr(module, item_name))
+        if (
+            isinstance(item, type)  # type: ignore[misc]
+            and issubclass(item, PluginInterface)
+            and item is not PluginInterface
+        ):
+            logger.info("Loaded plugin: %s from %s", item_name, path)
+            return item()
 
-    except Exception:
-        logger.exception("Failed to load plugin %s", plugin_path)
-        return None
-
-    else:
-        logger.error("No PluginInterface implementation found in %s", path)
-        return None
+    raise PluginLoadError(plugin_path, f"no PluginInterface implementation found in {path}")

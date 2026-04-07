@@ -9,7 +9,7 @@ from dojo.deps import (
     scan_css_dependencies,
     scan_html_dependencies,
 )
-from dojo.utils import get_recursive_yaml_deps
+from dojo.yaml_utils import get_recursive_yaml_deps
 
 # =============================================================================
 # UNIT TESTS: dojo.deps (Asset Discovery Logic)
@@ -315,3 +315,51 @@ def test_lua_dependencies_filter(tmp_path):
     assert str(output_json) + ":" in content
     assert "image.png" in content
     assert "data_folder/data.csv" in content
+
+
+def test_scan_css_dependencies_resolve_oserror(tmp_path, monkeypatch):
+    """Test that scan_css_dependencies ignores assets that trigger OSError during resolution."""
+    css_file = tmp_path / "style.css"
+    css_file.write_text("body { background: url('test.png'); }")
+    (tmp_path / "test.png").touch()
+
+    # Mock Path.resolve to raise OSError
+    def mock_resolve(*args, **kwargs):
+        raise OSError()
+
+    # Path is from pathlib, so we mock it directly on the Path object or globally
+    monkeypatch.setattr(Path, "resolve", mock_resolve)
+
+    assets = scan_css_dependencies(css_file)
+    assert assets == []
+
+
+def test_scan_html_dependencies_resolve_oserror(tmp_path, monkeypatch):
+    """Test that scan_html_dependencies ignores assets that trigger OSError during resolution."""
+    html_file = tmp_path / "index.html"
+    html_file.write_text('<img src="image.jpg">')
+    (tmp_path / "image.jpg").touch()
+
+    def mock_resolve(*args, **kwargs):
+        raise OSError()
+
+    monkeypatch.setattr(Path, "resolve", mock_resolve)
+
+    assets = scan_html_dependencies(html_file)
+    assert assets == []
+
+
+def test_scan_css_empty_unquoted(tmp_path):
+    """Test CSS scanner safely ignores empty or purely spaces url()."""
+    css_file = tmp_path / "style.css"
+    css_file.write_text("body { background: url(  ); }")
+    assets = scan_css_dependencies(css_file)
+    assert assets == []
+
+
+def test_scan_html_empty_href(tmp_path):
+    """Test HTML scanner ignores empty href/src."""
+    html_file = tmp_path / "index.html"
+    html_file.write_text('<a href="">Empty</a><img src="   ">')
+    assets = scan_html_dependencies(html_file)
+    assert assets == []

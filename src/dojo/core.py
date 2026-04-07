@@ -94,11 +94,7 @@ class NinjaGenerator:
         self.copied_assets: set[Path] = set()
 
         # Load plugins
-        self.plugins: list[PluginInterface] = []
-        for plugin_path in self.config.plugins:
-            plugin = load_plugin(plugin_path)
-            if plugin:
-                self.plugins.append(plugin)
+        self.plugins: list[PluginInterface] = [load_plugin(path) for path in self.config.plugins]
 
         # Sort plugins by priority (lower = earlier)
         self.plugins.sort(key=lambda p: p.priority)

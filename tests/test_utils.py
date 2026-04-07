@@ -4,13 +4,12 @@ from unittest.mock import patch
 import pytest
 
 from dojo.exceptions import CircularDependencyError, SecurityError
-from dojo.utils import (
+from dojo.paths import ninja_escape, sanitize_path
+from dojo.yaml_utils import (
     get_frontmatter_assets,
     get_recursive_yaml_deps,
-    ninja_escape,
     parse_frontmatter,
     parse_frontmatter_type,
-    sanitize_path,
 )
 
 

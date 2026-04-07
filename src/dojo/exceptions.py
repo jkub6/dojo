@@ -232,3 +232,11 @@ class CircularDependencyError(DojoError):
     def __init__(self, cycle: str) -> None:
         """Initialize CircularDependencyError."""
         super().__init__(f"Circular dependency detected: {cycle}")
+
+
+class PluginLoadError(DojoError):
+    """Raised when a plugin cannot be loaded."""
+
+    def __init__(self, path: str, reason: str) -> None:
+        """Initialize PluginLoadError."""
+        super().__init__(f"Failed to load plugin '{path}': {reason}")

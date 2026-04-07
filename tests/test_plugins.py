@@ -1,3 +1,6 @@
+import pytest
+
+from dojo.exceptions import PluginLoadError
 from dojo.plugins import PluginInterface, load_plugin
 
 
@@ -8,8 +11,9 @@ class TestPlugin(PluginInterface):
 
 
 def test_load_plugin_not_found():
-    """Test loading a non-existent plugin."""
-    assert load_plugin("non_existent_plugin.py") is None
+    """Test loading a non-existent plugin raises PluginLoadError."""
+    with pytest.raises(PluginLoadError, match="file not found"):
+        load_plugin("non_existent_plugin.py")
 
 
 def test_load_plugin_valid(tmp_path):
@@ -24,18 +28,12 @@ class MyPlugin(PluginInterface):
 """
     plugin_file.write_text(content)
 
-    # We need to make sure dojo is in path for the plugin to import it
-    # pytest should handle this if dojo is installed or in PYTHONPATH
-    # But just in case, we can't easily modify sys.path for the subprocess import
-    # importlib.util.spec_from_file_location used in plugins.py handles file paths directly.
-
     plugin = load_plugin(str(plugin_file))
-    assert plugin is not None
     assert isinstance(plugin, PluginInterface)
 
 
-def test_load_plugin_no_interface(tmp_path, caplog):
-    """Test loading a plugin that doesn't implement PluginInterface."""
+def test_load_plugin_no_interface(tmp_path):
+    """Test loading a plugin that doesn't implement PluginInterface raises."""
     plugin_file = tmp_path / "bad_plugin.py"
     content = """
 class BadPlugin:
@@ -43,11 +41,11 @@ class BadPlugin:
 """
     plugin_file.write_text(content)
 
-    plugin = load_plugin(str(plugin_file))
-    assert plugin is None
+    with pytest.raises(PluginLoadError, match="no PluginInterface implementation found"):
+        load_plugin(str(plugin_file))
 
 
-def test_load_plugin_import_error(tmp_path, caplog):
+def test_load_plugin_import_error(tmp_path):
     """Test loading a plugin that raises an error on import."""
     plugin_file = tmp_path / "error_plugin.py"
     content = """
@@ -55,10 +53,8 @@ raise ValueError("Boom!")
 """
     plugin_file.write_text(content)
 
-    plugin = load_plugin(str(plugin_file))
-    assert plugin is None
-    assert "Failed to load plugin" in caplog.text
-    assert "Boom!" in caplog.text
+    with pytest.raises(PluginLoadError, match="Boom!"):
+        load_plugin(str(plugin_file))
 
 
 def test_interface_methods():
@@ -88,7 +84,6 @@ class PriorityPlugin(PluginInterface):
     plugin_file.write_text(content)
 
     plugin = load_plugin(str(plugin_file))
-    assert plugin is not None
     expected_priority = 50
     assert plugin.priority == expected_priority
 

@@ -37,7 +37,7 @@
               ];
 
               nativeCheckInputs = with python-final; [
-                pytest
+                pytestCheckHook
                 pytest-cov
                 pytest-xdist
                 pytest-randomly

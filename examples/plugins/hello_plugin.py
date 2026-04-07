@@ -19,7 +19,7 @@ class HelloPlugin(PluginInterface):
     """Simple plugin that adds a greeting comment to Ninja output.
 
     This serves as a minimal example for plugin development.
-    See docs/PLUGINS.md for more advanced examples.
+    See docs/plugins.md for more advanced examples.
     """
 
     priority = 100  # Default priority

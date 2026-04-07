@@ -1,6 +1,6 @@
 import pytest
 
-from dojo.utils import should_process_file
+from dojo.paths import should_process_file
 
 
 @pytest.fixture

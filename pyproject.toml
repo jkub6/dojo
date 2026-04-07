@@ -24,10 +24,10 @@ classifiers = [
     "Topic :: Text Processing :: Markup",
 ]
 dependencies = [
-  "pyyaml>=6.0",
-  "pydantic>=2.0",
-  "tqdm>=4.0",
-  "rich>=10.0.0",
+  "pyyaml>=6.0.2",
+  "pydantic>=2.10",
+  "tqdm>=4.67",
+  "rich>=14.0",
 ]
 
 [dependency-groups]
@@ -207,5 +207,4 @@ ignore_names = [
     "validate_src_dir",
     "validate_config",
 ]
-
 

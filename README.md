@@ -8,7 +8,7 @@
 ## Key Features
 
 - **Blazing Fast**: Uses Ninja to track dependencies and perform minimal incremental rebuilds.
-- **Format Agnostic**: Support for HTML, PDF (via Decktape), and any other format Pandoc supports.
+- **Format Agnostic**: Support for HTML, PDF (via Decktape/Typst), and any other format Pandoc supports.
 - **Smart Assets**: Recursively discovers and copies CSS, images, and other dependencies.
 - **Pipeline Processing**: Built-in support for Ghostscript optimization, minification, and multi-step post-processing.
 - **Strict Configuration**: Pydantic-powered `dojo.yaml` with rigorous validation and ID discovery.
@@ -41,7 +41,7 @@ Traditional static site generators (SSGs) often struggle with complex document p
 
 - [Architecture Guide](docs/ARCHITECTURE.md)
 - [Plugin Development](docs/plugins.md)
-- [Configuration Schema](dojo schema)
+- [Configuration Schema](docs/schema.md) — run `dojo schema` to generate
 
 ## Contributing
 

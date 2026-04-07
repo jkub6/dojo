@@ -7,12 +7,12 @@ dispatching for build configuration, validation, and initialization.
 import argparse
 import logging
 import sys
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version as get_pkg_version
+from collections.abc import Callable
 from pathlib import Path
 
 from rich.console import Console
 
+from . import __version__
 from .config import load_config
 from .core import NinjaGenerator
 from .logging import setup_logging
@@ -31,6 +31,7 @@ class DojoArgs(argparse.Namespace):
     """
 
     command: str | None = None
+    func: Callable[["DojoArgs"], None] | None = None
     config: str | None = None
     verbose: bool = False
     quiet: bool = False
@@ -38,18 +39,6 @@ class DojoArgs(argparse.Namespace):
     dry_run: bool = False
     json_output: bool = False
     output: str | None = None
-
-
-def get_version() -> str:
-    """Get the current version of dojo.
-
-    Uses importlib.metadata to read version from package metadata,
-    with fallback for development installs.
-    """
-    try:
-        return get_pkg_version("dojo")
-    except PackageNotFoundError:
-        return "0.1.0-dev"
 
 
 def setup_cli_logging(*, verbose: bool, quiet: bool, json_output: bool = False) -> None:
@@ -65,12 +54,7 @@ def setup_cli_logging(*, verbose: bool, quiet: bool, json_output: bool = False) 
     setup_logging(level=level, json_output=json_output)
 
 
-def cmd_build(
-    args: DojoArgs,
-    parser: argparse.ArgumentParser | None = None,
-    *,
-    print_help_on_fail: bool = False,
-) -> None:
+def cmd_build(args: DojoArgs) -> None:
     """Handle the build command."""
     try:
         config, config_path = load_config(args.config)
@@ -93,11 +77,6 @@ def cmd_build(
     except FileNotFoundError as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
         console.print("[yellow]Tip:[/yellow] Run 'dojo init' to create a configuration file.")
-
-        if print_help_on_fail and parser:
-            sys.stdout.write("\n")
-            parser.print_help()
-
         sys.exit(1)
 
     except Exception as e:
@@ -133,7 +112,8 @@ def cmd_init(_args: DojoArgs) -> None:
         sys.exit(1)
 
     # Create a simple default config
-    content = """src_dir: content
+    content = """\
+src_dir: content
 output_dir: _site
 build_dir: _build
 default_type: page
@@ -160,8 +140,7 @@ types:
         #   - tool: custom_tool
         #     args: ["--param", "value"]
 """
-    with open(target, "w") as f:
-        f.write(content)
+    target.write_text(content, encoding="utf-8")
 
     msg = f"Created sample configuration at {target}"
     console.print(f"[bold green]{msg}[/bold green]")
@@ -169,8 +148,7 @@ types:
 
 def cmd_version(_args: DojoArgs) -> None:
     """Handle the version command."""
-    v = get_version()
-    console.print(f"[bold]dojo[/bold] version [cyan]{v}[/cyan]")
+    console.print(f"[bold]dojo[/bold] version [cyan]{__version__}[/cyan]")
 
 
 def cmd_schema(args: DojoArgs) -> None:
@@ -219,13 +197,16 @@ def main(argv: list[str] | None = None) -> None:
         dest="dry_run",
         help="Show what would be built without generating files",
     )
+    build_parser.set_defaults(func=cmd_build)
 
     # Check command
     check_parser = subparsers.add_parser("check", help="Validate configuration")
     check_parser.add_argument("-c", "--config", help="Path to configuration file")
+    check_parser.set_defaults(func=cmd_check)
 
     # Init command
-    subparsers.add_parser("init", help="Create a sample configuration")
+    init_parser = subparsers.add_parser("init", help="Create a sample configuration")
+    init_parser.set_defaults(func=cmd_init)
 
     # Schema command
     schema_parser = subparsers.add_parser("schema", help="Output JSON Schema for configuration")
@@ -234,9 +215,11 @@ def main(argv: list[str] | None = None) -> None:
         "--output",
         help="Write schema to file instead of stdout",
     )
+    schema_parser.set_defaults(func=cmd_schema)
 
     # Version command (as subcommand)
-    subparsers.add_parser("version", help="Show version info")
+    version_parser = subparsers.add_parser("version", help="Show version info")
+    version_parser.set_defaults(func=cmd_version)
 
     args = parser.parse_args(argv, namespace=DojoArgs())
 
@@ -247,26 +230,16 @@ def main(argv: list[str] | None = None) -> None:
             json_output=args.json_output,
         )
 
-        if args.version or args.command == "version":
+        if args.version:
             cmd_version(args)
             return
 
-        # Default to help if no command specified
-        command = args.command
-        if command is None:
-            parser.print_help()
-            sys.exit(0)
-        elif command == "build":
-            cmd_build(args, parser=parser)
-        elif command == "check":
-            cmd_check(args)
-        elif command == "init":
-            cmd_init(args)
-        elif command == "schema":
-            cmd_schema(args)
+        if args.func is not None:
+            args.func(args)
         else:
             parser.print_help()
-            sys.exit(1)
+            sys.exit(0)
+
     except Exception as e:
         if args.verbose:
             logger.exception("Unexpected error")
