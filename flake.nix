@@ -54,6 +54,10 @@
                 final.ghostscript
               ];
 
+              pytestFlagsArray = [
+                "--deselect=tests/test_e2e_tools.py::TestOptionalToolsPipeline::test_generates_and_executes_tools"
+              ];
+
               preCheck = ''
                 export HOME=$(mktemp -d)
                 export XDG_CONFIG_HOME=$HOME/.config

@@ -114,10 +114,8 @@ def normalize_ninja():
         # Normalize the dojo wrap prefix which includes sys.executable and wrap.py path
         # e.g. /path/to/python3 /path/to/dojo/wrap.py
         content = re.sub(r"\S*python\S* \S*dojo/wrap.py", "[DOJO_WRAP]", content)
-         # Normalize the regenerate rule's python interpreter (which may vary with -env suffix)
-        content = re.sub(
-            r"/nix/store/\S*python\S*(?:-env)?/bin/python\S*", "[PYTHON_BIN]", content
-        )
+        # Normalize the regenerate rule's python interpreter (which may vary with -env suffix)
+        content = re.sub(r"/nix/store/\S*python\S*(?:-env)?/bin/python\S*", "[PYTHON_BIN]", content)
         # Normalize any Nix store hash to prevent snapshot drift
         content = re.sub(r"/nix/store/[a-z0-9]{32}-", "/nix/store/[HASH]-", content)
 
