@@ -97,14 +97,23 @@ def normalize_ninja():
     Replaces absolute project and dojo paths with placeholders to keep
     snapshots stable across different environments.
     """
+    import re
 
     def _normalize(content: str, project_root: Path, dojo_root: Path) -> str:
         # Normalize project root
         content = content.replace(str(project_root.resolve()), "[PROJECT_ROOT]")
         content = content.replace(str(project_root), "[PROJECT_ROOT]")
 
+        content = content.replace(str(dojo_root.resolve()), "[DOJO_ROOT]")
         content = content.replace(str(dojo_root), "[DOJO_ROOT]")
 
-        return content.replace(str(dojo_root.resolve()), "[DOJO_ROOT]")
+        # Normalize the dynamic PATH env variable injected by Dojo
+        content = re.sub(r'env PATH="[^"]+"', 'env PATH="[TOOL_PATHS]:$$PATH"', content)
+
+        # Normalize tool paths, whether they are absolute paths or naked names
+        content = re.sub(r'\S*pandoc "\$\$in_abs"', '[TOOL_PANDOC] "$$in_abs"', content)
+        content = re.sub(r"\S*minify --html-keep", "[TOOL_MINIFY] --html-keep", content)
+        content = re.sub(r"\S*gs -sDEVICE", "[TOOL_GS] -sDEVICE", content)
+        return re.sub(r"\S*decktape reveal", "[TOOL_DECKTAPE] reveal", content)
 
     return _normalize
