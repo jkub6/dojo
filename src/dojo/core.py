@@ -22,13 +22,16 @@ if TYPE_CHECKING:
 
     from .config import Config, CustomRule, OutputConfig
 
-from .paths import ninja_escape, sanitize_path, shell_quote, should_process_file
+from .paths import should_process_file
 from .plugins import PluginInterface, load_plugin
 from .rules import get_builtin_rules
 from .stages import AssetProcessor, CompileStage, RenderStage
 from .yaml_utils import parse_frontmatter_type
 
 logger = logging.getLogger(__name__)
+
+# Constants
+MINIMUM_MULTIPLE_OUTPUTS = 2
 
 
 class NinjaGenerator:
@@ -146,9 +149,8 @@ class NinjaGenerator:
         filter_path = (Path(__file__).parent / "resources" / "format_links.lua").resolve()
 
         # Only generate for types with multiple outputs
-        minimum_multiple_outputs = 2
         for type_name, type_config in self.config.types.items():
-            if len(type_config.outputs) < minimum_multiple_outputs:
+            if len(type_config.outputs) < MINIMUM_MULTIPLE_OUTPUTS:
                 continue
 
             for out_config in type_config.outputs:
@@ -380,7 +382,7 @@ class NinjaGenerator:
             self._process_markdown_files(filtered_files)
 
         # Stage 4: Static assets
-        self._process_static_assets()
+        self._asset_processor.process_static_assets(self.config.static_dirs)
 
         # Stage 5: Post-process the final content via plugins
         self._post_process_and_write(len(filtered_files))
@@ -403,40 +405,6 @@ class NinjaGenerator:
             except Exception:
                 logger.exception("Failed to process %s", md_file)
                 raise
-
-    def _process_static_assets(self) -> None:
-        """Handle Stage 4: Copy static assets to output directory."""
-        for static_dir in self.config.static_dirs:
-            static_path = (
-                Path(self.src / static_dir).resolve()
-                if not Path(static_dir).is_absolute()
-                else Path(static_dir).resolve()
-            )
-            if not static_path.exists():
-                continue
-
-            for file in static_path.rglob("*"):
-                if not file.is_file():
-                    continue
-
-                try:
-                    rel_file = file.relative_to(static_path)
-                except ValueError:
-                    continue
-
-                final_path = sanitize_path(self.out_dir, rel_file)
-                if final_path not in self.copied_assets:
-                    self.emitter.build(
-                        outputs=final_path,
-                        rule=RuleName.COPY.value,
-                        inputs=file,
-                        variables={
-                            "in_shell": ninja_escape(shell_quote(file)),
-                            "out_shell": ninja_escape(shell_quote(final_path)),
-                        },
-                    )
-                    self.copied_assets.add(final_path)
-                    self.all_outputs.append(final_path)
 
     def _post_process_and_write(self, source_count: int) -> None:
         """Handle Stage 5: Plugin post-processing and actual file output."""

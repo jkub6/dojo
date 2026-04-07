@@ -47,35 +47,38 @@ class WrapArgs(argparse.Namespace):
 
 def resolve_placeholders(value: str, ctx: PlaceholderContext) -> str:
     """Replace `{placeholder}` variables based on resolved paths."""
-    v = value
-
+    # Pre-resolve common paths used by multiple placeholders
     in_abs = Path(ctx.in_file).resolve() if ctx.in_file else None
     out_abs = Path(ctx.out_file).resolve() if ctx.out_file else None
-
     in_abs_dir = in_abs.parent if in_abs else None
     out_abs_dir = out_abs.parent if out_abs else None
 
-    if "{in_abs}" in v and in_abs:
-        v = v.replace("{in_abs}", in_abs.as_posix())
-    if "{in_abs_dir}" in v and in_abs_dir:
-        v = v.replace("{in_abs_dir}", in_abs_dir.as_posix())
-    if "{out_abs}" in v and out_abs:
-        v = v.replace("{out_abs}", out_abs.as_posix())
-    if "{out_abs_dir}" in v and out_abs_dir:
-        v = v.replace("{out_abs_dir}", out_abs_dir.as_posix())
+    # Define available replacements
+    replacements: dict[str, str] = {}
 
-    if "{root_val}" in v and ctx.out_dir and out_abs_dir:
+    if in_abs and in_abs_dir:
+        replacements["{in_abs}"] = in_abs.as_posix()
+        replacements["{in_abs_dir}"] = in_abs_dir.as_posix()
+    if out_abs and out_abs_dir:
+        replacements["{out_abs}"] = out_abs.as_posix()
+        replacements["{out_abs_dir}"] = out_abs_dir.as_posix()
+
+    if ctx.out_dir and out_abs_dir:
         root_val = os.path.relpath(Path(ctx.out_dir).resolve(), out_abs_dir).replace("\\", "/")
-        v = v.replace("{root_val}", root_val)
+        replacements["{root_val}"] = root_val
 
-    if "{rel_src_dir}" in v and ctx.build_dir and in_abs_dir:
+    if ctx.build_dir and in_abs_dir:
         rel_src_dir = os.path.relpath(in_abs_dir, Path(ctx.build_dir).resolve()).replace("\\", "/")
-        v = v.replace("{rel_src_dir}", rel_src_dir)
+        replacements["{rel_src_dir}"] = rel_src_dir
 
-    if "{src_dir_val}" in v and ctx.build_dir and ctx.src_dir and in_abs_dir:
-        rel_src_dir = os.path.relpath(in_abs_dir, Path(ctx.build_dir).resolve()).replace("\\", "/")
-        src_dir_val = (Path(ctx.src_dir).resolve() / rel_src_dir).resolve().as_posix()
-        v = v.replace("{src_dir_val}", src_dir_val)
+        if ctx.src_dir:
+            src_dir_val = (Path(ctx.src_dir).resolve() / rel_src_dir).resolve().as_posix()
+            replacements["{src_dir_val}"] = src_dir_val
+
+    # Perform replacements
+    v = value
+    for placeholder, replacement in replacements.items():
+        v = v.replace(placeholder, replacement)
 
     return v
 
@@ -110,7 +113,8 @@ def _setup_env(path_env: str | None) -> dict[str, str]:
     """Prepare the environment with modified PATH if requested."""
     env = os.environ.copy()
     if path_env:
-        # Convert colon-separated to OS specific (e.g. semicolon on Windows)
+        # Dojo convention: input path_env is ALWAYS colon-separated regardless of host OS.
+        # It is merged into the system PATH using the OS-specific separator.
         paths = path_env.split(":")
         os_path_str = os.pathsep.join(paths)
         if "PATH" in env:
@@ -162,6 +166,7 @@ def run_wrap(argv: list[str]) -> None:
     args, unknown = parser.parse_known_args(argv, namespace=WrapArgs())
 
     cmd: list[str] = args.command or unknown
+    # Remove -- separator if it's the first element of the command
     if cmd and cmd[0] == "--":
         cmd = cmd[1:]
 

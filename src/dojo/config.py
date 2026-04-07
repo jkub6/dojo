@@ -6,13 +6,14 @@ for the `dojo.yaml` configuration file using Pydantic.
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 from pathlib import Path
 from typing import cast
 
 import yaml
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 from .constants import RuleName
 from .exceptions import (
@@ -24,6 +25,7 @@ from .exceptions import (
     DefaultsRequiredError,
     DefaultTypeNotFoundError,
     DirectoryConflictError,
+    DojoError,
     DuplicateOutputIdError,
     EssentialToolNotFoundError,
     PandocDataDirError,
@@ -31,6 +33,8 @@ from .exceptions import (
     SourceRequiresToolError,
 )
 from .resources import find_resource
+
+logger = logging.getLogger(__name__)
 
 
 def _resolve_defaults(
@@ -158,6 +162,10 @@ class OutputConfig(BaseModel):
 
         return self
 
+    def resolve_defaults(self, data_dir: str | None = None) -> None:
+        """Resolve defaults paths for this output."""
+        self.defaults = _resolve_defaults(self.defaults, data_dir)
+
 
 class TypeConfig(BaseModel):
     """Configuration for a content type."""
@@ -167,6 +175,12 @@ class TypeConfig(BaseModel):
         default=None,
         description="Default render settings for this type",
     )
+
+    def resolve_defaults(self, data_dir: str | None = None) -> None:
+        """Resolve defaults paths for this type and its outputs."""
+        self.defaults = _resolve_defaults(self.defaults, data_dir)
+        for out_conf in self.outputs:
+            out_conf.resolve_defaults(data_dir)
 
 
 class CustomRule(BaseModel):
@@ -324,9 +338,7 @@ class Config(BaseModel):
         """Resolve all defaults paths."""
         self.defaults = _resolve_defaults(self.defaults, self.pandoc_data_dir)
         for type_conf in self.types.values():
-            type_conf.defaults = _resolve_defaults(type_conf.defaults, self.pandoc_data_dir)
-            for out_conf in type_conf.outputs:
-                out_conf.defaults = _resolve_defaults(out_conf.defaults, self.pandoc_data_dir)
+            type_conf.resolve_defaults(self.pandoc_data_dir)
 
     def _validate_directories(self) -> None:
         """Validate that source/output/build directories do not conflict."""
@@ -383,8 +395,7 @@ def _find_config_path(explicit_path: str | None) -> Path:
         paths_to_check.append(Path(explicit_path))
 
     # 2. Environment Variable
-    env_path = os.environ.get("DOJO_CONFIG")
-    if env_path:
+    if env_path := os.environ.get("DOJO_CONFIG"):
         paths_to_check.append(Path(env_path))
 
     # 3. Local and User config
@@ -397,7 +408,7 @@ def _find_config_path(explicit_path: str | None) -> Path:
     )
 
     for path in paths_to_check:
-        if path.exists() and path.is_file():
+        if path.is_file():
             return path.resolve()
 
     if explicit_path:
@@ -448,7 +459,10 @@ def load_config(config_path: str | None = None) -> tuple[Config, Path]:
     try:
         config = Config.model_validate(data)
         _apply_config_file_exclusion(config, selected_path)
+    except (ValidationError, DojoError) as e:
+        raise ConfigInvalidError(selected_path, e) from e
     except Exception as e:
+        logger.exception("Unexpected error validating configuration from %s", selected_path)
         raise ConfigInvalidError(selected_path, e) from e
     else:
         return config, selected_path

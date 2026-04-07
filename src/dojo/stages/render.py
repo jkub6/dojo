@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from dojo.constants import RuleName
 from dojo.emitter import NinjaEmitter
 from dojo.exceptions import DependencyError, OutputSourceMissingError, OutputToolMissingError
-from dojo.paths import ninja_escape, sanitize_path, shell_quote
+from dojo.paths import ninja_quote, sanitize_path, shell_quote
 from dojo.stages._defaults import resolve_stage_dependencies
 
 if TYPE_CHECKING:
@@ -92,16 +92,7 @@ class RenderStage:
     ) -> None:
         """Render standard Pandoc with optional post-processing."""
         filename = f"{rel_stem.name}{out_config.suffix}.{out_config.extension}"
-        final_path = sanitize_path(self.out_dir, rel_stem.parent / filename)
-
-        steps = out_config.post_process
-        if steps:
-            render_target = sanitize_path(
-                self.build_dir,
-                Path("intermediates") / rel_stem.parent / f"{filename}.0.{out_config.extension}",
-            )
-        else:
-            render_target = final_path
+        final_path, render_target = self._get_paths(out_config, rel_stem, filename)
 
         # Resolve dependencies
         defaults_var, implicit = resolve_stage_dependencies(
@@ -115,9 +106,9 @@ class RenderStage:
 
         variables.update(
             {
-                "in_shell": ninja_escape(shell_quote(json_node)),
-                "out_shell": ninja_escape(shell_quote(render_target)),
-                "dojo_stem": ninja_escape(shell_quote(rel_stem.name)),
+                "in_shell": ninja_quote(json_node),
+                "out_shell": ninja_quote(render_target),
+                "dojo_stem": ninja_quote(rel_stem.name),
             }
         )
 
@@ -132,19 +123,13 @@ class RenderStage:
             variables=variables,
         )
 
-        if steps:
-            self._emit_pipeline_steps(
-                steps,
-                render_target,
-                final_path,
-                rel_stem.parent / filename,
-                out_config.extension,
-            )
-
-        if out_config.id:
-            local_registry[out_config.id] = final_path
-
-        self.all_outputs.append(final_path)
+        self._finalize_output(
+            out_config,
+            rel_stem,
+            render_target,
+            final_path,
+            local_registry,
+        )
 
     def _derive_output(
         self,
@@ -154,7 +139,7 @@ class RenderStage:
     ) -> None:
         """Derive output from other build products (e.g. HTML -> PDF)."""
         filename = f"{rel_stem.name}{out_config.suffix}.{out_config.extension}"
-        final_path = sanitize_path(self.out_dir, rel_stem.parent / filename)
+        final_path, render_target = self._get_paths(out_config, rel_stem, filename)
 
         if out_config.source is None:
             raise OutputSourceMissingError()
@@ -173,18 +158,9 @@ class RenderStage:
                 raise DependencyError(parent_id)
             source_paths.append(local_registry[parent_id])
 
-        steps = out_config.post_process
-        if steps:
-            render_target = sanitize_path(
-                self.build_dir,
-                Path("intermediates") / rel_stem.parent / f"{filename}.0.{out_config.extension}",
-            )
-        else:
-            render_target = final_path
-
         variables = {
-            "in_shell": ninja_escape(" ".join(shell_quote(p) for p in source_paths)),
-            "out_shell": ninja_escape(shell_quote(render_target)),
+            "in_shell": ninja_quote(" ".join(shell_quote(p) for p in source_paths)),
+            "out_shell": ninja_quote(render_target),
         }
         if out_config.args:
             variables["args"] = " ".join(out_config.args)
@@ -199,9 +175,43 @@ class RenderStage:
             variables=variables,
         )
 
-        if steps:
+        self._finalize_output(
+            out_config,
+            rel_stem,
+            render_target,
+            final_path,
+            local_registry,
+        )
+
+    def _get_paths(
+        self, out_config: OutputConfig, rel_stem: Path, filename: str
+    ) -> tuple[Path, Path]:
+        """Calculate final and intermediate target paths."""
+        final_path = sanitize_path(self.out_dir, rel_stem.parent / filename)
+
+        if out_config.post_process:
+            render_target = sanitize_path(
+                self.build_dir,
+                Path("intermediates") / rel_stem.parent / f"{filename}.0.{out_config.extension}",
+            )
+        else:
+            render_target = final_path
+
+        return final_path, render_target
+
+    def _finalize_output(
+        self,
+        out_config: OutputConfig,
+        rel_stem: Path,
+        render_target: Path,
+        final_path: Path,
+        local_registry: dict[str, Path],
+    ) -> None:
+        """Handle post-processing steps and register final output."""
+        filename = f"{rel_stem.name}{out_config.suffix}.{out_config.extension}"
+        if out_config.post_process:
             self._emit_pipeline_steps(
-                steps,
+                out_config.post_process,
                 render_target,
                 final_path,
                 rel_stem.parent / filename,
@@ -234,8 +244,8 @@ class RenderStage:
                 )
 
             variables = {
-                "in_shell": ninja_escape(shell_quote(current_input)),
-                "out_shell": ninja_escape(shell_quote(step_output)),
+                "in_shell": ninja_quote(current_input),
+                "out_shell": ninja_quote(step_output),
             }
             if step.args:
                 variables["args"] = " ".join(step.args)

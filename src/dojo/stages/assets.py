@@ -14,7 +14,7 @@ from pathlib import Path
 from dojo.constants import RuleName
 from dojo.deps import resolve_glob_dependencies, scan_css_dependencies, scan_html_dependencies
 from dojo.emitter import NinjaEmitter
-from dojo.paths import sanitize_path, shell_quote
+from dojo.paths import ninja_quote, sanitize_path
 from dojo.yaml_utils import extract_paths, get_frontmatter_assets, parse_frontmatter
 
 logger = logging.getLogger(__name__)
@@ -118,8 +118,8 @@ class AssetProcessor:
                     rule=RuleName.COPY.value,
                     inputs=asset,
                     variables={
-                        "in_shell": shell_quote(asset),
-                        "out_shell": shell_quote(final_path),
+                        "in_shell": ninja_quote(asset),
+                        "out_shell": ninja_quote(final_path),
                     },
                 )
                 self.copied_assets.add(final_path)
@@ -139,3 +139,42 @@ class AssetProcessor:
 
             # Explicitly DO NOT scan JS files
             # Any other file types are just copied (leaf nodes)
+
+    def process_static_assets(self, static_dirs: list[str]) -> None:
+        """Process and copy directories marked as static assets.
+
+        Args:
+            static_dirs: List of directory paths (relative to src or absolute)
+
+        """
+        for static_dir in static_dirs:
+            static_path = (
+                (self.src / static_dir).resolve()
+                if not Path(static_dir).is_absolute()
+                else Path(static_dir).resolve()
+            )
+            if not static_path.exists():
+                continue
+
+            for file in static_path.rglob("*"):
+                if not file.is_file():
+                    continue
+
+                try:
+                    rel_file = file.relative_to(static_path)
+                except ValueError:
+                    continue
+
+                final_path = sanitize_path(self.out_dir, rel_file)
+                if final_path not in self.copied_assets:
+                    self.emitter.build(
+                        outputs=final_path,
+                        rule=RuleName.COPY.value,
+                        inputs=file,
+                        variables={
+                            "in_shell": ninja_quote(file),
+                            "out_shell": ninja_quote(final_path),
+                        },
+                    )
+                    self.copied_assets.add(final_path)
+                    self.all_outputs.append(final_path)

@@ -230,7 +230,7 @@ def test_process_static_assets_missing_dir(core_config):
     cfg.static_dirs = ["nonexistent_dir"]
     gen = NinjaGenerator(cfg, path)
     # Shouldn't raise any error, should silently ignore missing dir
-    gen._process_static_assets()
+    gen._asset_processor.process_static_assets(cfg.static_dirs)
     assert len(gen.copied_assets) == 0
 
 
@@ -243,7 +243,7 @@ def test_process_static_assets_normal(core_config, tmp_path):
 
     cfg.static_dirs = [str(static_dir)]
     gen = NinjaGenerator(cfg, path)
-    gen._process_static_assets()
+    gen._asset_processor.process_static_assets(cfg.static_dirs)
 
     expected_out = Path(cfg.output_dir) / "test.jpg"
     assert expected_out in gen.copied_assets

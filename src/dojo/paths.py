@@ -41,6 +41,11 @@ def shell_quote(path: Path | str) -> str:
     return shlex.quote(s)
 
 
+def ninja_quote(path: Path | str) -> str:
+    """Escapes and quotes a path for safe use in Ninja variables."""
+    return ninja_escape(shell_quote(path))
+
+
 def sanitize_path(base: Path, relative: Path) -> Path:
     """Sanitize a path to prevent traversal attacks.
 

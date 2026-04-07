@@ -52,6 +52,7 @@ def test_resolve_placeholders_windows_simulation():
     with patch("dojo.wrap.Path") as mock_path:
         mock_instance = mock_path.return_value
         mock_instance.resolve.return_value.as_posix.return_value = "C:/Users/Dojo/in.md"
+        mock_instance.resolve.return_value.parent.as_posix.return_value = "C:/Users/Dojo"
 
         val = resolve_placeholders("{in_abs}", ctx)
         assert "\\" not in val
