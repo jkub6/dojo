@@ -139,6 +139,7 @@ def _handle_exec(
     env: dict[str, str],
     cwd: str | None,
     log_file: str | None,
+    out_file: str | None = None,
 ) -> None:
     """Execute the command using subprocess."""
     try:
@@ -154,9 +155,19 @@ def _handle_exec(
                 )
         else:
             result = subprocess.run(cmd, env=env, cwd=cwd, check=False)  # noqa: S603
+
+        if result.returncode != 0 and out_file:
+            path = Path(out_file)
+            if path.exists():
+                path.unlink()
+
         sys.exit(result.returncode)
     except (OSError, subprocess.SubprocessError) as e:
         sys.stderr.write(f"dojo wrap error executing {cmd[0]}: {e}\n")
+        if out_file:
+            path = Path(out_file)
+            if path.exists():
+                path.unlink()
         sys.exit(1)
 
 
@@ -201,7 +212,7 @@ def run_wrap(argv: list[str]) -> None:
         _handle_copy(final_cmd[0], final_cmd[1])
 
     env = _setup_env(args.path_env)
-    _handle_exec(final_cmd, env, cwd, p(args.log_file))
+    _handle_exec(final_cmd, env, cwd, p(args.log_file), p(args.out_file))
 
 
 if __name__ == "__main__":

@@ -16,14 +16,14 @@ rule regenerate
 build [PROJECT_ROOT]/_build/build.ninja: regenerate [PROJECT_ROOT]/dojo.yaml
 
 rule compile
-  command = [DOJO_WRAP] --path-env "[TOOL_PATHS]" --in-file $in_shell --out-file $out_shell --src-dir [PROJECT_ROOT]/content --out-dir [PROJECT_ROOT]/_site --build-dir [PROJECT_ROOT]/_build  --ensure-dir [PROJECT_ROOT]/_build --cwd [PROJECT_ROOT]/_build -- [TOOL_PANDOC] {in_abs} $defaults -t json -o {out_abs} -M depfile={out_abs}.d -M target={out_abs} -V root={root_val} -M root={root_val} --resource-path=.:{in_abs_dir} --lua-filter [DOJO_ROOT]/src/dojo/resources/dependencies.lua
+  command = [DOJO_WRAP] --path-env "[TOOL_PATHS]" --in-file $in_shell --out-file $out_shell --src-dir [PROJECT_ROOT]/content --out-dir [PROJECT_ROOT]/_site --build-dir [PROJECT_ROOT]/_build  --ensure-dir [PROJECT_ROOT]/_build --cwd [PROJECT_ROOT]/_build -- [TOOL_PANDOC] {in_abs} $defaults -t json -o {out_abs} -M depfile={out_abs}.d -M target={out_abs} -V root={root_val} -M root={root_val} --resource-path=.:{in_abs_dir} --lua-filter [DOJO_ROOT]/src/dojo/resources/dependencies.lua --lua-filter [DOJO_ROOT]/src/dojo/resources/relative_paths.lua
   description = 🧠 COMPILE $in
   pool = test_pool
   depfile = $out.d
   deps = gcc
 
 rule render
-  command = [DOJO_WRAP] --path-env "[TOOL_PATHS]" --in-file $in_shell --out-file $out_shell --src-dir [PROJECT_ROOT]/content --out-dir [PROJECT_ROOT]/_site --build-dir [PROJECT_ROOT]/_build  --ensure-dir {out_abs_dir} --cwd {out_abs_dir} -- [TOOL_PANDOC] {in_abs} $defaults -o {out_abs} -V root={root_val} -M root={root_val} -M dojo-rel-src-dir={rel_src_dir} --pdf-engine-opt=--root=[PROJECT_ROOT]/content --lua-filter [DOJO_ROOT]/src/dojo/resources/fix_typst_csl.lua --resource-path=.:{in_abs_dir}:{src_dir_val} --extract-media=media -M dojo-document-stem=$dojo_stem
+  command = [DOJO_WRAP] --path-env "[TOOL_PATHS]" --in-file $in_shell --out-file $out_shell --src-dir [PROJECT_ROOT]/content --out-dir [PROJECT_ROOT]/_site --build-dir [PROJECT_ROOT]/_build  --ensure-dir {out_abs_dir} --cwd {out_abs_dir} -- [TOOL_PANDOC] {in_abs} $defaults -o {out_abs} -V root={root_val} -M root={root_val} -M dojo-rel-src-dir={rel_src_dir} --pdf-engine-opt=--root=[PROJECT_ROOT]/content --lua-filter [DOJO_ROOT]/src/dojo/resources/fix_typst_csl.lua --resource-path=.:{in_abs_dir}:{src_dir_val} --extract-media=media --lua-filter [DOJO_ROOT]/src/dojo/resources/relative_paths.lua -M dojo-document-stem=$dojo_stem
   description = 🎨 RENDER $out
 
 rule copy
