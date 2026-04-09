@@ -111,7 +111,6 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     # COMPILE
     resources_dir = Path(__file__).parent.resolve() / "resources"
     dep_filter = resources_dir / "dependencies.lua"
-    rel_paths_filter = resources_dir / "relative_paths.lua"
     compile_flags = base_flags
     if config.add_resource_path:
         compile_flags += " --resource-path=.:{in_abs_dir}"
@@ -123,8 +122,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
                 f"{dojo_wrap_base} --ensure-dir {shell_quote(abs_build_dir)} --cwd {shell_quote(abs_build_dir)} -- "
                 f"{pandoc_wrapper} {{in_abs}} $defaults -t json -o {{out_abs}} "
                 f"-M depfile={{out_abs}}.d -M target={{out_abs}} {compile_flags} "
-                f"--lua-filter {shell_quote(dep_filter.as_posix())} "
-                f"--lua-filter {shell_quote(rel_paths_filter.as_posix())}"
+                f"--lua-filter {shell_quote(dep_filter.as_posix())}"
             ),
             description="🧠 COMPILE $in",
             depfile="$out.d",
@@ -142,7 +140,6 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
 
     # Media Extraction for generated diagrams (diagram.lua)
     render_flags.append("--extract-media=media")
-    render_flags.append(f"--lua-filter {shell_quote(rel_paths_filter.as_posix())}")
 
     rules.append(
         CustomRule(
