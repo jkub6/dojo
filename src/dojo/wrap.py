@@ -7,20 +7,27 @@ supporting path placeholder resolution and environment manipulation.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import functools
 import os
 import shutil
-import socketserver
 import subprocess
 import sys
 import threading
 from dataclasses import dataclass
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import IO, Protocol
 
 # Constants
 MIN_COPY_ARGS = 2
+
+
+class _LogHandler(Protocol):
+    """Protocol for logging handler to satisfy type checkers."""
+
+    def write(self, s: str, /) -> int: ...
+    def flush(self) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -53,59 +60,72 @@ class WrapArgs(argparse.Namespace):
     copy: bool = False
 
 
-def resolve_placeholders(value: str, ctx: PlaceholderContext) -> str:
-    """Replace `{placeholder}` variables based on resolved paths."""
-    # Pre-resolve common paths used by multiple placeholders
+def _get_path_repls(ctx: PlaceholderContext) -> dict[str, str]:
+    """Calculate path-based replacements."""
     in_abs = Path(ctx.in_file).resolve() if ctx.in_file else None
     out_abs = Path(ctx.out_file).resolve() if ctx.out_file else None
     in_abs_dir = in_abs.parent if in_abs else None
     out_abs_dir = out_abs.parent if out_abs else None
 
-    # Define available replacements
-    replacements: dict[str, str] = {}
-    if ctx.src_dir:
-        replacements["{src_dir}"] = ctx.src_dir
-    if ctx.out_dir:
-        replacements["{out_dir}"] = ctx.out_dir
-    if ctx.build_dir:
-        replacements["{build_dir}"] = ctx.build_dir
-    if ctx.serve_dir:
-        replacements["{serve_dir}"] = ctx.serve_dir
-
+    repls: dict[str, str] = {}
     if in_abs and in_abs_dir:
-        replacements["{in_abs}"] = in_abs.as_posix()
-        replacements["{in_abs_dir}"] = in_abs_dir.as_posix()
+        repls.update({"{in_abs}": in_abs.as_posix(), "{in_abs_dir}": in_abs_dir.as_posix()})
     if out_abs and out_abs_dir:
-        replacements["{out_abs}"] = out_abs.as_posix()
-        replacements["{out_abs_dir}"] = out_abs_dir.as_posix()
+        repls.update({"{out_abs}": out_abs.as_posix(), "{out_abs_dir}": out_abs_dir.as_posix()})
 
     if ctx.out_dir and out_abs_dir:
         root_val = os.path.relpath(Path(ctx.out_dir).resolve(), out_abs_dir).replace("\\", "/")
-        replacements["{root_val}"] = root_val
+        repls["{root_val}"] = root_val
+    return repls
 
-    if ctx.build_dir and in_abs_dir:
-        rel_src_dir = os.path.relpath(in_abs_dir, Path(ctx.build_dir).resolve()).replace("\\", "/")
-        replacements["{rel_src_dir}"] = rel_src_dir
 
-        if ctx.src_dir:
-            src_dir_val = (Path(ctx.src_dir).resolve() / rel_src_dir).resolve().as_posix()
-            replacements["{src_dir_val}"] = src_dir_val
-
+def _get_srv_repls(ctx: PlaceholderContext) -> dict[str, str]:
+    """Calculate server-based replacements."""
+    repls: dict[str, str] = {}
     if ctx.serve_dir and ctx.serve_port and ctx.in_file:
         serve_abs = Path(ctx.serve_dir).resolve()
-        in_abs = Path(ctx.in_file).resolve()
+        in_abs_val = Path(ctx.in_file).resolve()
         try:
-            rel_path = os.path.relpath(in_abs, serve_abs).replace("\\", "/")
-            replacements["{url}"] = f"http://localhost:{ctx.serve_port}/{rel_path}"
+            rel_path = os.path.relpath(in_abs_val, serve_abs).replace("\\", "/")
+            repls["{url}"] = f"http://localhost:{ctx.serve_port}/{rel_path}"
         except ValueError:
-            # Fallback if paths are on different drives on Windows
             pass
+    return repls
 
-    # Perform replacements
+
+def _get_replacements(ctx: PlaceholderContext) -> dict[str, str]:
+    """Calculate all available placeholder replacements."""
+    repls: dict[str, str] = {}
+    if ctx.src_dir:
+        repls["{src_dir}"] = ctx.src_dir
+    if ctx.out_dir:
+        repls["{out_dir}"] = ctx.out_dir
+    if ctx.build_dir:
+        repls["{build_dir}"] = ctx.build_dir
+    if ctx.serve_dir:
+        repls["{serve_dir}"] = ctx.serve_dir
+
+    repls.update(_get_path_repls(ctx))
+
+    in_abs = Path(ctx.in_file).resolve() if ctx.in_file else None
+    in_abs_dir = in_abs.parent if in_abs else None
+    if ctx.build_dir and in_abs_dir:
+        rel_src_dir = os.path.relpath(in_abs_dir, Path(ctx.build_dir).resolve()).replace("\\", "/")
+        repls["{rel_src_dir}"] = rel_src_dir
+        if ctx.src_dir:
+            sv = (Path(ctx.src_dir).resolve() / rel_src_dir).resolve().as_posix()
+            repls["{src_dir_val}"] = sv
+
+    repls.update(_get_srv_repls(ctx))
+    return repls
+
+
+def resolve_placeholders(value: str, ctx: PlaceholderContext) -> str:
+    """Replace `{placeholder}` variables based on resolved paths."""
+    replacements = _get_replacements(ctx)
     v = value
     for placeholder, replacement in replacements.items():
         v = v.replace(placeholder, replacement)
-
     return v
 
 
@@ -161,40 +181,23 @@ def _handle_copy(src: str, dst: str) -> None:
         sys.exit(1)
 
 
-
-
-
 def _handle_exec(
     cmd: list[str],
     env: dict[str, str],
     cwd: str | None,
-    log_file: str | None,
     out_file: str | None = None,
-    log_handler: Any = None,
+    log_handler: IO[str] | None = None,
 ) -> None:
     """Execute the command using subprocess."""
     try:
-        if log_handler:
-            result = subprocess.run(  # noqa: S603
-                cmd,
-                env=env,
-                cwd=cwd,
-                check=False,
-                stdout=log_handler,
-                stderr=subprocess.STDOUT,
-            )
-        elif log_file:
-            with open(log_file, "a", encoding="utf-8") as lf:
-                result = subprocess.run(  # noqa: S603
-                    cmd,
-                    env=env,
-                    cwd=cwd,
-                    check=False,
-                    stdout=lf,
-                    stderr=subprocess.STDOUT,
-                )
-        else:
-            result = subprocess.run(cmd, env=env, cwd=cwd, check=False)  # noqa: S603
+        result = subprocess.run(  # noqa: S603
+            cmd,
+            env=env,
+            cwd=cwd,
+            check=False,
+            stdout=log_handler if log_handler else sys.stdout,
+            stderr=subprocess.STDOUT if log_handler else sys.stderr,
+        )
 
         if result.returncode != 0 and out_file:
             path = Path(out_file)
@@ -211,13 +214,43 @@ def _handle_exec(
         sys.exit(1)
 
 
+def _start_server(directory: str, log_handler: IO[str] | None) -> tuple[ThreadingHTTPServer, int]:
+    """Start the ephemeral HTTP server."""
+
+    class LoggingQuietHandler(SimpleHTTPRequestHandler):
+        def log_message(self, format_spec: str, *args: object) -> None:
+            msg = f"HTTP: {format_spec % args}\n"
+            if log_handler:
+                log_handler.write(msg)
+                log_handler.flush()
+            else:
+                sys.stderr.write(msg)
+
+    handler = functools.partial(LoggingQuietHandler, directory=directory)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    port = server.server_address[1]
+
+    msg = f"DOJO SERVER: Starting at 127.0.0.1:{port} serving {directory}\n"
+    if log_handler:
+        log_handler.write(msg)
+        log_handler.flush()
+    else:
+        sys.stderr.write(msg)
+
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, port
+
+
+def _p(val: str | None, current_ctx: PlaceholderContext) -> str | None:
+    return resolve_placeholders(val, current_ctx) if val is not None else None
+
+
 def run_wrap(argv: list[str]) -> None:
     """Cross-platform command execution wrapper for Ninja rules."""
     parser = _create_parser()
     args, unknown = parser.parse_known_args(argv, namespace=WrapArgs())
-
     cmd: list[str] = args.command or unknown
-    # Remove -- separator if it's the first element of the command
     if cmd and cmd[0] == "--":
         cmd = cmd[1:]
 
@@ -234,82 +267,48 @@ def run_wrap(argv: list[str]) -> None:
         serve_dir=args.serve_dir,
     )
 
-    def p(val: str | None) -> str | None:
-        return resolve_placeholders(val, ctx) if val is not None else None
+    with contextlib.ExitStack() as stack:
+        log_handler: IO[str] | None = None
+        if args.log_file:
+            log_path = Path(_p(args.log_file, ctx))  # type: ignore[arg-type]
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_handler = stack.enter_context(open(log_path, "a", encoding="utf-8"))
 
-    log_handler = None
-    if args.log_file:
-        log_path = Path(p(args.log_file))
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        log_handler = open(log_path, "a", encoding="utf-8")
+        server: ThreadingHTTPServer | None = None
+        if args.serve_dir:
+            serve_path = _p(args.serve_dir, ctx)
+            server, port = _start_server(serve_path, log_handler)  # type: ignore[arg-type]
+            stack.callback(server.shutdown)
+            stack.callback(server.server_close)
+            ctx = PlaceholderContext(
+                in_file=args.in_file,
+                out_file=args.out_file,
+                src_dir=args.src_dir,
+                out_dir=args.out_dir,
+                build_dir=args.build_dir,
+                serve_dir=serve_path,
+                serve_port=port,
+            )
 
-    class LoggingQuietHandler(SimpleHTTPRequestHandler):
-        def log_message(self, format: str, *args: Any) -> None:
-            msg = f"HTTP: {format % args}\n"
-            if log_handler:
-                log_handler.write(msg)
-                log_handler.flush()
-            else:
-                sys.stderr.write(msg)
+        if args.ensure_dir:
+            ed = _p(args.ensure_dir, ctx)
+            if ed:
+                Path(ed).mkdir(parents=True, exist_ok=True)
 
-    server: socketserver.BaseServer | None = None
-    if args.serve_dir:
-        serve_path = p(args.serve_dir)
-        # Port 0 lets the OS pick a random free port
-        handler = functools.partial(LoggingQuietHandler, directory=serve_path)
-        server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-        port = server.server_address[1]
-        
-        msg = f"DOJO SERVER: Starting at 127.0.0.1:{port} serving {serve_path}\n"
-        if log_handler:
-            log_handler.write(msg)
-            log_handler.flush()
-        else:
-            sys.stderr.write(msg)
+        final_cmd = [_p(c, ctx) or c for c in cmd]
+        if args.copy:
+            if len(final_cmd) < MIN_COPY_ARGS:
+                sys.stderr.write("Error: Copy requires source and destination\n")
+                sys.exit(1)
+            _handle_copy(final_cmd[0], final_cmd[1])
 
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-
-        # Re-create context with the allocated port and RESOLVED serve_dir
-        ctx = PlaceholderContext(
-            in_file=args.in_file,
-            out_file=args.out_file,
-            src_dir=args.src_dir,
-            out_dir=args.out_dir,
-            build_dir=args.build_dir,
-            serve_dir=serve_path,
-            serve_port=port,
+        _handle_exec(
+            final_cmd,
+            _setup_env(args.path_env),
+            _p(args.cwd, ctx),
+            _p(args.out_file, ctx),
+            log_handler=log_handler,
         )
-
-    def p_final(val: str | None) -> str | None:
-        return resolve_placeholders(val, ctx) if val is not None else None
-
-    # Pre-flight
-    if args.ensure_dir:
-        ensure_dir = p(args.ensure_dir)
-        if ensure_dir:
-            Path(ensure_dir).mkdir(parents=True, exist_ok=True)
-
-    cwd = p(args.cwd)
-    final_cmd = [p(c) or c for c in cmd]
-
-    if args.copy:
-        if len(final_cmd) < MIN_COPY_ARGS:
-            if log_handler:
-                log_handler.write("Error: Copy requires source and destination\n")
-            sys.stderr.write("Error: Copy requires source and destination\n")
-            sys.exit(1)
-        _handle_copy(final_cmd[0], final_cmd[1])
-
-    env = _setup_env(args.path_env)
-    try:
-        _handle_exec(final_cmd, env, cwd, None, p(args.out_file), log_handler=log_handler)
-    finally:
-        if server:
-            server.shutdown()
-            server.server_close()
-        if log_handler:
-            log_handler.close()
 
 
 if __name__ == "__main__":

@@ -126,7 +126,8 @@ def test_handle_exec_with_log(tmp_path):
     from dojo.wrap import _handle_exec
 
     with patch("sys.exit") as mock_exit:
-        _handle_exec(cmd, os.environ.copy(), str(tmp_path), str(log_file))
+        with open(log_file, "a", encoding="utf-8") as lf:
+            _handle_exec(cmd, os.environ.copy(), str(tmp_path), log_handler=lf)
         mock_exit.assert_called()
 
     assert log_file.exists()
@@ -182,3 +183,86 @@ def test_run_wrap_copy_integration(mock_copy):
     with patch("sys.exit"):
         run_wrap(argv)
     mock_copy.assert_called_once_with("src.txt", "dst.txt")
+
+
+def test_resolve_placeholders_url():
+    ctx = PlaceholderContext(
+        in_file="/src/file.md",
+        serve_dir="/src",
+        serve_port=8080,
+    )
+    # Surgical mock of Path.resolve
+    with patch("pathlib.Path.resolve", autospec=True) as mock_resolve:
+        mock_resolve.side_effect = lambda self: self
+        val = resolve_placeholders("{url}", ctx)
+        assert val == "http://localhost:8080/file.md"
+
+
+def test_start_server(tmp_path):
+    serve_dir = tmp_path / "serve"
+    serve_dir.mkdir()
+    (serve_dir / "index.html").write_text("hello")
+
+    from io import StringIO
+
+    log_handler = StringIO()
+
+    from dojo.wrap import _start_server
+
+    server, port = _start_server(str(serve_dir), log_handler)
+
+    try:
+        assert port > 0
+        assert "DOJO SERVER: Starting" in log_handler.getvalue()
+        assert str(serve_dir) in log_handler.getvalue()
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_run_wrap_with_log_file(tmp_path):
+    log_file = tmp_path / "wrap.log"
+    argv = ["--log-file", str(log_file), "--", "echo", "logged message"]
+
+    with patch("sys.exit"), patch("dojo.wrap._handle_exec") as mock_exec:
+        run_wrap(argv)
+        mock_exec.assert_called_once()
+        # Verify log file was created
+        assert log_file.exists()
+
+
+def test_run_wrap_with_server(tmp_path):
+    serve_dir = tmp_path / "serve"
+    serve_dir.mkdir()
+    argv = ["--serve-dir", str(serve_dir), "--", "echo", "server test"]
+
+    with (
+        patch("sys.exit"),
+        patch("dojo.wrap._start_server") as mock_start,
+        patch("dojo.wrap._handle_exec"),
+    ):
+        mock_start.return_value = (patch("http.server.ThreadingHTTPServer").start(), 1234)
+        run_wrap(argv)
+        mock_start.assert_called_once()
+
+
+def test_resolve_placeholders_complex_paths():
+    """Test more complex path resolutions including root_val and rel_src_dir."""
+    ctx = PlaceholderContext(
+        in_file="/build/content/posts/first.md",
+        out_file="/out/posts/first.html",
+        src_dir="/src",
+        out_dir="/out",
+        build_dir="/build",
+    )
+
+    with patch("pathlib.Path.resolve", autospec=True) as mock_resolve:
+        mock_resolve.side_effect = lambda self: self
+        # root_val: relpath from out_abs_dir (/out/posts) to out_dir (/out) -> ..
+        assert resolve_placeholders("{root_val}", ctx) == ".."
+
+        # rel_src_dir: relpath from in_abs_dir (/build/content/posts) to build_dir (/build) -> content/posts
+        assert resolve_placeholders("{rel_src_dir}", ctx) == "content/posts"
+
+        # src_dir_val: src_dir (/src) + rel_src_dir (content/posts) -> /src/content/posts
+        assert resolve_placeholders("{src_dir_val}", ctx) == "/src/content/posts"
