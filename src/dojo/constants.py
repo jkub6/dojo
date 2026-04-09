@@ -17,6 +17,7 @@ class RuleName(StrEnum):
     MINIFY = "minify"
     GHOSTSCRIPT = "ghostscript"
     DECKTAPE = "decktape"
+    STAMP = "stamp"
 
 
 # Asset keys that implicitly reference files that should be tracked/copied

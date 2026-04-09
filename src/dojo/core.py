@@ -313,7 +313,7 @@ class NinjaGenerator:
                 )
                 self.emitter.newline()
 
-    def process_content(self, md_path: Path) -> None:
+    def process_content(self, md_path: Path, static_deps: list[Path] | Path | None = None) -> None:
         """Generate Ninja build rules for a single Markdown source file."""
         try:
             rel_path = md_path.relative_to(self.src)
@@ -343,7 +343,19 @@ class NinjaGenerator:
         if not type_config.outputs:
             return
 
-        # Stage 2: Render/Derive
+        # Stage 2: Asset processing
+        # Discovers assets (CSS, JS, images) and adds COPY rules.
+        # Returns list of asset output paths to use as implicit dependencies for rendering.
+        asset_deps = self._asset_processor.process_assets(md_path)
+
+        # Combine explicit asset deps with global static deps
+        all_deps = list(asset_deps)
+        if static_deps:
+            if isinstance(static_deps, list):
+                all_deps.extend(static_deps)
+            else:
+                all_deps.append(static_deps)
+        # Stage 3: Render/Derive
         local_registry: dict[str, Path] = {}
         for out_config in type_config.outputs:
             # Plugin Hook: Modify output config
@@ -357,12 +369,15 @@ class NinjaGenerator:
                 content_type,
             )
 
-            self._render_stage.render(current_config, json_node, rel_stem, local_registry)
+            self._render_stage.render(
+                current_config,
+                json_node,
+                rel_stem,
+                local_registry,
+                implicit_deps=all_deps,
+            )
 
         self.emitter.newline()
-
-        # Stage 3: Asset processing
-        self._asset_processor.process_assets(md_path)
 
     def generate(self) -> None:
         """Scan source files and generate build.ninja."""
@@ -374,17 +389,34 @@ class NinjaGenerator:
 
         self.emit_header()
 
+        # Stage 2: Static assets
+        # Process these first so they can be used as dependencies for content rendering
+        static_outputs = self._asset_processor.process_static_assets(self.config.static_dirs)
+
+        # Optimization: Create a stamp file to represent all static assets.
+        # This keeps the Ninja build edges for individual files compact (Professional Refinement).
+        stamp_path = self.build_dir / ".static_assets.stamp"
+        if static_outputs:
+            self.emitter.comment("Group static assets into a single stamp for cleaner dependencies")
+            self.emitter.build(
+                outputs=stamp_path,
+                rule=RuleName.STAMP.value,
+                inputs=static_outputs,
+            )
+            self.emitter.newline()
+            static_deps = stamp_path
+        else:
+            static_deps = None
+
+        # Stage 3: Content processing
         filtered_files = self._get_filtered_files()
         if not filtered_files:
             logger.warning("No Markdown files found in %s", self.src)
         else:
             logger.info("Found %d Markdown file(s)", len(filtered_files))
-            self._process_markdown_files(filtered_files)
+            self._process_markdown_files(filtered_files, static_deps=static_deps)
 
-        # Stage 4: Static assets
-        self._asset_processor.process_static_assets(self.config.static_dirs)
-
-        # Stage 5: Post-process the final content via plugins
+        # Stage 4: Post-process the final content via plugins
         self._post_process_and_write(len(filtered_files))
 
     def _get_filtered_files(self) -> list[Path]:
@@ -396,12 +428,16 @@ class NinjaGenerator:
             if should_process_file(f, self.src, self.config.include, self.config.exclude)
         ]
 
-    def _process_markdown_files(self, files: list[Path]) -> None:
+    def _process_markdown_files(
+        self,
+        files: list[Path],
+        static_deps: list[Path] | Path | None = None,
+    ) -> None:
         """Iterate over and process multiple Markdown files."""
         progress: Iterable[Path] = tqdm(files, desc="Processing", unit="file", disable=self.quiet)
         for md_file in progress:
             try:
-                self.process_content(md_file)
+                self.process_content(md_file, static_deps=static_deps)
             except Exception:
                 logger.exception("Failed to process %s", md_file)
                 raise

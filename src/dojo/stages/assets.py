@@ -59,7 +59,7 @@ class AssetProcessor:
         self.copied_assets = copied_assets
         self.all_outputs = all_outputs
 
-    def process_assets(self, md_path: Path) -> None:
+    def process_assets(self, md_path: Path) -> list[Path]:
         """Process and copy assets referenced by a Markdown file.
 
         Discovers assets from:
@@ -70,6 +70,9 @@ class AssetProcessor:
 
         Args:
             md_path: Absolute path to source Markdown file
+
+        Returns:
+            List of absolute paths to the copied/referenced assets in the output directory.
 
         """
         # 1. Get initial assets from frontmatter 'css'
@@ -86,6 +89,7 @@ class AssetProcessor:
         # We use a while loop to handle nested dependencies discovered during scanning
         queue = deque(pending_assets)
         processed_assets: set[Path] = set()
+        output_assets: list[Path] = []
 
         while queue:
             asset = queue.popleft()
@@ -96,7 +100,6 @@ class AssetProcessor:
             processed_assets.add(asset)
 
             # Self-reference check: Don't copy the source markdown file itself
-            # even if a glob included it.
             if asset.resolve() == md_path.resolve():
                 continue
 
@@ -110,6 +113,7 @@ class AssetProcessor:
                 continue
 
             final_path = sanitize_path(self.out_dir, rel_asset)
+            output_assets.append(final_path)
 
             # Global deduplication: Only emit COPY rule once per build
             if final_path not in self.copied_assets:
@@ -127,26 +131,26 @@ class AssetProcessor:
                 self.emitter.newline()
 
             # Smart Scanning: Look for nested dependencies
-            # CSS -> url()
             if asset.suffix.lower() == ".css":
                 new_deps = scan_css_dependencies(asset)
                 queue.extend(dep for dep in new_deps if dep not in processed_assets)
-
-            # HTML -> src, href
             elif asset.suffix.lower() == ".html":
                 new_deps = scan_html_dependencies(asset)
                 queue.extend(dep for dep in new_deps if dep not in processed_assets)
 
-            # Explicitly DO NOT scan JS files
-            # Any other file types are just copied (leaf nodes)
+        return output_assets
 
-    def process_static_assets(self, static_dirs: list[str]) -> None:
+    def process_static_assets(self, static_dirs: list[str]) -> list[Path]:
         """Process and copy directories marked as static assets.
 
         Args:
             static_dirs: List of directory paths (relative to src or absolute)
 
+        Returns:
+            List of absolute paths to all discovered/copied files in the output directory.
+
         """
+        static_outputs: list[Path] = []
         for static_dir in static_dirs:
             static_path = (
                 (self.src / static_dir).resolve()
@@ -166,6 +170,8 @@ class AssetProcessor:
                     continue
 
                 final_path = sanitize_path(self.out_dir, rel_file)
+                static_outputs.append(final_path)
+
                 if final_path not in self.copied_assets:
                     self.emitter.build(
                         outputs=final_path,
@@ -178,3 +184,5 @@ class AssetProcessor:
                     )
                     self.copied_assets.add(final_path)
                     self.all_outputs.append(final_path)
+
+        return static_outputs

@@ -42,6 +42,10 @@ rule decktape
   command = [DOJO_WRAP] --path-env "[TOOL_PATHS]" --in-file $in_shell --out-file $out_shell --src-dir [PROJECT_ROOT]/content --out-dir [PROJECT_ROOT]/_site --build-dir [PROJECT_ROOT]/_build  --ensure-dir {out_abs_dir} --serve-dir {out_dir} -- [TOOL_DECKTAPE] reveal $args {url} {out_abs}
   description = 📸 DECKTAPE $out
 
+rule stamp
+  command = [PYTHON_BIN] -c 'from pathlib import Path; Path("$out").touch()'
+  description = 📌 STAMP $out
+
 # Source: [PROJECT_ROOT]/content/index.md
 build [PROJECT_ROOT]/_build/index.json: compile [PROJECT_ROOT]/content/index.md
   in_shell = [PROJECT_ROOT]/content/index.md

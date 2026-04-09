@@ -207,4 +207,13 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
         )
     )
 
+    # STAMP
+    rules.append(
+        CustomRule(
+            name=RuleName.STAMP.value,
+            command=f"{shell_quote(sys.executable)} -c 'from pathlib import Path; Path(\"$out\").touch()'",
+            description="📌 STAMP $out",
+        )
+    )
+
     return rules

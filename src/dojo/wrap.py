@@ -161,23 +161,7 @@ def _handle_copy(src: str, dst: str) -> None:
         sys.exit(1)
 
 
-class QuietHandler(SimpleHTTPRequestHandler):
-    """HTTP handler that suppresses logging to stdout."""
 
-    def log_message(self, format: str, *args: Any) -> None:
-        """Silence standard request logging."""
-        pass
-
-
-def _start_server(directory: str) -> tuple[socketserver.BaseServer, int]:
-    """Start an ephemeral threaded HTTP server in a background thread."""
-    handler = functools.partial(QuietHandler, directory=directory)
-    # Port 0 lets the OS pick a random free port
-    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-    port = server.server_address[1]
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    return server, port
 
 
 def _handle_exec(
@@ -186,10 +170,20 @@ def _handle_exec(
     cwd: str | None,
     log_file: str | None,
     out_file: str | None = None,
+    log_handler: Any = None,
 ) -> None:
     """Execute the command using subprocess."""
     try:
-        if log_file:
+        if log_handler:
+            result = subprocess.run(  # noqa: S603
+                cmd,
+                env=env,
+                cwd=cwd,
+                check=False,
+                stdout=log_handler,
+                stderr=subprocess.STDOUT,
+            )
+        elif log_file:
             with open(log_file, "a", encoding="utf-8") as lf:
                 result = subprocess.run(  # noqa: S603
                     cmd,
@@ -240,10 +234,42 @@ def run_wrap(argv: list[str]) -> None:
         serve_dir=args.serve_dir,
     )
 
+    def p(val: str | None) -> str | None:
+        return resolve_placeholders(val, ctx) if val is not None else None
+
+    log_handler = None
+    if args.log_file:
+        log_path = Path(p(args.log_file))
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_handler = open(log_path, "a", encoding="utf-8")
+
+    class LoggingQuietHandler(SimpleHTTPRequestHandler):
+        def log_message(self, format: str, *args: Any) -> None:
+            msg = f"HTTP: {format % args}\n"
+            if log_handler:
+                log_handler.write(msg)
+                log_handler.flush()
+            else:
+                sys.stderr.write(msg)
+
     server: socketserver.BaseServer | None = None
     if args.serve_dir:
-        serve_path = resolve_placeholders(args.serve_dir, ctx)
-        server, port = _start_server(serve_path)
+        serve_path = p(args.serve_dir)
+        # Port 0 lets the OS pick a random free port
+        handler = functools.partial(LoggingQuietHandler, directory=serve_path)
+        server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        port = server.server_address[1]
+        
+        msg = f"DOJO SERVER: Starting at 127.0.0.1:{port} serving {serve_path}\n"
+        if log_handler:
+            log_handler.write(msg)
+            log_handler.flush()
+        else:
+            sys.stderr.write(msg)
+
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
         # Re-create context with the allocated port and RESOLVED serve_dir
         ctx = PlaceholderContext(
             in_file=args.in_file,
@@ -255,7 +281,7 @@ def run_wrap(argv: list[str]) -> None:
             serve_port=port,
         )
 
-    def p(val: str | None) -> str | None:
+    def p_final(val: str | None) -> str | None:
         return resolve_placeholders(val, ctx) if val is not None else None
 
     # Pre-flight
@@ -269,17 +295,21 @@ def run_wrap(argv: list[str]) -> None:
 
     if args.copy:
         if len(final_cmd) < MIN_COPY_ARGS:
+            if log_handler:
+                log_handler.write("Error: Copy requires source and destination\n")
             sys.stderr.write("Error: Copy requires source and destination\n")
             sys.exit(1)
         _handle_copy(final_cmd[0], final_cmd[1])
 
     env = _setup_env(args.path_env)
     try:
-        _handle_exec(final_cmd, env, cwd, p(args.log_file), p(args.out_file))
+        _handle_exec(final_cmd, env, cwd, None, p(args.out_file), log_handler=log_handler)
     finally:
         if server:
             server.shutdown()
             server.server_close()
+        if log_handler:
+            log_handler.close()
 
 
 if __name__ == "__main__":

@@ -68,6 +68,7 @@ class RenderStage:
         json_node: Path,
         rel_stem: Path,
         local_registry: dict[str, Path],
+        implicit_deps: list[Path] | None = None,
     ) -> None:
         """Convert JSON to output format or derived output.
 
@@ -76,12 +77,13 @@ class RenderStage:
             json_node: Path to JSON AST file
             rel_stem: Relative path without extension
             local_registry: Registry of output IDs to paths for this content
+            implicit_deps: Extra implicit dependencies (e.g. assets)
 
         """
         if out_config.source:
-            self._derive_output(out_config, rel_stem, local_registry)
+            self._derive_output(out_config, rel_stem, local_registry, implicit_deps)
         else:
-            self._standard_render(out_config, rel_stem, json_node, local_registry)
+            self._standard_render(out_config, rel_stem, json_node, local_registry, implicit_deps)
 
     def _standard_render(
         self,
@@ -89,6 +91,7 @@ class RenderStage:
         rel_stem: Path,
         json_node: Path,
         local_registry: dict[str, Path],
+        implicit_deps: list[Path] | None = None,
     ) -> None:
         """Render standard Pandoc with optional post-processing."""
         filename = f"{rel_stem.name}{out_config.suffix}.{out_config.extension}"
@@ -115,11 +118,15 @@ class RenderStage:
         if out_config.args:
             variables["args"] = " ".join(out_config.args)
 
+        all_implicit = list(implicit)
+        if implicit_deps:
+            all_implicit.extend(implicit_deps)
+
         self.emitter.build(
             outputs=render_target,
             rule=RuleName.RENDER.value,
             inputs=json_node,
-            implicit=implicit,
+            implicit=all_implicit,
             variables=variables,
         )
 
@@ -136,6 +143,7 @@ class RenderStage:
         out_config: OutputConfig,
         rel_stem: Path,
         local_registry: dict[str, Path],
+        implicit_deps: list[Path] | None = None,
     ) -> None:
         """Derive output from other build products (e.g. HTML -> PDF)."""
         filename = f"{rel_stem.name}{out_config.suffix}.{out_config.extension}"
@@ -172,6 +180,7 @@ class RenderStage:
             outputs=render_target,
             rule=out_config.tool,
             inputs=source_paths,
+            implicit=implicit_deps,
             variables=variables,
         )
 
