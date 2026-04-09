@@ -63,6 +63,14 @@ def resolve_placeholders(value: str, ctx: PlaceholderContext) -> str:
 
     # Define available replacements
     replacements: dict[str, str] = {}
+    if ctx.src_dir:
+        replacements["{src_dir}"] = ctx.src_dir
+    if ctx.out_dir:
+        replacements["{out_dir}"] = ctx.out_dir
+    if ctx.build_dir:
+        replacements["{build_dir}"] = ctx.build_dir
+    if ctx.serve_dir:
+        replacements["{serve_dir}"] = ctx.serve_dir
 
     if in_abs and in_abs_dir:
         replacements["{in_abs}"] = in_abs.as_posix()
@@ -236,14 +244,14 @@ def run_wrap(argv: list[str]) -> None:
     if args.serve_dir:
         serve_path = resolve_placeholders(args.serve_dir, ctx)
         server, port = _start_server(serve_path)
-        # Re-create context with the allocated port for placeholder resolution
+        # Re-create context with the allocated port and RESOLVED serve_dir
         ctx = PlaceholderContext(
             in_file=args.in_file,
             out_file=args.out_file,
             src_dir=args.src_dir,
             out_dir=args.out_dir,
             build_dir=args.build_dir,
-            serve_dir=args.serve_dir,
+            serve_dir=serve_path,
             serve_port=port,
         )
 
