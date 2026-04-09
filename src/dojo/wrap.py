@@ -7,12 +7,17 @@ supporting path placeholder resolution and environment manipulation.
 from __future__ import annotations
 
 import argparse
+import functools
 import os
 import shutil
+import socketserver
 import subprocess
 import sys
+import threading
 from dataclasses import dataclass
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 
 # Constants
 MIN_COPY_ARGS = 2
@@ -27,6 +32,8 @@ class PlaceholderContext:
     src_dir: str | None = None
     out_dir: str | None = None
     build_dir: str | None = None
+    serve_dir: str | None = None
+    serve_port: int | None = None
 
 
 class WrapArgs(argparse.Namespace):
@@ -40,6 +47,7 @@ class WrapArgs(argparse.Namespace):
     src_dir: str | None = None
     out_dir: str | None = None
     build_dir: str | None = None
+    serve_dir: str | None = None
     log_file: str | None = None
     command: list[str] | None = None
     copy: bool = False
@@ -75,6 +83,16 @@ def resolve_placeholders(value: str, ctx: PlaceholderContext) -> str:
             src_dir_val = (Path(ctx.src_dir).resolve() / rel_src_dir).resolve().as_posix()
             replacements["{src_dir_val}"] = src_dir_val
 
+    if ctx.serve_dir and ctx.serve_port and ctx.in_file:
+        serve_abs = Path(ctx.serve_dir).resolve()
+        in_abs = Path(ctx.in_file).resolve()
+        try:
+            rel_path = os.path.relpath(in_abs, serve_abs).replace("\\", "/")
+            replacements["{url}"] = f"http://localhost:{ctx.serve_port}/{rel_path}"
+        except ValueError:
+            # Fallback if paths are on different drives on Windows
+            pass
+
     # Perform replacements
     v = value
     for placeholder, replacement in replacements.items():
@@ -101,6 +119,7 @@ def _create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--src-dir", help="Absolute source directory.")
     parser.add_argument("--out-dir", help="Absolute output directory.")
     parser.add_argument("--build-dir", help="Absolute build directory.")
+    parser.add_argument("--serve-dir", help="Directory to serve via HTTP during execution.")
     parser.add_argument("--log-file", help="Redirect stdout and stderr to this log file.")
     parser.add_argument("command", nargs=argparse.REMAINDER, help="The command to run after --")
     parser.add_argument(
@@ -132,6 +151,25 @@ def _handle_copy(src: str, dst: str) -> None:
     except OSError as e:
         sys.stderr.write(f"dojo wrap copy error: {e}\n")
         sys.exit(1)
+
+
+class QuietHandler(SimpleHTTPRequestHandler):
+    """HTTP handler that suppresses logging to stdout."""
+
+    def log_message(self, format: str, *args: Any) -> None:
+        """Silence standard request logging."""
+        pass
+
+
+def _start_server(directory: str) -> tuple[socketserver.BaseServer, int]:
+    """Start an ephemeral threaded HTTP server in a background thread."""
+    handler = functools.partial(QuietHandler, directory=directory)
+    # Port 0 lets the OS pick a random free port
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    port = server.server_address[1]
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, port
 
 
 def _handle_exec(
@@ -191,7 +229,23 @@ def run_wrap(argv: list[str]) -> None:
         src_dir=args.src_dir,
         out_dir=args.out_dir,
         build_dir=args.build_dir,
+        serve_dir=args.serve_dir,
     )
+
+    server: socketserver.BaseServer | None = None
+    if args.serve_dir:
+        serve_path = resolve_placeholders(args.serve_dir, ctx)
+        server, port = _start_server(serve_path)
+        # Re-create context with the allocated port for placeholder resolution
+        ctx = PlaceholderContext(
+            in_file=args.in_file,
+            out_file=args.out_file,
+            src_dir=args.src_dir,
+            out_dir=args.out_dir,
+            build_dir=args.build_dir,
+            serve_dir=args.serve_dir,
+            serve_port=port,
+        )
 
     def p(val: str | None) -> str | None:
         return resolve_placeholders(val, ctx) if val is not None else None
@@ -212,7 +266,12 @@ def run_wrap(argv: list[str]) -> None:
         _handle_copy(final_cmd[0], final_cmd[1])
 
     env = _setup_env(args.path_env)
-    _handle_exec(final_cmd, env, cwd, p(args.log_file), p(args.out_file))
+    try:
+        _handle_exec(final_cmd, env, cwd, p(args.log_file), p(args.out_file))
+    finally:
+        if server:
+            server.shutdown()
+            server.server_close()
 
 
 if __name__ == "__main__":

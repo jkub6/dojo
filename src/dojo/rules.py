@@ -191,12 +191,12 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
         ]
     )
 
-    decktape_cmd = f"{dojo_wrap_base} --ensure-dir {{out_abs_dir}} "
+    decktape_cmd = f"{dojo_wrap_base} --ensure-dir {{out_abs_dir}} --serve-dir {{out_dir}} "
     if config.log_file:
         log_path = Path(config.log_file).resolve().as_posix()
         decktape_cmd += f"--log-file {shell_quote(log_path)} "
 
-    decktape_cmd += f"-- {shell_quote(config.tools.decktape)} reveal $args {{in_abs}} {{out_abs}}"
+    decktape_cmd += f"-- {shell_quote(config.tools.decktape)} reveal $args {{url}} {{out_abs}}"
 
     rules.append(
         CustomRule(
