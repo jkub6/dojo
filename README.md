@@ -22,17 +22,20 @@ Traditional static site generators (SSGs) often struggle with complex document p
 ## Quick Start
 
 1. **Initialize a project**:
+
    ```bash
    dojo init
    ```
 
 2. **Build your site**:
+
    ```bash
    dojo build
    ```
 
 3. **Run Ninja**:
    Dojo generates a `_build/build.ninja` file. Run ninja to finalize the build:
+
    ```bash
    ninja -C _build
    ```
