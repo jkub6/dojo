@@ -63,46 +63,52 @@ flowchart TB
 
 ## Module Responsibilities
 
-| Module | Purpose | Key Classes/Functions |
-|--------|---------|----------------------|
-| `cli.py` | Command-line interface | `main()`, `cmd_build()`, `cmd_schema()` |
-| `config.py` | Configuration loading & validation | `Config`, `TypeConfig`, `OutputConfig` |
-| `core.py` | Pipeline orchestration | `NinjaGenerator` |
-| `stages/compile.py` | Markdown → JSON AST | `CompileStage` |
-| `stages/render.py` | JSON → Output formats | `RenderStage` |
-| `stages/assets.py` | Asset dependency copying | `AssetProcessor` |
-| `emitter.py` | Ninja syntax generation | `NinjaEmitter` |
-| `rules.py` | Built-in Ninja rules | `get_builtin_rules()` |
-| `plugins.py` | Plugin interface | `PluginInterface`, `load_plugin()` |
-| `schema.py` | JSON Schema export | `generate_schema()` |
+| Module              | Purpose                            | Key Classes/Functions                   |
+| ------------------- | ---------------------------------- | --------------------------------------- |
+| `cli.py`            | Command-line interface             | `main()`, `cmd_build()`, `cmd_schema()` |
+| `config.py`         | Configuration loading & validation | `Config`, `TypeConfig`, `OutputConfig`  |
+| `core.py`           | Pipeline orchestration             | `NinjaGenerator`                        |
+| `stages/compile.py` | Markdown → JSON AST                | `CompileStage`                          |
+| `stages/render.py`  | JSON → Output formats              | `RenderStage`                           |
+| `stages/assets.py`  | Asset dependency copying           | `AssetProcessor`                        |
+| `emitter.py`        | Ninja syntax generation            | `NinjaEmitter`                          |
+| `rules.py`          | Built-in Ninja rules               | `get_builtin_rules()`                   |
+| `plugins.py`        | Plugin interface                   | `PluginInterface`, `load_plugin()`      |
+| `schema.py`         | JSON Schema export                 | `generate_schema()`                     |
 
 ## Build Pipeline Stages
 
 ### 1. Compile Stage
-**Input:** Markdown files  
-**Output:** JSON AST files in `_build/`  
+
+**Input:** Markdown files\
+**Output:** JSON AST files in `_build/`\
 **Tool:** Pandoc with `-t json`
 
 The compile stage parses Markdown with YAML frontmatter and produces a Pandoc AST (Abstract Syntax Tree) in JSON format. This intermediate representation enables:
+
 - Programmatic content inspection
 - Dependency tracking via Lua filters
 - Multiple output formats from single source
 
 ### 2. Render Stage
-**Input:** JSON AST  
-**Output:** HTML, PDF, or other formats in `_site/`  
+
+**Input:** JSON AST\
+**Output:** HTML, PDF, or other formats in `_site/`\
 **Tool:** Pandoc with format-specific options
 
 The render stage transforms JSON AST to final formats using Pandoc's rich output capabilities. Key features:
+
 - Format-specific templates and defaults
 - Post-processing hooks (minification, or multi-step pipelines)
 - Derived outputs (HTML → PDF via Decktape, which can also be post-processed)
 
 ### 3. Asset Stage
-**Input:** Content frontmatter, CSS, HTML  
+
+**Input:** Content frontmatter, CSS, HTML\
 **Output:** Copied assets in `_site/`
 
 The asset stage recursively discovers and copies dependencies:
+
 - CSS files referenced in frontmatter
 - Glob patterns in `dependencies` field
 - Nested `url()` references in CSS
@@ -163,18 +169,19 @@ See [Plugin Development Guide](plugins.md) for plugin authoring guide.
 
 Dojo uses a specific convention for Ninja rule variables to ensure build correctness and shell safety:
 
-| Variable | Purpose | Description |
-|----------|---------|-------------|
-| `$in` | Universal | Input file(s) (Ninja internal) |
-| `$out` | Universal | Output file(s) (Ninja internal) |
-| `$in_shell` | Safety | Shell-quoted input path for use in command templates |
-| `$out_shell` | Safety | Shell-quoted output path for use in command templates |
-| `$args` | Tooling | Extra command-line arguments from `OutputConfig` |
-| `$defaults` | Pandoc | Space-separated list of Pandoc defaults files |
+| Variable     | Purpose   | Description                                           |
+| ------------ | --------- | ----------------------------------------------------- |
+| `$in`        | Universal | Input file(s) (Ninja internal)                        |
+| `$out`       | Universal | Output file(s) (Ninja internal)                       |
+| `$in_shell`  | Safety    | Shell-quoted input path for use in command templates  |
+| `$out_shell` | Safety    | Shell-quoted output path for use in command templates |
+| `$args`      | Tooling   | Extra command-line arguments from `OutputConfig`      |
+| `$defaults`  | Pandoc    | Space-separated list of Pandoc defaults files         |
 
 The `_shell` variants are pre-quoted using `shlex.quote` by the `NinjaGenerator` to prevent issues with paths containing spaces or special characters.
 
 ## Incremental Build Support
+
 - Tracking file modification times
 - Using `depfile` for dynamic dependencies discovered during compilation
 - Minimizing rebuild scope to only changed files

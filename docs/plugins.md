@@ -1,6 +1,7 @@
 # Dojo Plugin Development Guide
 
 Dojo supports plugins to extend the build process. Plugins can:
+
 - Add custom Ninja rules
 - Modify output configurations
 - Post-process the generated Ninja file
@@ -68,6 +69,7 @@ plugins:
 Execution order for plugins (lower numbers run first). Use this to ensure your plugin runs before or after others.
 
 Recommended ranges:
+
 - `0-49`: Validation/preprocessing plugins
 - `50-99`: Transformation plugins
 - `100`: Default priority
@@ -78,14 +80,17 @@ Recommended ranges:
 #### `get_custom_rules() -> list[CustomRule]`
 
 Return a list of custom Ninja rules. Each rule must have:
+
 - `name`: Unique rule name (must not conflict with built-in rules)
 - `command`: Shell command to execute
 - `description`: (Optional) Shown during build
 
 **Built-in rule names you cannot use:**
+
 - `regenerate`, `compile`, `render`, `minify`, `ghostscript`, `decktape`
 
 **Example:**
+
 ```python
 def get_custom_rules(self) -> list[CustomRule]:
     return [
@@ -106,10 +111,12 @@ Called for each output configuration before generating build edges.
 Return a modified copy of the config (use `model_copy()`).
 
 **Arguments:**
+
 - `output_config`: The OutputConfig being processed
 - `content_type`: The content type (e.g., "page", "slide")
 
 **Example:**
+
 ```python
 def modify_output_config(
     self,
@@ -130,6 +137,7 @@ Called after all build edges are generated but before writing to disk.
 Return the modified Ninja file content.
 
 **Example:**
+
 ```python
 def post_process_ninja(self, ninja_content: str) -> str:
     # Add a default target
@@ -140,24 +148,25 @@ def post_process_ninja(self, ninja_content: str) -> str:
 
 When defining custom rules, you can use these Ninja variables:
 
-| Variable | Description |
-|----------|-------------|
-| `$in` | Input file(s) |
-| `$out` | Output file(s) |
-| `$in_shell` | Shell-quoted input path |
-| `$out_shell` | Shell-quoted output path |
-| `$args` | Extra arguments from output config |
-| `$defaults` | Pandoc defaults files |
+| Variable     | Description                        |
+| ------------ | ---------------------------------- |
+| `$in`        | Input file(s)                      |
+| `$out`       | Output file(s)                     |
+| `$in_shell`  | Shell-quoted input path            |
+| `$out_shell` | Shell-quoted output path           |
+| `$args`      | Extra arguments from output config |
+| `$defaults`  | Pandoc defaults files              |
 
 ## Best Practices
 
 1. **Don't modify inputs in-place** — always return new/copied objects using `model_copy()`
 
 2. **Log plugin actions** — use `logging.getLogger(__name__)` for debugging:
+
    ```python
    import logging
    logger = logging.getLogger(__name__)
-   
+
    def get_custom_rules(self):
        logger.debug("Loading custom rules from MyPlugin")
        return [...]
@@ -166,6 +175,7 @@ When defining custom rules, you can use these Ninja variables:
 3. **Handle errors gracefully** — raise meaningful exceptions with context
 
 4. **Test your plugins** — create unit tests for your plugin logic:
+
    ```python
    def test_my_plugin_rules():
        plugin = MyPlugin()
@@ -208,16 +218,19 @@ class MinifyPlugin(PluginInterface):
 ## Debugging Plugins
 
 1. **Enable verbose logging:**
+
    ```bash
    dojo build --verbose -c dojo.yaml
    ```
 
 2. **Use dry-run mode:**
+
    ```bash
    dojo build --dry-run -c dojo.yaml
    ```
 
 3. **Check the generated Ninja file:**
+
    ```bash
    cat _build/build.ninja
    ```
