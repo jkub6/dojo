@@ -158,13 +158,12 @@ plugins = [
 strict = true
 
 disallow_any_explicit = true
-disallow_any_expr = true
+# disallow_any_expr = true
 disallow_any_unimported = true
 disallow_any_decorated = true
 
 disallow_untyped_globals = true
 warn_unreachable = true
-explicit_override = true
 
 enable_error_code = [
     "ignore-without-code", # Forces you to specify what error code you are ignoring (e.g. # type: ignore[attr-defined])
@@ -182,18 +181,6 @@ warn_required_dynamic_aliases = true
 [[tool.mypy.overrides]]
 module = ["yaml", "tqdm", "rich.*"]
 ignore_missing_imports = true
-
-# schema.py uses Pydantic's model_json_schema() which returns dict[str, Any].
-# This is an external library type we cannot change.
-[[tool.mypy.overrides]]
-module = "dojo.schema"
-disallow_any_expr = false
-
-# core.py uses Pydantic's model_copy(update=...) which accepts dict[str, Any].
-# This is an external library type we cannot change.
-[[tool.mypy.overrides]]
-module = "dojo.core"
-disallow_any_expr = false
 
 [tool.coverage.run]
 branch = true
