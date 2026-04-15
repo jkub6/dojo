@@ -151,23 +151,27 @@ pythonpath = "src"
 [tool.mypy]
 files = "src"
 python_version = "3.13"
-strict = true
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-check_untyped_defs = true
-disallow_any_unimported = true
-disallow_any_expr = true
-disallow_any_decorated = true
-disallow_any_explicit = true
-disallow_subclassing_any = true
-warn_unreachable = true
-warn_unused_ignores = true
-no_implicit_reexport = true
-strict_equality = true
-extra_checks = true
 plugins = [
   "pydantic.mypy"
+]
+
+strict = true
+
+disallow_any_explicit = true
+disallow_any_expr = true
+disallow_any_unimported = true
+disallow_any_decorated = true
+
+disallow_untyped_globals = true
+warn_unreachable = true
+explicit_override = true
+
+enable_error_code = [
+    "ignore-without-code", # Forces you to specify what error code you are ignoring (e.g. # type: ignore[attr-defined])
+    "redundant-expr",      # Checks for pointless boolean expressions
+    "truthy-bool",         # Warns when checking truthiness of a boolean (e.g. 'if x == True:')
+    "redundant-self",      # Warns about redundant self/cls assignments
+    "unused-awaitable",    # Warns if an awaitable is returned and not awaited
 ]
 
 [tool.pydantic-mypy]
