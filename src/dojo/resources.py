@@ -55,7 +55,7 @@ def get_pandoc_data_dirs(
     return [p for p in paths if p.exists()]
 
 
-@functools.lru_cache(maxsize=_CACHE_SIZE)  # type: ignore[misc]
+@functools.lru_cache(maxsize=_CACHE_SIZE)
 def _cached_find_resource(
     category: str,
     name: str,

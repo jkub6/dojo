@@ -103,7 +103,7 @@ def load_plugin(plugin_path: str) -> PluginInterface:
     for item_name in dir(module):
         item = cast("object", getattr(module, item_name))
         if (
-            isinstance(item, type)  # type: ignore[misc]
+            isinstance(item, type)
             and issubclass(item, PluginInterface)
             and item is not PluginInterface
         ):

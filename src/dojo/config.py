@@ -80,7 +80,7 @@ class ToolPaths(BaseModel):
         data_dict = cast("dict[str, object]", data)
         for field_name, field_info in cls.model_fields.items():
             # Get from input data or use the field's default
-            current = data_dict.get(field_name, field_info.default)  # type: ignore[misc]
+            current = data_dict.get(field_name, field_info.default)
 
             if not isinstance(current, str) or not current:
                 continue
