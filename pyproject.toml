@@ -9,26 +9,19 @@ description = "Ninja Build Generator for Static Site Generation"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
-authors = [
-  {name = "Jake", email = "jkub66@gmail.com"},
-]
+authors = [{ name = "Jake", email = "jkub66@gmail.com" }]
 classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
-    "Topic :: Software Development :: Build Tools",
-    "Topic :: Text Processing :: Markup",
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development :: Build Tools",
+  "Topic :: Text Processing :: Markup",
 ]
-dependencies = [
-  "pyyaml>=6.0.2",
-  "pydantic>=2.10",
-  "tqdm>=4.67",
-  "rich>=14.0",
-]
+dependencies = ["pyyaml>=6.0.2", "pydantic>=2.10", "tqdm>=4.67", "rich>=14.0"]
 
 [dependency-groups]
 dev = [
@@ -43,7 +36,7 @@ dev = [
   "mypy",
   "types-PyYAML",
   "vulture",
-  "jsonschema"
+  "jsonschema",
 ]
 
 [project.urls]
@@ -65,44 +58,44 @@ src = ["src"]
 
 [tool.ruff.lint]
 select = [
-    "F",      # Pyflakes (logic errors)
-    "E",      # pycodestyle (style)
-    "W",      # pycodestyle (warnings)
-    "I",      # isort (imports)
-    "N",      # pep8-naming (class/function names)
-    "B",      # flake8-bugbear (likely bugs/design problems)
-    "A",      # flake8-builtins (shadowing builtins)
-    "C4",     # flake8-comprehensions (better list/dict comps)
-    "DTZ",    # flake8-datetimez (require timezone-aware dates)
-    "SIM",    # flake8-simplify (suggestions for simpler code)
-    "T20",    # flake8-print (disallow print, prefer logging)
-    "RUF",    # Ruff-specific rules
-    "ERA",    # eradicate (ban commented out code)
-    "PL",     # Pylint (static analysis)
-    "S",      # Bandit (Security)
-    "UP",     # pyupgrade (Modernize syntax)
-    "D",      # pydocstyle (Docstrings)
-    "PT",     # flake8-pytest-style (Test best practices)
-    "C90",    # McCabe (Complexity check)
-    "ANN",    # Enforce Type Hints (Strict!)
-    "TRY",    # Exception handling anti-patterns
-    "BLE",    # Ban blind exceptions (except Exception:)
-    "PERF",   # Performance anti-patterns
-    "LOG",    # Logging best practices
-    "RET",    # Return value consistency
-    "TCH",    # Type-checking blocks (Move imports under IF TYPE_CHECKING)
-    "ARG",    # Unused arguments (strict)
-    "TID",    # flake8-tidy-imports
-    "FBT",    # Boolean trap
-    "COM",    # Trailing commas
-    "G",      # Logging format
+  "F",    # Pyflakes (logic errors)
+  "E",    # pycodestyle (style)
+  "W",    # pycodestyle (warnings)
+  "I",    # isort (imports)
+  "N",    # pep8-naming (class/function names)
+  "B",    # flake8-bugbear (likely bugs/design problems)
+  "A",    # flake8-builtins (shadowing builtins)
+  "C4",   # flake8-comprehensions (better list/dict comps)
+  "DTZ",  # flake8-datetimez (require timezone-aware dates)
+  "SIM",  # flake8-simplify (suggestions for simpler code)
+  "T20",  # flake8-print (disallow print, prefer logging)
+  "RUF",  # Ruff-specific rules
+  "ERA",  # eradicate (ban commented out code)
+  "PL",   # Pylint (static analysis)
+  "S",    # Bandit (Security)
+  "UP",   # pyupgrade (Modernize syntax)
+  "D",    # pydocstyle (Docstrings)
+  "PT",   # flake8-pytest-style (Test best practices)
+  "C90",  # McCabe (Complexity check)
+  "ANN",  # Enforce Type Hints (Strict!)
+  "TRY",  # Exception handling anti-patterns
+  "BLE",  # Ban blind exceptions (except Exception:)
+  "PERF", # Performance anti-patterns
+  "LOG",  # Logging best practices
+  "RET",  # Return value consistency
+  "TCH",  # Type-checking blocks (Move imports under IF TYPE_CHECKING)
+  "ARG",  # Unused arguments (strict)
+  "TID",  # flake8-tidy-imports
+  "FBT",  # Boolean trap
+  "COM",  # Trailing commas
+  "G",    # Logging format
 ]
 ignore = [
-    "E501", # Line too long (handled by formatter)
-    "D203", # One blank line before class (conflicts with D211)
-    "D213", # Multi-line docstring summary at second line (conflicts with D212)
-    "COM812", # Trailing comma missing (conflicts with formatter)
-    "ISC001", # Implicit string concatenation (conflicts with formatter)
+  "E501",   # Line too long (handled by formatter)
+  "D203",   # One blank line before class (conflicts with D211)
+  "D213",   # Multi-line docstring summary at second line (conflicts with D212)
+  "COM812", # Trailing comma missing (conflicts with formatter)
+  "ISC001", # Implicit string concatenation (conflicts with formatter)
 ]
 
 
@@ -121,15 +114,29 @@ indent-style = "space"
 # - PLC0415: Inline imports (common practice for test isolation)
 # - ANN: Annotations
 # - D100, D103: Doc strings
-"tests/**/*.py" = ["S101", "ARG", "S603", "S607", "PT011", "TRY301", "PLC0415", "ANN", "D100", "D103", "PLR2004"]
+"tests/**/*.py" = [
+  "S101",
+  "ARG",
+  "S603",
+  "S607",
+  "PT011",
+  "TRY301",
+  "PLC0415",
+  "ANN",
+  "D100",
+  "D103",
+  "PLR2004",
+]
 
 # Stage modules have imports that TC rules incorrectly flag as type-hint-only.
 # NinjaEmitter and Path are used for both type hints AND runtime operations
 # (e.g., emitter.build() calls, path.resolve()). Moving to TYPE_CHECKING would
 # cause NameError at runtime. This is a known limitation of static TC analysis.
 "src/dojo/stages/*.py" = ["TC001", "TC003"]
-"src/dojo/schema.py" = ["TC003"]  # Path used at runtime for write_text()
-"src/dojo/emitter.py" = ["PLR0913"] # Ninja build format has many optional fields
+"src/dojo/schema.py" = ["TC003"] # Path used at runtime for write_text()
+"src/dojo/emitter.py" = [
+  "PLR0913",
+] # Ninja build format has many optional fields
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -137,13 +144,13 @@ python_files = "test_*.py"
 python_functions = "test_*"
 python_classes = "Test*"
 addopts = [
-    "--strict",
-    "--cov=src",
-    "--cov-report=term-missing",
-    "--cov-report=xml",
-    "--tb=short",
-    "-nauto",
-    "--randomly-seed=1234",
+  "--strict",
+  "--cov=src",
+  "--cov-report=term-missing",
+  "--cov-report=xml",
+  "--tb=short",
+  "-nauto",
+  "--randomly-seed=1234",
 ]
 timeout = 30
 pythonpath = "src"
@@ -151,9 +158,7 @@ pythonpath = "src"
 [tool.mypy]
 files = "src"
 python_version = "3.13"
-plugins = [
-  "pydantic.mypy"
-]
+plugins = ["pydantic.mypy"]
 
 strict = true
 
@@ -166,11 +171,11 @@ disallow_untyped_globals = true
 warn_unreachable = true
 
 enable_error_code = [
-    "ignore-without-code", # Forces you to specify what error code you are ignoring (e.g. # type: ignore[attr-defined])
-    "redundant-expr",      # Checks for pointless boolean expressions
-    "truthy-bool",         # Warns when checking truthiness of a boolean (e.g. 'if x == True:')
-    "redundant-self",      # Warns about redundant self/cls assignments
-    "unused-awaitable",    # Warns if an awaitable is returned and not awaited
+  "ignore-without-code", # Forces you to specify what error code you are ignoring (e.g. # type: ignore[attr-defined])
+  "redundant-expr",      # Checks for pointless boolean expressions
+  "truthy-bool",         # Warns when checking truthiness of a boolean (e.g. 'if x == True:')
+  "redundant-self",      # Warns about redundant self/cls assignments
+  "unused-awaitable",    # Warns if an awaitable is returned and not awaited
 ]
 
 [tool.pydantic-mypy]
@@ -188,11 +193,11 @@ source = ["src/dojo"]
 
 [tool.coverage.report]
 exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "if __name__ == .__main__.:",
-    "raise NotImplementedError",
-    "if TYPE_CHECKING:",
+  "pragma: no cover",
+  "def __repr__",
+  "if __name__ == .__main__.:",
+  "raise NotImplementedError",
+  "if TYPE_CHECKING:",
 ]
 show_missing = true
 
@@ -200,12 +205,11 @@ show_missing = true
 min_confidence = 80
 paths = ["src"]
 ignore_names = [
-    "cls",
-    "resolve_tool_paths",
-    "validate_defaults_path",
-    "validate_derived_output",
-    "validate_custom_rules",
-    "validate_src_dir",
-    "validate_config",
+  "cls",
+  "resolve_tool_paths",
+  "validate_defaults_path",
+  "validate_derived_output",
+  "validate_custom_rules",
+  "validate_src_dir",
+  "validate_config",
 ]
-
