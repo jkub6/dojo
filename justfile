@@ -14,37 +14,33 @@ default:
 
 [group('Quality')]
 [doc('Apply automatic fixes (formatting and linting)')]
-fix:
-	ruff format .
-	ruff check --fix-only .
-	alejandra .
-	statix fix .
+fix: format
+  ruff check --fix-only .
+  statix fix .
 
 [group('Quality')]
-[doc('Alias for fix')]
-format: fix
+[doc('Format code')]
+format:
+  nix fmt
 
 [group('Quality')]
 [doc('Run all static analysis checks')]
 check:
-	ruff format --check .
 	ruff check .
-	mypy src
-	vulture src --min-confidence 80
-	typos --config .typos.toml .
-	alejandra --check .
+	mypy
+	vulture
 	statix check .
-	nix flake check --all-systems .
+	typos --config .typos.toml .
+	nix flake check --all-systems .  # This will check formatting too
 
 [group('Quality')]
-[doc('Alias for check')]
-lint: check
-
-[group('Quality')]
-[doc('Run tests (with coverage via pyproject.toml addopts)')]
+[doc('Run all tests')]
 test:
 	pytest
 
+[group('Quality')]
+[doc('Run full CI pipeline: check, test, build')]
+ci: check test build
 
 # =============================================================================
 # Build
@@ -54,14 +50,6 @@ test:
 [doc('Build the Nix package')]
 build:
 	nix build
-
-# =============================================================================
-# CI
-# =============================================================================
-
-[group('CI')]
-[doc('Run full CI pipeline: check, test, build')]
-ci: check test build
 
 # =============================================================================
 # Maintenance

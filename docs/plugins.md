@@ -39,9 +39,7 @@ class MyPlugin(PluginInterface):
         """Modify output configuration before processing."""
         # Example: Add suffix to all PDF outputs
         if output_config.extension == "pdf":
-            output_config = output_config.model_copy(
-                update={"suffix": "-optimized"}
-            )
+            output_config = output_config.model_copy(update={"suffix": "-optimized"})
         return output_config
 
     def post_process_ninja(self, ninja_content: str) -> str:
@@ -66,7 +64,8 @@ plugins:
 
 #### `priority: int = 100`
 
-Execution order for plugins (lower numbers run first). Use this to ensure your plugin runs before or after others.
+Execution order for plugins (lower numbers run first). Use this to ensure your plugin runs before or
+after others.
 
 Recommended ranges:
 
@@ -97,8 +96,8 @@ def get_custom_rules(self) -> list[CustomRule]:
         CustomRule(
             name="compress_pdf",
             command="gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 "
-                    "-dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET -dBATCH "
-                    "-sOutputFile=$out $in",
+            "-dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET -dBATCH "
+            "-sOutputFile=$out $in",
             description="🗜️  COMPRESS $out",
             pool="heavy",  # Must be defined in dojo.yaml 'pools'
         )
@@ -107,8 +106,8 @@ def get_custom_rules(self) -> list[CustomRule]:
 
 #### `modify_output_config(output_config, content_type) -> OutputConfig`
 
-Called for each output configuration before generating build edges.
-Return a modified copy of the config (use `model_copy()`).
+Called for each output configuration before generating build edges. Return a modified copy of the
+config (use `model_copy()`).
 
 **Arguments:**
 
@@ -133,8 +132,8 @@ def modify_output_config(
 
 #### `post_process_ninja(ninja_content) -> str`
 
-Called after all build edges are generated but before writing to disk.
-Return the modified Ninja file content.
+Called after all build edges are generated but before writing to disk. Return the modified Ninja
+file content.
 
 **Example:**
 
@@ -165,7 +164,9 @@ When defining custom rules, you can use these Ninja variables:
 
    ```python
    import logging
+
    logger = logging.getLogger(__name__)
+
 
    def get_custom_rules(self):
        logger.debug("Loading custom rules from MyPlugin")
@@ -190,7 +191,8 @@ When defining custom rules, you can use these Ninja variables:
 
 ### Image Optimization Plugin
 
-See [examples/plugins/image_optimizer.py](../examples/plugins/image_optimizer.py) for a complete example that adds PNG and JPEG optimization rules.
+See [examples/plugins/image_optimizer.py](../examples/plugins/image_optimizer.py) for a complete
+example that adds PNG and JPEG optimization rules.
 
 ### Minification Plugin
 
@@ -237,7 +239,8 @@ class MinifyPlugin(PluginInterface):
 
 ## Plugin Loading
 
-Dojo loads plugins in the order they appear in the config file, then sorts them by `priority`. The loading process:
+Dojo loads plugins in the order they appear in the config file, then sorts them by `priority`. The
+loading process:
 
 1. Parse plugin path from config
 2. Load Python module from file

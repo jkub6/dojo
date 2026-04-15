@@ -136,11 +136,20 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_functions = "test_*"
 python_classes = "Test*"
-addopts = "--cov=src --cov-report=term-missing --cov-report=xml -n auto --randomly-seed=1234"
+addopts = [
+    "--strict",
+    "--cov=src",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+    "--tb=short",
+    "-nauto",
+    "--randomly-seed=1234",
+]
 timeout = 30
 pythonpath = "src"
 
 [tool.mypy]
+files = "src"
 python_version = "3.13"
 strict = true
 warn_return_any = true

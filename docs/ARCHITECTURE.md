@@ -4,7 +4,9 @@
 
 ## Overview
 
-Dojo transforms Markdown content into optimized static websites using [Ninja](https://ninja-build.org/) for fast, incremental builds and [Pandoc](https://pandoc.org/) for flexible document conversion.
+Dojo transforms Markdown content into optimized static websites using
+[Ninja](https://ninja-build.org/) for fast, incremental builds and [Pandoc](https://pandoc.org/) for
+flexible document conversion.
 
 ## Architecture Diagram
 
@@ -84,7 +86,8 @@ flowchart TB
 **Output:** JSON AST files in `_build/`\
 **Tool:** Pandoc with `-t json`
 
-The compile stage parses Markdown with YAML frontmatter and produces a Pandoc AST (Abstract Syntax Tree) in JSON format. This intermediate representation enables:
+The compile stage parses Markdown with YAML frontmatter and produces a Pandoc AST (Abstract Syntax
+Tree) in JSON format. This intermediate representation enables:
 
 - Programmatic content inspection
 - Dependency tracking via Lua filters
@@ -96,7 +99,8 @@ The compile stage parses Markdown with YAML frontmatter and produces a Pandoc AS
 **Output:** HTML, PDF, or other formats in `_site/`\
 **Tool:** Pandoc with format-specific options
 
-The render stage transforms JSON AST to final formats using Pandoc's rich output capabilities. Key features:
+The render stage transforms JSON AST to final formats using Pandoc's rich output capabilities. Key
+features:
 
 - Format-specific templates and defaults
 - Post-processing hooks (minification, or multi-step pipelines)
@@ -118,24 +122,20 @@ The asset stage recursively discovers and copies dependencies:
 
 ```yaml
 # dojo.yaml
-src_dir: content         # Source markdown directory
-output_dir: _site        # Output directory
-build_dir: _build        # Build artifacts directory
-default_type: page       # Default content type
-
-pools:                   # Resource pools (concurrency limits)
-  heavy: 2               # Limit heavy tasks to 2 parallel jobs
-
-rule_pools:              # Assign rules to pools
-  decktape: heavy        # Run decktape in the 'heavy' pool
-
+src_dir: content # Source markdown directory
+output_dir: _site # Output directory
+build_dir: _build # Build artifacts directory
+default_type: page # Default content type
+pools: # Resource pools (concurrency limits)
+  heavy: 2 # Limit heavy tasks to 2 parallel jobs
+rule_pools: # Assign rules to pools
+  decktape: heavy # Run decktape in the 'heavy' pool
 types:
-  page:                   # Content type definition
+  page: # Content type definition
     outputs:
-      - id: html          # Output identifier
-        extension: html   # File extension
+      - id: html # Output identifier
+        extension: html # File extension
         defaults: defaults/page.yaml
-        
   slide:
     outputs:
       - id: html
@@ -143,15 +143,14 @@ types:
         defaults: defaults/slide.yaml
       - id: pdf
         extension: pdf
-        source: html      # Derived from HTML output
-        tool: decktape    # Tool to use
+        source: html # Derived from HTML output
+        tool: decktape # Tool to use
         args: ["--size", "A4"] # Tool-specific arguments
-        post_process:     # Multi-step pipeline
+        post_process: # Multi-step pipeline
           - tool: ghostscript
             args: ["-dPDFSETTINGS=/screen"]
           - tool: minify
-
-plugins:                  # Optional plugin paths
+plugins: # Optional plugin paths
   - plugins/custom.py
 ```
 
@@ -167,7 +166,8 @@ See [Plugin Development Guide](plugins.md) for plugin authoring guide.
 
 ## Ninja Variables
 
-Dojo uses a specific convention for Ninja rule variables to ensure build correctness and shell safety:
+Dojo uses a specific convention for Ninja rule variables to ensure build correctness and shell
+safety:
 
 | Variable     | Purpose   | Description                                           |
 | ------------ | --------- | ----------------------------------------------------- |
@@ -178,7 +178,8 @@ Dojo uses a specific convention for Ninja rule variables to ensure build correct
 | `$args`      | Tooling   | Extra command-line arguments from `OutputConfig`      |
 | `$defaults`  | Pandoc    | Space-separated list of Pandoc defaults files         |
 
-The `_shell` variants are pre-quoted using `shlex.quote` by the `NinjaGenerator` to prevent issues with paths containing spaces or special characters.
+The `_shell` variants are pre-quoted using `shlex.quote` by the `NinjaGenerator` to prevent issues
+with paths containing spaces or special characters.
 
 ## Incremental Build Support
 
