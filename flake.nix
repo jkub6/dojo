@@ -2,7 +2,7 @@
   description = "Dojo - A static site and document generator built on Pandoc and Typst";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
     flake-parts.url = "github:hercules-ci/flake-parts";
 
@@ -72,8 +72,8 @@
                     final.ghostscript
                   ];
 
-                  pytestFlagsArray = [
-                    "--deselect=tests/test_e2e_tools.py::TestOptionalToolsPipeline::test_generates_and_executes_tools"
+                  disabledTests = [
+                    "test_generates_and_executes_tools"
                   ];
 
                   preCheck = ''
