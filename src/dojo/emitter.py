@@ -76,6 +76,7 @@ class NinjaEmitter:
         outputs: Path | list[Path],
         rule: str,
         inputs: Path | list[Path] | None = None,
+        *,
         implicit: Path | list[Path] | None = None,
         order_only: Path | list[Path] | None = None,
         variables: dict[str, str] | None = None,
