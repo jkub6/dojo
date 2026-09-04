@@ -28,4 +28,5 @@ ASSET_KEYS = [
     "template",
     "include-before",
     "include-after",
+    "metadata-files",
 ]
