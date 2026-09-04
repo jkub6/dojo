@@ -136,7 +136,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     render_flags.extend(_get_typst_flags(config))
 
     if config.add_resource_path:
-        render_flags.append("--resource-path=.:{in_abs_dir}:{src_dir_val}")
+        render_flags.append("--resource-path=.:{in_abs_dir}:{src_dir_val}:{src_dir}")
 
     # Media Extraction for generated diagrams (diagram.lua)
     render_flags.append("--extract-media=media")

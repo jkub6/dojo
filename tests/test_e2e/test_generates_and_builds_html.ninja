@@ -23,7 +23,7 @@ rule compile
   deps = gcc
 
 rule render
-  command = [DOJO_WRAP] --path-env "[TOOL_PATHS]" --in-file $in_shell --out-file $out_shell --src-dir [PROJECT_ROOT]/content --out-dir [PROJECT_ROOT]/_site --build-dir [PROJECT_ROOT]/_build  --ensure-dir {out_abs_dir} --cwd {out_abs_dir} -- [TOOL_PANDOC] {in_abs} $defaults -o {out_abs} -V root={root_val} -M root={root_val} -M dojo-rel-src-dir={rel_src_dir} --pdf-engine-opt=--root=[PROJECT_ROOT]/content --lua-filter [DOJO_ROOT]/src/dojo/resources/fix_typst_csl.lua --resource-path=.:{in_abs_dir}:{src_dir_val} --extract-media=media -M dojo-document-stem=$dojo_stem
+  command = [DOJO_WRAP] --path-env "[TOOL_PATHS]" --in-file $in_shell --out-file $out_shell --src-dir [PROJECT_ROOT]/content --out-dir [PROJECT_ROOT]/_site --build-dir [PROJECT_ROOT]/_build  --ensure-dir {out_abs_dir} --cwd {out_abs_dir} -- [TOOL_PANDOC] {in_abs} $defaults -o {out_abs} -V root={root_val} -M root={root_val} -M dojo-rel-src-dir={rel_src_dir} --pdf-engine-opt=--root=[PROJECT_ROOT]/content --lua-filter [DOJO_ROOT]/src/dojo/resources/fix_typst_csl.lua --resource-path=.:{in_abs_dir}:{src_dir_val}:{src_dir} --extract-media=media -M dojo-document-stem=$dojo_stem
   description = 🎨 RENDER $out
 
 rule copy

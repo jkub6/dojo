@@ -255,6 +255,16 @@ def get_recursive_yaml_deps(
         assets = extract_paths(data, asset_keys)
         _resolve_assets(assets, _state.deps)
 
+        # 3. Handle Recursive Metadata Files
+        metadata_files = extract_paths(data, ["metadata-files"])
+        for meta_ref in metadata_files:
+            meta_path = Path(meta_ref)
+            if not meta_path.is_absolute():
+                meta_path = Path.cwd() / meta_path
+            meta_path = meta_path.resolve()
+            if meta_path.exists():
+                _state.deps.extend(get_recursive_yaml_deps(meta_path, _state=_state))
+
     finally:
         _state.stack.pop()
 
