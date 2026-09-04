@@ -114,7 +114,9 @@ function Pandoc(doc)
       elseif item_path:match("%*") then
         -- Simple glob support for * (e.g., "*.avif", "images/*.png")
         local dir, pattern = item_path:match("^(.-/?)([^/]*%*[^/]*)$")
-        if not dir or dir == "" then dir = "." end
+        if not dir or dir == "" then
+          dir = "."
+        end
         if pattern then
           -- Convert glob pattern to Lua pattern (e.g., *.avif -> .*%\\.avif$)
           local lua_pattern = "^" .. pattern:gsub("%.", "%%."):gsub("%*", ".*") .. "$"

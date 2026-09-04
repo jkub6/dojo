@@ -284,7 +284,7 @@ def test_lua_dependencies_filter(tmp_path):
     data_folder = tmp_path / "data_folder"
     data_folder.mkdir()
     (data_folder / "data.csv").touch()
-    
+
     # Touch image so existence check passes
     (tmp_path / "image.png").touch()
 
