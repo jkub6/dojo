@@ -17,10 +17,21 @@ local function escape_makefile(s)
   return s:gsub(" ", "\\ ")
 end
 
--- Add a path to dependencies if it exists (or just add it blindly for Ninja to complain/check)
+local function file_exists(filepath)
+  local f = io.open(filepath, "r")
+  if f then
+    f:close()
+    return true
+  end
+  return false
+end
+
+-- Add a path to dependencies if it exists
 local function add_dep(p)
   if p and p ~= "" then
-    table.insert(dependencies, p)
+    if file_exists(p) then
+      table.insert(dependencies, p)
+    end
   end
 end
 
@@ -100,6 +111,22 @@ function Pandoc(doc)
 
       if is_dir_ok then
         add_folder_recursive(item_path)
+      elseif item_path:match("%*") then
+        -- Simple glob support for * (e.g., "*.avif", "images/*.png")
+        local dir, pattern = item_path:match("^(.-/?)([^/]*%*[^/]*)$")
+        if not dir or dir == "" then dir = "." end
+        if pattern then
+          -- Convert glob pattern to Lua pattern (e.g., *.avif -> .*%\\.avif$)
+          local lua_pattern = "^" .. pattern:gsub("%.", "%%."):gsub("%*", ".*") .. "$"
+          local ok, files = pcall(system.list_directory, dir)
+          if ok and files then
+            for _, f in ipairs(files) do
+              if f:match(lua_pattern) then
+                add_dep(path.join({ dir, f }))
+              end
+            end
+          end
+        end
       else
         add_dep(item_path)
       end
