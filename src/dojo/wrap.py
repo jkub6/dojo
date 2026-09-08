@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import functools
+import json
 import os
 import shutil
 import subprocess
@@ -246,6 +247,49 @@ def _p(val: str | None, current_ctx: PlaceholderContext) -> str | None:
     return resolve_placeholders(val, current_ctx) if val is not None else None
 
 
+def _inject_slide_level(cmd: list[str], meta: dict[str, object]) -> None:
+    """Inject slide-level flag from metadata if present."""
+    if "slide-level" not in meta:
+        return
+    val = meta["slide-level"]
+    if not isinstance(val, dict):
+        return
+    if val.get("t") == "MetaString":
+        cmd.insert(1, f"--slide-level={val['c']}")
+    elif val.get("t") == "MetaInlines":
+        text = "".join(i.get("c", "") for i in val.get("c", []) if i.get("t") == "Str")
+        cmd.insert(1, f"--slide-level={text}")
+
+
+def _inject_toc(cmd: list[str], meta: dict[str, object]) -> None:
+    """Inject or remove toc flag from metadata if present."""
+    if "toc" not in meta:
+        return
+    val = meta["toc"]
+    if not isinstance(val, dict) or val.get("t") != "MetaBool":
+        return
+    if val.get("c"):
+        if "--toc" not in cmd:
+            cmd.insert(1, "--toc")
+    elif "--toc" in cmd:
+        cmd.remove("--toc")
+
+
+def _inject_metadata_overrides(cmd: list[str], in_file: str | None) -> None:
+    """Dynamically extract structural options from document AST metadata."""
+    if not (cmd and "pandoc" in cmd[0] and in_file and in_file.endswith(".json")):
+        return
+
+    try:
+        with open(in_file, encoding="utf-8") as f:
+            ast = json.load(f)
+            meta = ast.get("meta", {})
+            _inject_slide_level(cmd, meta)
+            _inject_toc(cmd, meta)
+    except (OSError, ValueError) as e:
+        sys.stderr.write(f"dojo wrap warning: Failed to extract metadata from AST: {e}\n")
+
+
 def run_wrap(argv: list[str]) -> None:
     """Cross-platform command execution wrapper for Ninja rules."""
     parser = _create_parser()
@@ -257,6 +301,8 @@ def run_wrap(argv: list[str]) -> None:
     if not cmd:
         sys.stderr.write("Error: No command provided to dojo wrap\n")
         sys.exit(1)
+
+    _inject_metadata_overrides(cmd, args.in_file)
 
     ctx = PlaceholderContext(
         in_file=args.in_file,
