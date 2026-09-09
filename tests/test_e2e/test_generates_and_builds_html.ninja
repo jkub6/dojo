@@ -35,7 +35,7 @@ rule minify
   description = ⚡ MINIFY $out
 
 rule ghostscript
-  command = [DOJO_WRAP] --path-env "[TOOL_PATHS]" --in-file $in_shell --out-file $out_shell --src-dir [PROJECT_ROOT]/content --out-dir [PROJECT_ROOT]/_site --build-dir [PROJECT_ROOT]/_build  --ensure-dir {out_abs_dir} -- [TOOL_GS] -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET -dBATCH -dSAFER $args -sOutputFile={out_abs} {in_abs}
+  command = [DOJO_WRAP] --path-env "[TOOL_PATHS]" --in-file $in_shell --out-file $out_shell --src-dir [PROJECT_ROOT]/content --out-dir [PROJECT_ROOT]/_site --build-dir [PROJECT_ROOT]/_build  --ensure-dir {out_abs_dir} -- [TOOL_GS] -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH -dSAFER $args -sOutputFile={out_abs} {in_abs}
   description = 🗜️  COMPRESS $out
 
 rule decktape
