@@ -200,8 +200,8 @@ class RenderStage:
 
         if out_config.post_process:
             render_target = sanitize_path(
-                self.build_dir,
-                Path("intermediates") / rel_stem.parent / f"{filename}.0.{out_config.extension}",
+                self.out_dir,
+                rel_stem.parent / f".dojo-tmp-{filename}.0.{out_config.extension}",
             )
         else:
             render_target = final_path
@@ -248,8 +248,8 @@ class RenderStage:
                 step_output = final_output
             else:
                 step_output = sanitize_path(
-                    self.build_dir,
-                    Path("intermediates") / f"{base_path}.{i + 1}.{extension}",
+                    self.out_dir,
+                    base_path.parent / f".dojo-tmp-{base_path.name}.{i + 1}.{extension}",
                 )
 
             variables = {
