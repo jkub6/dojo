@@ -23,6 +23,24 @@
         "nixpkgs-lib": "nixpkgs-lib_2"
       },
       "locked": {
+        "lastModified": 1788450739,
+        "narHash": "sha256-glZLQlzIn1fXH6PazR2iUmTo7kzzyYSshrWhLS9TqCU=",
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
+        "rev": "31729ca8cbdb4fa927b34e5f4353e6a83f39e993",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
+        "type": "github"
+      }
+    },
+    "flake-parts_3": {
+      "inputs": {
+        "nixpkgs-lib": "nixpkgs-lib_3"
+      },
+      "locked": {
         "lastModified": 1778716662,
         "narHash": "sha256-m1Yf0wZ8j1OHjTc2UwHwyQRSnNeSgLJOd7q5Y45hzi4=",
         "owner": "hercules-ci",
@@ -36,9 +54,9 @@
         "type": "github"
       }
     },
-    "flake-parts_3": {
+    "flake-parts_4": {
       "inputs": {
-        "nixpkgs-lib": "nixpkgs-lib_3"
+        "nixpkgs-lib": "nixpkgs-lib_4"
       },
       "locked": {
         "lastModified": 1775087534,
@@ -80,11 +98,11 @@
         "treefmt-nix-config": "treefmt-nix-config_2"
       },
       "locked": {
-        "lastModified": 1789077100,
-        "narHash": "sha256-rzFDrbd75cY46wg9QM6503FyPQ4gsHHH9x12Vf8Sd78=",
+        "lastModified": 1789078662,
+        "narHash": "sha256-txxBhGYFXhzn9+gCRCsejYE8ZQbz6R+o91VBA4+ZVq0=",
         "owner": "jkub6",
         "repo": "mdformat-pandoc",
-        "rev": "0297c964d801f7bee98e5543bfbbd4e8422d347f",
+        "rev": "31048b7038318329ffb1e233050e3b5c5a4074d5",
         "type": "github"
       },
       "original": {
@@ -101,6 +119,27 @@
         "treefmt-nix-config": "treefmt-nix-config_3"
       },
       "locked": {
+        "lastModified": 1789077100,
+        "narHash": "sha256-rzFDrbd75cY46wg9QM6503FyPQ4gsHHH9x12Vf8Sd78=",
+        "owner": "jkub6",
+        "repo": "mdformat-pandoc",
+        "rev": "0297c964d801f7bee98e5543bfbbd4e8422d347f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "jkub6",
+        "repo": "mdformat-pandoc",
+        "type": "github"
+      }
+    },
+    "mdformat-pandoc_3": {
+      "inputs": {
+        "flake-parts": "flake-parts_4",
+        "nixpkgs": "nixpkgs_4",
+        "treefmt-nix": "treefmt-nix_4",
+        "treefmt-nix-config": "treefmt-nix-config_4"
+      },
+      "locked": {
         "lastModified": 1777924050,
         "narHash": "sha256-CT0VCcrPDwSdKdNeVy4lgNyK1GHf/BUHJ00lBEwnxGg=",
         "ref": "refs/heads/main",
@@ -114,10 +153,10 @@
         "url": "ssh://git@github.com/jkub6/mdformat-pandoc"
       }
     },
-    "mdformat-pandoc_3": {
+    "mdformat-pandoc_4": {
       "inputs": {
         "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs_4"
+        "nixpkgs": "nixpkgs_5"
       },
       "locked": {
         "lastModified": 1776219652,
@@ -166,6 +205,21 @@
     },
     "nixpkgs-lib_2": {
       "locked": {
+        "lastModified": 1788057806,
+        "narHash": "sha256-DTQSMxzDWmT0zhguthvegnVkn7CFqGCv4IHCzk5ZUpM=",
+        "owner": "nix-community",
+        "repo": "nixpkgs.lib",
+        "rev": "596e2e3940e09b2abbeb03f75fa1828c57fcd72c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "nixpkgs.lib",
+        "type": "github"
+      }
+    },
+    "nixpkgs-lib_3": {
+      "locked": {
         "lastModified": 1777168982,
         "narHash": "sha256-GOkGPcboWE9BmGCRMLX3worL4EMnsnG8MyKmXNeYuhQ=",
         "owner": "nix-community",
@@ -179,7 +233,7 @@
         "type": "github"
       }
     },
-    "nixpkgs-lib_3": {
+    "nixpkgs-lib_4": {
       "locked": {
         "lastModified": 1774748309,
         "narHash": "sha256-+U7gF3qxzwD5TZuANzZPeJTZRHS29OFQgkQ2kiTJBIQ=",
@@ -196,6 +250,22 @@
     },
     "nixpkgs_2": {
       "locked": {
+        "lastModified": 1789006805,
+        "narHash": "sha256-xB8mKMOx1IA9vTDNLmJZ6n4wCMq/cuWBBOzGCRnqxrU=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "8ce4ef6cb6f871616146b9fe26d2a5ae594e94fe",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_3": {
+      "locked": {
         "lastModified": 1780749050,
         "narHash": "sha256-3av0pIjlOWQ6rDbNOmpUSvbNnJkGORQKKjb4LtCZsIY=",
         "owner": "NixOS",
@@ -210,7 +280,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_3": {
+    "nixpkgs_4": {
       "locked": {
         "lastModified": 1775710090,
         "narHash": "sha256-ar3rofg+awPB8QXDaFJhJ2jJhu+KqN/PRCXeyuXR76E=",
@@ -226,7 +296,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_4": {
+    "nixpkgs_5": {
       "locked": {
         "lastModified": 1775423009,
         "narHash": "sha256-vPKLpjhIVWdDrfiUM8atW6YkIggCEKdSAlJPzzhkQlw=",
@@ -242,7 +312,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_5": {
+    "nixpkgs_6": {
       "locked": {
         "lastModified": 1775710090,
         "narHash": "sha256-ar3rofg+awPB8QXDaFJhJ2jJhu+KqN/PRCXeyuXR76E=",
@@ -258,7 +328,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_6": {
+    "nixpkgs_7": {
       "locked": {
         "lastModified": 1776877367,
         "narHash": "sha256-EHq1/OX139R1RvBzOJ0aMRT3xnWyqtHBRUBuO1gFzjI=",
@@ -274,7 +344,23 @@
         "type": "github"
       }
     },
-    "nixpkgs_7": {
+    "nixpkgs_8": {
+      "locked": {
+        "lastModified": 1789006805,
+        "narHash": "sha256-xB8mKMOx1IA9vTDNLmJZ6n4wCMq/cuWBBOzGCRnqxrU=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "8ce4ef6cb6f871616146b9fe26d2a5ae594e94fe",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_9": {
       "locked": {
         "lastModified": 1789006805,
         "narHash": "sha256-xB8mKMOx1IA9vTDNLmJZ6n4wCMq/cuWBBOzGCRnqxrU=",
@@ -336,7 +422,26 @@
     "treefmt-nix-config": {
       "inputs": {
         "mdformat-pandoc": "mdformat-pandoc",
-        "nixpkgs": "nixpkgs_7"
+        "nixpkgs": "nixpkgs_9"
+      },
+      "locked": {
+        "lastModified": 1789078696,
+        "narHash": "sha256-m4bAAQCSHJQfjI3P34X2Hb9Qtgfg6D5ulAJz7NSs12E=",
+        "owner": "jkub6",
+        "repo": "treefmt-nix-config",
+        "rev": "639a327562d6e634be1227ee7fc48a7a40268d47",
+        "type": "github"
+      },
+      "original": {
+        "owner": "jkub6",
+        "repo": "treefmt-nix-config",
+        "type": "github"
+      }
+    },
+    "treefmt-nix-config_2": {
+      "inputs": {
+        "mdformat-pandoc": "mdformat-pandoc_2",
+        "nixpkgs": "nixpkgs_8"
       },
       "locked": {
         "lastModified": 1789077623,
@@ -352,10 +457,10 @@
         "type": "github"
       }
     },
-    "treefmt-nix-config_2": {
+    "treefmt-nix-config_3": {
       "inputs": {
-        "mdformat-pandoc": "mdformat-pandoc_2",
-        "nixpkgs": "nixpkgs_6"
+        "mdformat-pandoc": "mdformat-pandoc_3",
+        "nixpkgs": "nixpkgs_7"
       },
       "locked": {
         "lastModified": 1777924084,
@@ -371,10 +476,10 @@
         "url": "ssh://git@github.com/jkub6/treefmt-nix-config"
       }
     },
-    "treefmt-nix-config_3": {
+    "treefmt-nix-config_4": {
       "inputs": {
-        "mdformat-pandoc": "mdformat-pandoc_3",
-        "nixpkgs": "nixpkgs_5"
+        "mdformat-pandoc": "mdformat-pandoc_4",
+        "nixpkgs": "nixpkgs_6"
       },
       "locked": {
         "lastModified": 1776269943,
@@ -399,6 +504,30 @@
         ]
       },
       "locked": {
+        "lastModified": 1786901030,
+        "narHash": "sha256-WSFCsDSE5ffgD2MqzkM2CYjeFiKhRF/dJUN8uedb6YE=",
+        "owner": "numtide",
+        "repo": "treefmt-nix",
+        "rev": "27b3b12a8e6375f28ebe122f07d230ca5459bbfa",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "treefmt-nix",
+        "type": "github"
+      }
+    },
+    "treefmt-nix_3": {
+      "inputs": {
+        "nixpkgs": [
+          "treefmt-nix-config",
+          "mdformat-pandoc",
+          "treefmt-nix-config",
+          "mdformat-pandoc",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
         "lastModified": 1780220602,
         "narHash": "sha256-eynAfOmbmxJnkp7YewvCEbShNnnYJ9gLLqkzsYtBPeM=",
         "owner": "numtide",
@@ -412,9 +541,11 @@
         "type": "github"
       }
     },
-    "treefmt-nix_3": {
+    "treefmt-nix_4": {
       "inputs": {
         "nixpkgs": [
+          "treefmt-nix-config",
+          "mdformat-pandoc",
           "treefmt-nix-config",
           "mdformat-pandoc",
           "treefmt-nix-config",
