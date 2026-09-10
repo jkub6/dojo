@@ -111,8 +111,8 @@ def cmd_init(_args: DojoArgs) -> None:
         console.print(f"[bold red]{msg}[/bold red]")
         sys.exit(1)
 
-    # Create a simple default config
-    content = """\
+    # Create a working starter project
+    config_content = """\
 src_dir: content
 output_dir: _site
 build_dir: _build
@@ -140,10 +140,48 @@ types:
         #   - tool: custom_tool
         #     args: ["--param", "value"]
 """
-    target.write_text(content, encoding="utf-8")
 
-    msg = f"Created sample configuration at {target}"
-    console.print(f"[bold green]{msg}[/bold green]")
+    defaults_content = """\
+# Pandoc defaults for HTML output
+# See: https://pandoc.org/MANUAL.html#defaults-files
+writer: html5
+standalone: true
+metadata:
+  lang: en
+"""
+
+    index_content = """\
+---
+title: Home
+---
+
+# Welcome to Dojo
+
+Your site is ready. Edit this file or add more Markdown files to `content/`.
+"""
+
+    # Write configuration
+    target.write_text(config_content, encoding="utf-8")
+
+    # Create content directory with sample page
+    content_dir = Path("content")
+    content_dir.mkdir(exist_ok=True)
+    index_path = content_dir / "index.md"
+    if not index_path.exists():
+        index_path.write_text(index_content, encoding="utf-8")
+
+    # Create defaults directory with Pandoc defaults
+    defaults_dir = Path("defaults")
+    defaults_dir.mkdir(exist_ok=True)
+    defaults_path = defaults_dir / "html.yaml"
+    if not defaults_path.exists():
+        defaults_path.write_text(defaults_content, encoding="utf-8")
+
+    console.print("[bold green]✨ Created starter project:[/bold green]")
+    console.print(f"  {target}")
+    console.print(f"  {index_path}")
+    console.print(f"  {defaults_path}")
+    console.print("\n[yellow]Next steps:[/yellow] Run 'dojo build' then 'ninja -C _build'")
 
 
 def cmd_version(_args: DojoArgs) -> None:

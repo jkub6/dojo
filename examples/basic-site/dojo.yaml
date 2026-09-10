@@ -1,0 +1,11 @@
+src_dir: content
+output_dir: _site
+build_dir: _build
+default_type: page
+tools:
+  pandoc: pandoc
+types:
+  page:
+    outputs:
+      - extension: html
+        defaults: defaults/html.yaml

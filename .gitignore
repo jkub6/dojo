@@ -44,6 +44,8 @@ venv.bak/
 
 # Nix
 .direnv/
+result
+result-*
 
 # Ninja
 build.ninja
@@ -53,12 +55,16 @@ build.ninja
 # Project Artifacts
 _site/
 _build/
-result
+_cache/
 
 # Editor Configs
 .idea/
 .vscode/
+*.swp
+*.swo
+*~
 
 # System
 .DS_Store
 .dojo.log
+node_modules/

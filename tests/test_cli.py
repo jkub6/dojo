@@ -44,13 +44,15 @@ def test_cli_version_subcommand(capsys):
 
 
 def test_init_creates_file(tmp_path, monkeypatch, capsys):
-    """Test init command creates dojo.yaml."""
+    """Test init command creates a complete starter project."""
     monkeypatch.chdir(tmp_path)
     main(["init"])
 
     assert (tmp_path / "dojo.yaml").exists()
+    assert (tmp_path / "content" / "index.md").exists()
+    assert (tmp_path / "defaults" / "html.yaml").exists()
     captured = capsys.readouterr()
-    assert "Created sample configuration" in captured.out
+    assert "Created starter project" in captured.out
 
 
 def test_init_existing_file(tmp_path, monkeypatch, capsys):

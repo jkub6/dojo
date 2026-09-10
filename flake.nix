@@ -1,5 +1,5 @@
 {
-  description = "Dojo - A static site and document generator built on Pandoc and Typst";
+  description = "Dojo - A static site and document generator powered by Ninja and Pandoc";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -11,7 +11,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    treefmt-nix-config.url = "git+ssh://git@github.com/jkub6/treefmt-nix-config";
+    treefmt-nix-config.url = "github:jkub6/treefmt-nix-config";
   };
 
   outputs = inputs @ {flake-parts, ...}:
@@ -20,6 +20,7 @@
       systems = [
         "x86_64-linux"
         "aarch64-linux"
+        # macOS support is untested; uncomment when CI covers Darwin:
         # "x86_64-darwin"
         # "aarch64-darwin"
       ];
@@ -37,7 +38,7 @@
             ++ [
               (python-final: _python-prev: {
                 dojo = python-final.buildPythonPackage {
-                  pname = "dojo";
+                  pname = "dojo-ssg";
                   version = "0.1.0";
                   pyproject = true;
 
@@ -72,6 +73,7 @@
                     final.ghostscript
                   ];
 
+                  # Disabled: requires tool execution that fails in the Nix build sandbox
                   disabledTests = [
                     "test_generates_and_executes_tools"
                   ];
@@ -84,7 +86,7 @@
                   '';
 
                   meta = with final.lib; {
-                    description = "A static site and document generator built on Pandoc and Typst";
+                    description = "A static site and document generator powered by Ninja and Pandoc";
                     homepage = "https://github.com/jkub6/dojo";
                     license = licenses.mit;
                     mainProgram = "dojo"; # Explicit mainProgram mapping

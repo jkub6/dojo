@@ -3,15 +3,24 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "dojo"
+name = "dojo-ssg"
 version = "0.1.0"
-description = "Ninja Build Generator for Static Site Generation"
+description = "A static site and document generator powered by Ninja and Pandoc"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
 authors = [{ name = "Jake", email = "jkub66@gmail.com" }]
+keywords = [
+  "ninja",
+  "pandoc",
+  "ssg",
+  "static-site-generator",
+  "build-tool",
+  "typst",
+]
 classifiers = [
   "Development Status :: 4 - Beta",
+  "Environment :: Console",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
@@ -20,6 +29,7 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
   "Topic :: Software Development :: Build Tools",
   "Topic :: Text Processing :: Markup",
+  "Typing :: Typed",
 ]
 dependencies = ["pyyaml>=6.0.2", "pydantic>=2.10", "tqdm>=4.67", "rich>=14.0"]
 
@@ -44,6 +54,7 @@ Homepage = "https://github.com/jkub6/dojo"
 Documentation = "https://github.com/jkub6/dojo#readme"
 Repository = "https://github.com/jkub6/dojo.git"
 Issues = "https://github.com/jkub6/dojo/issues"
+Changelog = "https://github.com/jkub6/dojo/blob/main/CHANGELOG.md"
 
 [project.scripts]
 dojo = "dojo.cli:entry_point"
@@ -132,8 +143,8 @@ indent-style = "space"
 # NinjaEmitter and Path are used for both type hints AND runtime operations
 # (e.g., emitter.build() calls, path.resolve()). Moving to TYPE_CHECKING would
 # cause NameError at runtime. This is a known limitation of static TC analysis.
-"src/dojo/stages/*.py" = ["TC001", "TC003"]
-"src/dojo/schema.py" = ["TC003"] # Path used at runtime for write_text()
+"src/dojo/stages/*.py" = ["TCH001", "TCH003"]
+"src/dojo/schema.py" = ["TCH003"] # Path used at runtime for write_text()
 "src/dojo/emitter.py" = [
   "PLR0913",
 ] # Ninja build format has many optional fields
@@ -143,15 +154,7 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_functions = "test_*"
 python_classes = "Test*"
-addopts = [
-  "--strict",
-  "--cov=src",
-  "--cov-report=term-missing",
-  "--cov-report=xml",
-  "--tb=short",
-  "-nauto",
-  "--randomly-seed=1234",
-]
+addopts = ["--strict-markers", "--strict-config", "--tb=short"]
 timeout = 30
 pythonpath = "src"
 

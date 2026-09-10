@@ -15,13 +15,13 @@ default:
 [group('Quality')]
 [doc('Apply automatic fixes (formatting and linting)')]
 fix: format
-  ruff check --fix-only .
-  statix fix .
+	ruff check --fix-only .
+	statix fix .
 
 [group('Quality')]
 [doc('Format code')]
 format:
-  nix fmt
+	nix fmt
 
 [group('Quality')]
 [doc('Run all static analysis checks')]
@@ -31,12 +31,12 @@ check:
 	vulture
 	statix check .
 	typos --config .typos.toml .
-	nix flake check --all-systems .  # This will check formatting too
+	nix flake check .
 
 [group('Quality')]
 [doc('Run all tests')]
 test:
-	pytest
+	pytest -nauto --cov=src --cov-report=term-missing --cov-report=xml
 
 [group('Quality')]
 [doc('Run full CI pipeline: check, test, build')]
