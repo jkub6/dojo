@@ -98,11 +98,11 @@
         "treefmt-nix-config": "treefmt-nix-config_2"
       },
       "locked": {
-        "lastModified": 1789145267,
-        "narHash": "sha256-J7A21azFx7k51EKuUqlcMlDNfusq3bYxtZ9jMwlj7zQ=",
+        "lastModified": 1789146985,
+        "narHash": "sha256-N6iMmKXpiei092EUZr9Iz2940cbEoJPDFLT1wZDAy3s=",
         "owner": "jkub6",
         "repo": "mdformat-pandoc",
-        "rev": "c55485570d760d7bbc8ea132af951cccf37e993b",
+        "rev": "fce24f117908689e1196a1d52156323cadaf2f1b",
         "type": "github"
       },
       "original": {
@@ -425,11 +425,11 @@
         "nixpkgs": "nixpkgs_9"
       },
       "locked": {
-        "lastModified": 1789145279,
-        "narHash": "sha256-SepU8JN74v+zp077vFctvSZBOKWbXXuZ7nk3w83jPBU=",
+        "lastModified": 1789147003,
+        "narHash": "sha256-vFgnfol4cCh0oca2ZU6jeHAVfYK8LNaFqt3wYhbYEUY=",
         "owner": "jkub6",
         "repo": "treefmt-nix-config",
-        "rev": "65a3909005730e7020bd011934d621c2dffe39ec",
+        "rev": "fe3f0af495661e7c324afae80f6a61919af0cc47",
         "type": "github"
       },
       "original": {
