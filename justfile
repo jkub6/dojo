@@ -31,7 +31,7 @@ check:
 	vulture
 	statix check .
 	typos --config .typos.toml .
-	nix flake check .
+	nix flake check . --all-systems
 
 [group('Quality')]
 [doc('Run all tests')]
