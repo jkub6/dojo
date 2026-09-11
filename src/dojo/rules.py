@@ -4,6 +4,7 @@ Defines the standard set of rules for compilation, rendering,
 asset processing, and tool invocation provided by default.
 """
 
+import os
 import sys
 from pathlib import Path
 from typing import cast
@@ -53,6 +54,14 @@ def _get_typst_flags(config: Config) -> list[str]:
         font_path = (Path(config.pandoc_data_dir).resolve() / "fonts").as_posix()
         if Path(font_path).exists():
             flags.append(f"--pdf-engine-opt=--font-path={shell_quote(font_path)}")
+
+    env_font_paths = os.environ.get("TYPST_FONT_PATHS")
+    if env_font_paths:
+        flags.extend(
+            f"--pdf-engine-opt=--font-path={shell_quote(p.strip())}"
+            for p in env_font_paths.split(os.pathsep)
+            if p.strip()
+        )
 
     resources_dir = Path(__file__).parent.resolve() / "resources"
     typst_csl_filter = resources_dir / "fix_typst_csl.lua"
