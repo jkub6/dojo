@@ -169,6 +169,9 @@ class AssetProcessor:
                 except ValueError:
                     continue
 
+                if any(part.startswith(".") for part in rel_file.parts):
+                    continue
+
                 final_path = sanitize_path(self.out_dir, rel_file)
                 static_outputs.append(final_path)
 

@@ -75,7 +75,15 @@ def _get_path_repls(ctx: PlaceholderContext) -> dict[str, str]:
         repls.update({"{out_abs}": out_abs.as_posix(), "{out_abs_dir}": out_abs_dir.as_posix()})
 
     if ctx.out_dir and out_abs_dir:
-        root_val = os.path.relpath(Path(ctx.out_dir).resolve(), out_abs_dir).replace("\\", "/")
+        base_dir = Path(ctx.out_dir).resolve()
+        if ctx.build_dir:
+            build_abs = Path(ctx.build_dir).resolve()
+            try:
+                out_abs_dir.relative_to(build_abs)
+                base_dir = build_abs
+            except ValueError:
+                pass
+        root_val = os.path.relpath(base_dir, out_abs_dir).replace("\\", "/")
         repls["{root_val}"] = root_val
     return repls
 
