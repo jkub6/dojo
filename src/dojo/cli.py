@@ -15,6 +15,7 @@ from rich.console import Console
 from . import __version__
 from .config import load_config
 from .core import NinjaGenerator
+from .crunch import crunch_file
 from .log_config import setup_logging
 from .schema import print_schema, write_schema
 
@@ -39,6 +40,9 @@ class DojoArgs(argparse.Namespace):
     dry_run: bool = False
     json_output: bool = False
     output: str | None = None
+    input: str | None = None
+    level: int = 22
+    window_log: int = 26
 
 
 def setup_cli_logging(*, verbose: bool, quiet: bool, json_output: bool = False) -> None:
@@ -199,6 +203,20 @@ def cmd_schema(args: DojoArgs) -> None:
         print_schema()
 
 
+def cmd_crunch(args: DojoArgs) -> None:
+    """Handle the crunch command."""
+    input_file = args.input or "-"
+    output_file = args.output or "-"
+    try:
+        crunch_file(input_file, output_file, level=args.level, window_log=args.window_log)
+    except Exception as e:
+        if args.verbose:
+            logger.exception("Crunch compression failed")
+        else:
+            console.print(f"[bold red]Error:[/bold red] {e}")
+        sys.exit(1)
+
+
 def main(argv: list[str] | None = None) -> None:
     """CLI entry point for dojo."""
     parser = argparse.ArgumentParser(
@@ -258,6 +276,35 @@ def main(argv: list[str] | None = None) -> None:
     # Version command (as subcommand)
     version_parser = subparsers.add_parser("version", help="Show version info")
     version_parser.set_defaults(func=cmd_version)
+
+    # Crunch command
+    crunch_parser = subparsers.add_parser(
+        "crunch", help="Compress HTML into self-extracting offline HTML"
+    )
+    crunch_parser.add_argument(
+        "input", nargs="?", default="-", help='Input HTML file ("-" for stdin)'
+    )
+    crunch_parser.add_argument(
+        "-o", "--output", help='Output file (default: stdout; "-" also means stdout)'
+    )
+    crunch_parser.add_argument(
+        "-l",
+        "--level",
+        type=int,
+        default=22,
+        choices=range(1, 23),
+        metavar="1-22",
+        help="Zstd level (default: 22)",
+    )
+    crunch_parser.add_argument(
+        "--window-log",
+        type=int,
+        default=26,
+        choices=range(10, 28),
+        metavar="10-27",
+        help="Decoder history: 2^N bytes (default: 26 = 64 MiB)",
+    )
+    crunch_parser.set_defaults(func=cmd_crunch)
 
     args = parser.parse_args(argv, namespace=DojoArgs())
 

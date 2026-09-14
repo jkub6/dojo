@@ -18,6 +18,7 @@ class RuleName(StrEnum):
     GHOSTSCRIPT = "ghostscript"
     DECKTAPE = "decktape"
     STAMP = "stamp"
+    CRUNCH = "crunch"
 
 
 # Asset keys that implicitly reference files that should be tracked/copied

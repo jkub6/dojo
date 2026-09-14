@@ -122,6 +122,7 @@ def normalize_ninja():
         # Normalize tool paths and commands
         content = re.sub(r"\S*pandoc {in_abs}", "[TOOL_PANDOC] {in_abs}", content)
         content = re.sub(r"\S*minify --html-keep", "[TOOL_MINIFY] --html-keep", content)
+        content = re.sub(r"\S*python\S* -m dojo\.crunch", "[PYTHON_BIN] -m dojo.crunch", content)
         content = re.sub(r"\S*gs -sDEVICE", "[TOOL_GS] -sDEVICE", content)
         content = re.sub(r"--copy -- ", "[PY_COPY] ", content)
         return re.sub(r"\S*decktape reveal", "[TOOL_DECKTAPE] reveal", content)

@@ -49,6 +49,7 @@
                     pydantic
                     tqdm
                     rich
+                    zstandard
                   ];
 
                   nativeBuildInputs = [
@@ -146,6 +147,7 @@
               p.pydantic
               p.tqdm
               p.rich
+              p.zstandard
               # Test
               p.pytest
               p.pytest-cov

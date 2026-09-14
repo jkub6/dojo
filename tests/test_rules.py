@@ -93,3 +93,22 @@ def test_builtin_rules_no_tools(tmp_path):
     regen_rule = next(r for r in rules if r.name == "regenerate")
     assert "dojo build" in regen_rule.command
     assert "PYTHONPATH=" in regen_rule.command
+
+
+def test_builtin_rules_crunch():
+    c = Config.model_construct(
+        src_dir="src",
+        output_dir="site",
+        build_dir="build",
+        default_type="page",
+        types={},
+        tools=ToolPaths.model_construct(pandoc="pandoc"),
+        root_ref_dir=".",
+        add_resource_path=True,
+        rule_pools={"crunch": "heavy"},
+    )
+    rules = get_builtin_rules(c, Path("config.yaml"))
+    crunch_rule = next(r for r in rules if r.name == "crunch")
+    assert "wrap.py" in crunch_rule.command
+    assert "-m dojo.crunch" in crunch_rule.command
+    assert crunch_rule.pool == "heavy"

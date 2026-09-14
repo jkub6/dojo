@@ -240,3 +240,39 @@ class PluginLoadError(DojoError):
     def __init__(self, path: str, reason: str) -> None:
         """Initialize PluginLoadError."""
         super().__init__(f"Failed to load plugin '{path}': {reason}")
+
+
+class CrunchError(DojoError):
+    """Base error for crunch compression issues."""
+
+
+class InvalidUtf8HtmlError(CrunchError):
+    """Raised when HTML input contains invalid UTF-8 data."""
+
+    def __init__(self) -> None:
+        """Initialize InvalidUtf8HtmlError."""
+        super().__init__("Input must be valid UTF-8 HTML.")
+
+
+class IncompleteUtf8HtmlError(CrunchError):
+    """Raised when HTML input ends with an incomplete UTF-8 byte sequence."""
+
+    def __init__(self) -> None:
+        """Initialize IncompleteUtf8HtmlError."""
+        super().__init__("Input ends with incomplete UTF-8.")
+
+
+class StreamSizeMismatchError(CrunchError):
+    """Raised when stream size changes unexpectedly during compression."""
+
+    def __init__(self) -> None:
+        """Initialize StreamSizeMismatchError."""
+        super().__init__("Input size changed during compression.")
+
+
+class SameInputOutputError(CrunchError):
+    """Raised when input and output refer to the same file."""
+
+    def __init__(self) -> None:
+        """Initialize SameInputOutputError."""
+        super().__init__("Input and output refer to the same file.")

@@ -187,6 +187,16 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
                 pool=get_pool(RuleName.MINIFY.value),
             ),
             CustomRule(
+                name=RuleName.CRUNCH.value,
+                command=(
+                    f"{dojo_wrap_base} --ensure-dir {{out_abs_dir}} -- "
+                    f"{shell_quote(sys.executable)} -m dojo.crunch "
+                    "{in_abs} -o {out_abs} $args"
+                ),
+                description="🗜️  CRUNCH $out",
+                pool=get_pool(RuleName.CRUNCH.value),
+            ),
+            CustomRule(
                 name=RuleName.GHOSTSCRIPT.value,
                 command=(
                     f"{dojo_wrap_base} --ensure-dir {{out_abs_dir}} -- "

@@ -34,6 +34,10 @@ rule minify
   command = [DOJO_WRAP] --path-env "[TOOL_PATHS]" --in-file $in_shell --out-file $out_shell --src-dir [PROJECT_ROOT]/content --out-dir [PROJECT_ROOT]/_site --build-dir [PROJECT_ROOT]/_build  --ensure-dir {out_abs_dir} -- [TOOL_MINIFY] --html-keep-document-tags --html-keep-end-tags -q $args -o {out_abs} {in_abs}
   description = ⚡ MINIFY $out
 
+rule crunch
+  command = [DOJO_WRAP] --path-env "[TOOL_PATHS]" --in-file $in_shell --out-file $out_shell --src-dir [PROJECT_ROOT]/content --out-dir [PROJECT_ROOT]/_site --build-dir [PROJECT_ROOT]/_build  --ensure-dir {out_abs_dir} -- [PYTHON_BIN] -m dojo.crunch {in_abs} -o {out_abs} $args
+  description = 🗜️  CRUNCH $out
+
 rule ghostscript
   command = [DOJO_WRAP] --path-env "[TOOL_PATHS]" --in-file $in_shell --out-file $out_shell --src-dir [PROJECT_ROOT]/content --out-dir [PROJECT_ROOT]/_site --build-dir [PROJECT_ROOT]/_build  --ensure-dir {out_abs_dir} -- [TOOL_GS] -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH -dSAFER $args -sOutputFile={out_abs} {in_abs}
   description = 🗜️  COMPRESS $out

@@ -31,7 +31,13 @@ classifiers = [
   "Topic :: Text Processing :: Markup",
   "Typing :: Typed",
 ]
-dependencies = ["pyyaml>=6.0.2", "pydantic>=2.10", "tqdm>=4.67", "rich>=14.0"]
+dependencies = [
+  "pyyaml>=6.0.2",
+  "pydantic>=2.10",
+  "tqdm>=4.67",
+  "rich>=14.0",
+  "zstandard>=0.23",
+]
 
 [dependency-groups]
 dev = [
@@ -187,7 +193,7 @@ init_typed = true
 warn_required_dynamic_aliases = true
 
 [[tool.mypy.overrides]]
-module = ["yaml", "tqdm", "rich.*"]
+module = ["yaml", "tqdm", "rich.*", "zstandard", "zstandard.*"]
 ignore_missing_imports = true
 
 [tool.coverage.run]
