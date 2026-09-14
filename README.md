@@ -15,8 +15,8 @@ extreme speed of Ninja's incremental build system.
 - **Format Agnostic**: Support for HTML, PDF (via Decktape/Typst), and any other format Pandoc
   supports.
 - **Smart Assets**: Recursively discovers and copies CSS, images, and other dependencies.
-- **Pipeline Processing**: Built-in support for Ghostscript optimization, minification, and
-  multi-step post-processing.
+- **Pipeline Processing**: Built-in support for Ghostscript optimization, minification,
+  self-extracting offline HTML compression (crunch), and multi-step post-processing.
 - **Strict Configuration**: Pydantic-powered `dojo.yaml` with rigorous validation and ID discovery.
 - **Extensible**: Fully featured Python-based plugin system to modify Ninja rules and build
   orchestration.
@@ -80,6 +80,23 @@ nix develop github:jkub6/dojo
    ```
 
 Your generated site will be in `_site/`.
+
+### Offline HTML Compression (`crunch`)
+
+Dojo includes built-in offline HTML compression using in-process Zstandard compression and an
+embedded Web Worker decoder. You can use it as a post-processing tool in `dojo.yaml`:
+
+```yaml
+post_process:
+  - tool: minify
+  - tool: crunch
+```
+
+Or compress HTML documents directly from the command line:
+
+```bash
+dojo crunch input.html -o output.html
+```
 
 ## Why Dojo?
 

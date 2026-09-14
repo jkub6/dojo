@@ -65,25 +65,26 @@ flowchart TB
 
 ## Module Responsibilities
 
-| Module              | Purpose                            | Key Classes/Functions                                                                 |
-| ------------------- | ---------------------------------- | ------------------------------------------------------------------------------------- |
-| `cli.py`            | Command-line interface             | `main()`, `cmd_build()`, `cmd_init()`, `cmd_check()`, `cmd_schema()`, `cmd_version()` |
-| `config.py`         | Configuration loading & validation | `Config`, `TypeConfig`, `OutputConfig`, `load_config()`                               |
-| `core.py`           | Pipeline orchestration             | `NinjaGenerator`                                                                      |
-| `stages/compile.py` | Markdown → JSON AST                | `CompileStage`                                                                        |
-| `stages/render.py`  | JSON → Output formats              | `RenderStage`                                                                         |
-| `stages/assets.py`  | Asset dependency copying           | `AssetProcessor`                                                                      |
-| `emitter.py`        | Ninja syntax generation            | `NinjaEmitter`                                                                        |
-| `rules.py`          | Built-in Ninja rules               | `get_builtin_rules()`                                                                 |
-| `plugins.py`        | Plugin interface                   | `PluginInterface`, `load_plugin()`                                                    |
-| `schema.py`         | JSON Schema export                 | `generate_schema()`                                                                   |
-| `deps.py`           | Dependency file parsing            | `parse_depfile()`                                                                     |
-| `resources.py`      | Bundled resource lookup            | `find_resource()`                                                                     |
-| `paths.py`          | Path utilities and sanitization    | `sanitize_path()`                                                                     |
-| `exceptions.py`     | Custom exception hierarchy         | `DojoError`, `ConfigInvalidError`, etc.                                               |
-| `yaml_utils.py`     | YAML loading utilities             | YAML helper functions                                                                 |
-| `log_config.py`     | Logging configuration              | `setup_logging()`                                                                     |
-| `wrap.py`           | Subprocess execution wrapper       | Tool execution with error handling                                                    |
+| Module              | Purpose                            | Key Classes/Functions                                                                                 |
+| ------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `cli.py`            | Command-line interface             | `main()`, `cmd_build()`, `cmd_init()`, `cmd_check()`, `cmd_schema()`, `cmd_version()`, `cmd_crunch()` |
+| `config.py`         | Configuration loading & validation | `Config`, `TypeConfig`, `OutputConfig`, `load_config()`                                               |
+| `core.py`           | Pipeline orchestration             | `NinjaGenerator`                                                                                      |
+| `crunch.py`         | Self-extracting HTML compressor    | `crunch_file()`, `generate_payloads()`, `encode_base91()`                                             |
+| `stages/compile.py` | Markdown → JSON AST                | `CompileStage`                                                                                        |
+| `stages/render.py`  | JSON → Output formats              | `RenderStage`                                                                                         |
+| `stages/assets.py`  | Asset dependency copying           | `AssetProcessor`                                                                                      |
+| `emitter.py`        | Ninja syntax generation            | `NinjaEmitter`                                                                                        |
+| `rules.py`          | Built-in Ninja rules               | `get_builtin_rules()`                                                                                 |
+| `plugins.py`        | Plugin interface                   | `PluginInterface`, `load_plugin()`                                                                    |
+| `schema.py`         | JSON Schema export                 | `generate_schema()`                                                                                   |
+| `deps.py`           | Dependency file parsing            | `parse_depfile()`                                                                                     |
+| `resources.py`      | Bundled resource lookup            | `find_resource()`                                                                                     |
+| `paths.py`          | Path utilities and sanitization    | `sanitize_path()`                                                                                     |
+| `exceptions.py`     | Custom exception hierarchy         | `DojoError`, `ConfigInvalidError`, etc.                                                               |
+| `yaml_utils.py`     | YAML loading utilities             | YAML helper functions                                                                                 |
+| `log_config.py`     | Logging configuration              | `setup_logging()`                                                                                     |
+| `wrap.py`           | Subprocess execution wrapper       | Tool execution with error handling                                                                    |
 
 ## Build Pipeline Stages
 
@@ -110,7 +111,7 @@ The render stage transforms JSON AST to final formats using Pandoc's rich output
 features:
 
 - Format-specific templates and defaults
-- Post-processing hooks (minification, or multi-step pipelines)
+- Post-processing hooks (minification, offline HTML compression via crunch, or multi-step pipelines)
 - Derived outputs (HTML → PDF via Decktape, which can also be post-processed)
 
 ### 3. Asset Stage

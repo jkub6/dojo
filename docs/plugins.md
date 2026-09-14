@@ -86,7 +86,7 @@ Return a list of custom Ninja rules. Each rule must have:
 
 **Built-in rule names you cannot use:**
 
-- `regenerate`, `compile`, `render`, `minify`, `ghostscript`, `decktape`
+- `regenerate`, `compile`, `render`, `minify`, `ghostscript`, `decktape`, `crunch`
 
 **Example:**
 
