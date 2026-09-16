@@ -330,3 +330,99 @@ def test_config_type_output_defaults_resolved_with_data_dir(tmp_path, valid_conf
     cfg = Config(**valid_config_data)
     assert cfg.types["page"].defaults == str(type_yaml.resolve())
     assert cfg.types["page"].outputs[0].defaults == str(output_yaml.resolve())
+
+
+# --- Additional Edge Cases ---
+
+
+def test_tool_paths_non_dict():
+    """Verify resolve_tool_paths returns data as-is if not a dict."""
+    res = ToolPaths.resolve_tool_paths("non-dict")
+    assert res == "non-dict"
+
+
+def test_tool_paths_empty_or_non_string():
+    """Verify resolve_tool_paths skips empty or non-string tool entries."""
+    data = {"pandoc": "pandoc", "minify": ""}
+    res = ToolPaths.resolve_tool_paths(data)
+    assert isinstance(res, dict)
+    assert res["minify"] == ""
+
+
+def test_normalize_post_process_variations(tmp_path):
+    """Test normalize_post_process handles None, single string, single dict, and invalid types."""
+    d = tmp_path / "defaults.yaml"
+    d.touch()
+
+    # Single string
+    oc1 = OutputConfig(extension="html", defaults=str(d), post_process="minify")
+    assert len(oc1.post_process) == 1
+    assert oc1.post_process[0].tool == "minify"
+
+    # Single dict
+    oc2 = OutputConfig(
+        extension="html",
+        defaults=str(d),
+        post_process={"tool": "ghostscript", "args": ["-dQUIET"]},
+    )
+    assert len(oc2.post_process) == 1
+    assert oc2.post_process[0].tool == "ghostscript"
+
+    # Invalid type raises error
+    with pytest.raises(TypeError):
+        OutputConfig(extension="html", defaults=str(d), post_process=12345)
+
+
+def test_custom_rule_conflict_with_builtin(valid_config_data):
+    """Test that defining a custom rule named after a built-in rule raises CustomRuleConflictError."""
+    from dojo.config import CustomRule
+    from dojo.constants import RuleName
+
+    valid_config_data["custom_rules"] = [
+        CustomRule(name=RuleName.COMPILE.value, command="custom_compile $in")
+    ]
+    with pytest.raises(
+        CustomRuleConflictError,
+        match=f"Custom rule name '{RuleName.COMPILE.value}' conflicts with built-in rule",
+    ):
+        Config(**valid_config_data)
+
+
+def test_undefined_pool_reference(valid_config_data):
+    """Test that referencing an undefined pool raises ConfigInvalidError."""
+    valid_config_data["rule_pools"] = {"render": "nonexistent_pool"}
+    valid_config_data["pools"] = {"other_pool": 2}
+    with pytest.raises(ConfigError, match="references undefined pool"):
+        Config(**valid_config_data)
+
+
+def test_auto_exclude_outside_parent(valid_config_data):
+    """Test _auto_exclude gracefully handles child paths outside parent."""
+    cfg = Config(**valid_config_data)
+    child = Path("/entirely/different/path")
+    parent = Path(cfg.src_dir).resolve()
+    initial_exclude = list(cfg.exclude)
+    cfg._auto_exclude(child, parent)
+    assert cfg.exclude == initial_exclude
+
+
+def test_load_config_non_dict_yaml(tmp_path):
+    """Test load_config raises ConfigError when YAML is a list or scalar."""
+    bad_yaml = tmp_path / "list_config.yaml"
+    bad_yaml.write_text("- item1\n- item2\n")
+    with pytest.raises(ConfigError, match="must be a dictionary"):
+        load_config(str(bad_yaml))
+
+
+def test_exception_messages_edge_cases():
+    """Verify exception formatting for various error conditions."""
+    from dojo.exceptions import ConfigLoadError, DirectoryConflictError, EssentialToolNotFoundError
+
+    err1 = EssentialToolNotFoundError("pandoc", "/opt/pandoc")
+    assert "/opt/pandoc" in str(err1)
+
+    err2 = DirectoryConflictError("dir1", "/path1", "dir2", "/path2", issue="conflict")
+    assert "Directory conflict between dir1 and dir2" in str(err2)
+
+    err3 = ConfigLoadError("Failed", "/path/to/cfg", ValueError("inner"))
+    assert "inner" in str(err3)

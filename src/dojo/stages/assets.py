@@ -10,12 +10,15 @@ from __future__ import annotations
 import logging
 from collections import deque
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dojo.constants import RuleName
 from dojo.deps import resolve_glob_dependencies, scan_css_dependencies, scan_html_dependencies
-from dojo.emitter import NinjaEmitter
 from dojo.paths import ninja_quote, sanitize_path
 from dojo.yaml_utils import extract_paths, get_frontmatter_assets, parse_frontmatter
+
+if TYPE_CHECKING:
+    from dojo.emitter import NinjaEmitter
 
 logger = logging.getLogger(__name__)
 

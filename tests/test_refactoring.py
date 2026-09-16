@@ -22,9 +22,6 @@ def test_directory_conflict(tmp_path):
     with pytest.raises(DirectoryConflictError, match="Directory conflict"):
         Config(**data)
 
-    with pytest.raises(DirectoryConflictError, match="Directory conflict"):
-        Config(**data)
-
     # one inside another - now allowed if child is output/build
     build = src / "build"
     build.mkdir()

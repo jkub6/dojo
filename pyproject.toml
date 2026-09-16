@@ -104,14 +104,19 @@ select = [
   "ARG",  # Unused arguments (strict)
   "TID",  # flake8-tidy-imports
   "FBT",  # Boolean trap
-  "COM",  # Trailing commas
   "G",    # Logging format
+  "FA",   # flake8-future-annotations (enforce __future__ annotations)
+  "PIE",  # flake8-pie (clean code practices)
+  "RSE",  # flake8-raise (clean exception raises)
+  "SLOT", # flake8-slots (require __slots__ where appropriate)
+  "PGH",  # pygrep-hooks (ban generic ignores/eval)
+  "FLY",  # flynt (f-strings)
+  "YTT",  # flake8-2020 (Python 2/3 version checks)
 ]
 ignore = [
   "E501",   # Line too long (handled by formatter)
   "D203",   # One blank line before class (conflicts with D211)
   "D213",   # Multi-line docstring summary at second line (conflicts with D212)
-  "COM812", # Trailing comma missing (conflicts with formatter)
   "ISC001", # Implicit string concatenation (conflicts with formatter)
 ]
 
@@ -123,6 +128,7 @@ indent-style = "space"
 [tool.ruff.lint.per-file-ignores]
 # Test code is allowed to:
 # - S101: Use assert statements
+# - S311: Standard pseudo-random generators (deterministic test data)
 # - ARG: Have unused arguments (fixtures)
 # - S603: Use subprocess without shell=False validation
 # - S607: Starting process with partial executable path (e.g., "ninja")
@@ -131,8 +137,10 @@ indent-style = "space"
 # - PLC0415: Inline imports (common practice for test isolation)
 # - ANN: Annotations
 # - D100, D103: Doc strings
+# - PLR2004: Magic value used in comparison (e.g., status codes, counts in tests)
 "tests/**/*.py" = [
   "S101",
+  "S311",
   "ARG",
   "S603",
   "S607",
@@ -145,12 +153,6 @@ indent-style = "space"
   "PLR2004",
 ]
 
-# Stage modules have imports that TC rules incorrectly flag as type-hint-only.
-# NinjaEmitter and Path are used for both type hints AND runtime operations
-# (e.g., emitter.build() calls, path.resolve()). Moving to TYPE_CHECKING would
-# cause NameError at runtime. This is a known limitation of static TC analysis.
-"src/dojo/stages/*.py" = ["TCH001", "TCH003"]
-"src/dojo/schema.py" = ["TCH003"] # Path used at runtime for write_text()
 "src/dojo/emitter.py" = [
   "PLR0913",
 ] # Ninja build format has many optional fields
@@ -193,7 +195,7 @@ init_typed = true
 warn_required_dynamic_aliases = true
 
 [[tool.mypy.overrides]]
-module = ["yaml", "tqdm", "rich.*", "zstandard", "zstandard.*"]
+module = ["tqdm", "zstandard", "zstandard.*"]
 ignore_missing_imports = true
 
 [tool.coverage.run]
@@ -216,7 +218,6 @@ paths = ["src"]
 ignore_names = [
   "cls",
   "resolve_tool_paths",
-  "validate_defaults_path",
   "validate_derived_output",
   "validate_custom_rules",
   "validate_src_dir",

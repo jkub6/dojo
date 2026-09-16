@@ -104,7 +104,7 @@ def setup_logging(
             show_time=False,
             show_path=False,
             markup=True,
-            console=Console(),
+            console=Console(file=stream),
         )
         dojo_logger.addHandler(rich_handler)
 

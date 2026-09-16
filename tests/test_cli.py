@@ -68,6 +68,25 @@ def test_init_existing_file(tmp_path, monkeypatch, capsys):
     assert "already exists" in captured.out
 
 
+def test_init_existing_content_and_defaults(tmp_path, monkeypatch, capsys):
+    """Test init preserves existing content and defaults files if dojo.yaml does not exist."""
+    monkeypatch.chdir(tmp_path)
+    content_dir = tmp_path / "content"
+    content_dir.mkdir()
+    (content_dir / "index.md").write_text("existing content", encoding="utf-8")
+
+    defaults_dir = tmp_path / "defaults"
+    defaults_dir.mkdir()
+    (defaults_dir / "html.yaml").write_text("existing defaults", encoding="utf-8")
+
+    main(["init"])
+
+    assert (content_dir / "index.md").read_text(encoding="utf-8") == "existing content"
+    assert (defaults_dir / "html.yaml").read_text(encoding="utf-8") == "existing defaults"
+    captured = capsys.readouterr()
+    assert "Created starter project" in captured.out
+
+
 def test_check_valid_config(tmp_path, monkeypatch, capsys):
     """Test check command with valid config."""
     monkeypatch.chdir(tmp_path)

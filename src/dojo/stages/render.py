@@ -8,17 +8,18 @@ both standard rendering and derived outputs.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dojo.constants import RuleName
-from dojo.emitter import NinjaEmitter
 from dojo.exceptions import DependencyError, OutputSourceMissingError, OutputToolMissingError
 from dojo.paths import ninja_quote, sanitize_path, shell_quote
 from dojo.stages._defaults import resolve_stage_dependencies
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from dojo.config import Config, OutputConfig, PipelineStep
+    from dojo.emitter import NinjaEmitter
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +151,7 @@ class RenderStage:
         final_path, render_target = self._get_paths(out_config, rel_stem, filename)
 
         if out_config.source is None:
-            raise OutputSourceMissingError()
+            raise OutputSourceMissingError
         raw_source = out_config.source
 
         source_ids_list: list[str] = [raw_source] if isinstance(raw_source, str) else raw_source
@@ -174,7 +175,7 @@ class RenderStage:
             variables["args"] = " ".join(out_config.args)
 
         if out_config.tool is None:
-            raise OutputToolMissingError()
+            raise OutputToolMissingError
 
         self.emitter.build(
             outputs=render_target,

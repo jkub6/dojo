@@ -6,16 +6,17 @@ Markdown source files to Pandoc JSON AST format.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dojo.constants import RuleName
-from dojo.emitter import NinjaEmitter
 from dojo.paths import ninja_quote, sanitize_path
 from dojo.stages._defaults import resolve_stage_dependencies
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from dojo.config import Config, TypeConfig
+    from dojo.emitter import NinjaEmitter
 
 
 class CompileStage:

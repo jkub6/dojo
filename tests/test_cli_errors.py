@@ -181,3 +181,24 @@ class TestCLIErrors:
         with pytest.raises(SystemExit) as exc:
             main(["init"])
         assert exc.value.code == 1
+
+    def test_main_internal_error_verbose(self, mocker) -> None:
+        """Test that unhandled exceptions in main with --verbose log the exception."""
+        mocker.patch("dojo.cli.setup_cli_logging", side_effect=RuntimeError("Verbose Crash"))
+        with pytest.raises(SystemExit) as exc:
+            main(["--verbose", "--version"])
+        assert exc.value.code == 1
+
+    def test_crunch_unexpected_error(self, mocker) -> None:
+        """Test that crunch command handles unexpected exceptions gracefully."""
+        mocker.patch("dojo.cli.crunch_file", side_effect=RuntimeError("Crunch Failed"))
+        with pytest.raises(SystemExit) as exc:
+            main(["crunch", "input.html", "-o", "output.html"])
+        assert exc.value.code == 1
+
+    def test_crunch_unexpected_error_verbose(self, mocker) -> None:
+        """Test that crunch command with --verbose logs unexpected exceptions."""
+        mocker.patch("dojo.cli.crunch_file", side_effect=RuntimeError("Crunch Failed Verbose"))
+        with pytest.raises(SystemExit) as exc:
+            main(["--verbose", "crunch", "input.html", "-o", "output.html"])
+        assert exc.value.code == 1

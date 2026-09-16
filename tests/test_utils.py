@@ -174,3 +174,50 @@ def test_get_frontmatter_assets_nested(tmp_path):
 
     assets = get_frontmatter_assets(f)
     assert css_file.resolve() in assets
+
+
+def test_parse_frontmatter_empty_and_non_dict(tmp_path):
+    """Test parse_frontmatter handles empty frontmatter block and non-dict frontmatter."""
+    f_empty = tmp_path / "empty.md"
+    f_empty.write_text("---\n\n---\n# Heading", encoding="utf-8")
+    assert parse_frontmatter(f_empty) == {}
+
+    f_non_dict = tmp_path / "scalar.md"
+    f_non_dict.write_text("---\njust a scalar string\n---\n# Heading", encoding="utf-8")
+    assert parse_frontmatter(f_non_dict) is None
+
+
+def test_recursive_yaml_deps_diamond_and_metadata_files(tmp_path):
+    """Test get_recursive_yaml_deps handles diamond dependencies and metadata-files."""
+    root = tmp_path / "root.yaml"
+    branch1 = tmp_path / "branch1.yaml"
+    branch2 = tmp_path / "branch2.yaml"
+    shared = tmp_path / "shared.yaml"
+    shared.write_text("color: blue\n", encoding="utf-8")
+
+    meta_file = tmp_path / "meta.yaml"
+    meta_child = tmp_path / "meta_child.yaml"
+    meta_child.write_text("tag: test\n", encoding="utf-8")
+    meta_file.write_text(f"defaults: [{meta_child}]\n", encoding="utf-8")
+
+    branch1.write_text(f"defaults: [{shared}]\n", encoding="utf-8")
+    branch2.write_text(f"defaults: [{shared}]\n", encoding="utf-8")
+    root.write_text(
+        f"defaults:\n  - {branch1}\n  - {branch2}\nmetadata-files:\n  - {meta_file}\n",
+        encoding="utf-8",
+    )
+
+    deps = get_recursive_yaml_deps(root)
+    assert shared.resolve() in deps
+    assert branch1.resolve() in deps
+    assert branch2.resolve() in deps
+    assert meta_child.resolve() in deps
+
+
+def test_extract_paths_non_string_non_list():
+    """Test extract_paths skips values that are neither strings nor lists."""
+    from dojo.yaml_utils import extract_paths
+
+    data = {"key_int": 123, "key_dict": {"nested": "value"}, "key_str": "path.txt"}
+    paths = extract_paths(data, ["key_int", "key_dict", "key_str"])
+    assert paths == ["path.txt"]

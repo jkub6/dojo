@@ -62,14 +62,13 @@ def test_should_process_file_properties(includes, excludes):
     src_dir = Path("/src")
     file_path = Path("/src/content/index.md")
 
-    # Property: If a file matches any exclude pattern, it MUST return False
-    # (Simplified test: if we add the exact file to excludes)
-    if should_process_file(file_path, src_dir, includes, ["content/*.md"]):
-        assert "content/*.md" not in excludes  # Wait, logic check
-        pass
+    # Property 1: If an exclude pattern matches the relative path, it MUST return False regardless of includes
+    assert not should_process_file(file_path, src_dir, includes, [*excludes, "content/*.md"])
 
-    # Property: If includes is empty, all non-excluded files are processed
-    if not includes:
-        should_process_file(file_path, src_dir, [], excludes)
-        if not any(file_path.name == e for e in excludes):  # Very rough check
-            pass
+    # Property 2: If includes is empty and no excludes match, it MUST return True
+    non_matching_excludes = ["other/*", "nomatch.*"]
+    assert should_process_file(file_path, src_dir, [], non_matching_excludes)
+
+    # Property 3: Files outside src_dir must return False
+    outside_file = Path("/other/dir/file.md")
+    assert not should_process_file(outside_file, src_dir, includes, excludes)

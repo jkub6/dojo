@@ -40,7 +40,6 @@ def pipeline_config_data(tmp_path):
 
 
 def test_pipeline_generation(pipeline_config_data, tmp_path):
-    # This test will fail until we implement the changes
     cfg = Config(**pipeline_config_data)
     gen = NinjaGenerator(cfg, tmp_path / "dojo.yaml")
 

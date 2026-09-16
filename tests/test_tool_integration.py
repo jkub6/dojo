@@ -36,10 +36,6 @@ def test_compile_command_line_filters(minimal_config, tmp_path, mock_emitter):
     stage.compile(Path("src/test.md"), Path("test"), type_cfg)
 
     mock_emitter.build.assert_called_once()
-    # Check that filters are part of the command (indirectly via variables if used)
-    # Actually, filters are usually baked into the rule or passed as args.
-    # In Dojo, they are passed via the command template.
-    pass
 
 
 def test_ninja_generator_pool_emission(minimal_config, tmp_path, mock_emitter):

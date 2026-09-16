@@ -155,10 +155,10 @@ class OutputConfig(BaseModel):
     def validate_derived_output(self) -> OutputConfig:
         """Validate that derived outputs have required fields."""
         if self.source is not None and self.tool is None:
-            raise SourceRequiresToolError()
+            raise SourceRequiresToolError
 
         if self.source is None and self.defaults is None:
-            raise DefaultsRequiredError()
+            raise DefaultsRequiredError
 
         return self
 
@@ -413,7 +413,7 @@ def _find_config_path(explicit_path: str | None) -> Path:
 
     if explicit_path:
         raise ConfigFileNotFoundError(explicit_path)
-    raise ConfigFileNotFoundError()
+    raise ConfigFileNotFoundError
 
 
 def _apply_config_file_exclusion(config: Config, config_path: Path) -> None:

@@ -18,17 +18,10 @@ import threading
 from dataclasses import dataclass
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import IO, Protocol
+from typing import IO, overload
 
 # Constants
 MIN_COPY_ARGS = 2
-
-
-class _LogHandler(Protocol):
-    """Protocol for logging handler to satisfy type checkers."""
-
-    def write(self, s: str, /) -> int: ...
-    def flush(self) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -251,6 +244,14 @@ def _start_server(directory: str, log_handler: IO[str] | None) -> tuple[Threadin
     return server, port
 
 
+@overload
+def _p(val: None, current_ctx: PlaceholderContext) -> None: ...
+
+
+@overload
+def _p(val: str, current_ctx: PlaceholderContext) -> str: ...
+
+
 def _p(val: str | None, current_ctx: PlaceholderContext) -> str | None:
     return resolve_placeholders(val, current_ctx) if val is not None else None
 
@@ -324,14 +325,14 @@ def run_wrap(argv: list[str]) -> None:
     with contextlib.ExitStack() as stack:
         log_handler: IO[str] | None = None
         if args.log_file:
-            log_path = Path(_p(args.log_file, ctx))  # type: ignore[arg-type]
+            log_path = Path(_p(args.log_file, ctx))
             log_path.parent.mkdir(parents=True, exist_ok=True)
             log_handler = stack.enter_context(open(log_path, "a", encoding="utf-8"))
 
         server: ThreadingHTTPServer | None = None
         if args.serve_dir:
             serve_path = _p(args.serve_dir, ctx)
-            server, port = _start_server(serve_path, log_handler)  # type: ignore[arg-type]
+            server, port = _start_server(serve_path, log_handler)
             stack.callback(server.shutdown)
             stack.callback(server.server_close)
             ctx = PlaceholderContext(

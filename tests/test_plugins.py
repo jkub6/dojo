@@ -7,8 +7,6 @@ from dojo.plugins import PluginInterface, load_plugin
 class TestPlugin(PluginInterface):
     """Test plugin implementation."""
 
-    pass
-
 
 def test_load_plugin_not_found():
     """Test loading a non-existent plugin raises PluginLoadError."""
@@ -98,7 +96,7 @@ def test_plugin_priority_sorting():
         priority = 10
 
     class DefaultPriority(PluginInterface):
-        pass  # Uses default 100
+        """Uses default priority 100."""
 
     plugins = [LowPriority(), DefaultPriority(), HighPriority()]
     sorted_plugins = sorted(plugins, key=lambda p: getattr(p, "priority", 100))
@@ -106,3 +104,12 @@ def test_plugin_priority_sorting():
     assert isinstance(sorted_plugins[0], HighPriority)
     assert isinstance(sorted_plugins[1], DefaultPriority)
     assert isinstance(sorted_plugins[2], LowPriority)
+
+
+def test_load_plugin_spec_none(tmp_path, monkeypatch):
+    """Test load_plugin raises PluginLoadError when spec_from_file_location returns None."""
+    f = tmp_path / "dummy_plugin.py"
+    f.touch()
+    monkeypatch.setattr("importlib.util.spec_from_file_location", lambda *args, **kwargs: None)
+    with pytest.raises(PluginLoadError, match="failed to create import spec"):
+        load_plugin(str(f))

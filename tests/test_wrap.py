@@ -266,3 +266,62 @@ def test_resolve_placeholders_complex_paths():
 
         # src_dir_val: src_dir (/src) + rel_src_dir (content/posts) -> /src/content/posts
         assert resolve_placeholders("{src_dir_val}", ctx) == "/src/content/posts"
+
+
+def test_handle_exec_unlinks_on_nonzero_exit(tmp_path):
+    """Verify _handle_exec removes out_file if command returns non-zero."""
+    from dojo.wrap import _handle_exec
+
+    out_file = tmp_path / "failed_output.html"
+    out_file.write_text("partial output", encoding="utf-8")
+
+    with (
+        patch("sys.exit") as mock_exit,
+        patch("subprocess.run") as mock_run,
+    ):
+        mock_run.return_value.returncode = 2
+        _handle_exec(["fake_cmd"], {}, None, out_file=str(out_file))
+        assert not out_file.exists()
+        mock_exit.assert_called_once_with(2)
+
+
+def test_handle_exec_unlinks_on_oserror(tmp_path):
+    """Verify _handle_exec removes out_file if command execution raises OSError."""
+    from dojo.wrap import _handle_exec
+
+    out_file = tmp_path / "failed_output.html"
+    out_file.write_text("partial output", encoding="utf-8")
+
+    with (
+        patch("sys.exit") as mock_exit,
+        patch("subprocess.run", side_effect=OSError("Exec failed")),
+    ):
+        _handle_exec(["fake_cmd"], {}, None, out_file=str(out_file))
+        assert not out_file.exists()
+        mock_exit.assert_called_once_with(1)
+
+
+def test_resolve_placeholders_out_abs_dir_not_in_build():
+    """Verify root_val falls back to out_dir when out_abs_dir is outside build_dir."""
+    ctx = PlaceholderContext(
+        out_file="/out/site/index.html",
+        out_dir="/out/site",
+        build_dir="/different/build",
+    )
+    with patch("pathlib.Path.resolve", autospec=True) as mock_resolve:
+        mock_resolve.side_effect = lambda self: self
+        root = resolve_placeholders("{root_val}", ctx)
+        assert root == "."
+
+
+def test_inject_metadata_overrides_corrupt_json(tmp_path, capsys):
+    """Verify _inject_metadata_overrides gracefully handles invalid JSON in AST."""
+    from dojo.wrap import _inject_metadata_overrides
+
+    corrupt_file = tmp_path / "corrupt.json"
+    corrupt_file.write_text("not json", encoding="utf-8")
+
+    cmd = ["pandoc", "input.json", "-o", "output.html"]
+    _inject_metadata_overrides(cmd, str(corrupt_file))
+    captured = capsys.readouterr()
+    assert "Failed to extract metadata from AST" in captured.err

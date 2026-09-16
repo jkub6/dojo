@@ -15,6 +15,7 @@ import zstandard as zstd
 from dojo.cli import main as dojo_cli_main
 from dojo.crunch import (
     BASE91_ALPHABET,
+    _write_output_chunks,
     base36_encode,
     chunked_reader,
     crunch_file,
@@ -168,7 +169,7 @@ def test_generate_payloads_decompression_fidelity():
 
 def test_generate_payloads_large_content():
     # Generate content whose compressed size exceeds TRANSPORT_BYTES (256 KB)
-    rng = random.Random(42)  # noqa: S311
+    rng = random.Random(42)
     words = ["".join(rng.choices(string.ascii_letters, k=10)) for _ in range(50000)]
     large_html = "<p>" + " </p><p> ".join(words) + "</p>"
     large_bytes = large_html.encode("utf-8")
@@ -244,3 +245,32 @@ def test_dojo_cli_crunch_subcommand(tmp_path: Path):
     dojo_cli_main(["crunch", str(in_file), "-o", str(out_file)])
     assert out_file.exists()
     assert "Decompressing HTML..." in out_file.read_text(encoding="utf-8")
+
+
+def test_write_output_chunks_stdout(mocker):
+    """Test _write_output_chunks writing to stdout buffer."""
+    fake_buffer = io.BytesIO()
+    mock_stdout = mocker.MagicMock()
+    mock_stdout.buffer = fake_buffer
+    mocker.patch("sys.stdout", mock_stdout)
+
+    data = b"<h1>Stdout stream test</h1>"
+    _write_output_chunks(io.BytesIO(data), "-", len(data), level=1, window_log=26)
+    assert len(fake_buffer.getvalue()) > 0
+    assert b"Decompressing HTML..." in fake_buffer.getvalue()
+
+
+def test_crunch_cli_stdin_tty_error(monkeypatch):
+    """Test crunch CLI errors out if reading from stdin when stdin is a tty."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    with pytest.raises(SystemExit) as exc:
+        crunch_main(["-"])
+    assert exc.value.code != 0
+
+
+def test_crunch_cli_error_exit(mocker):
+    """Test crunch CLI exits with error message on CrunchError/OSError."""
+    mocker.patch("dojo.crunch.crunch_file", side_effect=OSError("Disk full"))
+    with pytest.raises(SystemExit) as exc:
+        crunch_main(["some_input.html", "-o", "some_output.html"])
+    assert "Disk full" in str(exc.value)

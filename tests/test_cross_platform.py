@@ -1,8 +1,9 @@
 import io
+import sys
 from pathlib import Path
 
 from dojo.emitter import NinjaEmitter
-from dojo.paths import ninja_escape
+from dojo.paths import ninja_escape, shell_quote
 
 
 def test_ninja_escape_always_forward_slashes():
@@ -32,3 +33,10 @@ def test_emitter_uses_posix_paths(mock_emitter):
     # Check that backslashes are never used in the generated Ninja output
     assert "\\" not in content
     assert "content/subdir/index.md" in content
+
+
+def test_shell_quote_windows(monkeypatch):
+    """Verify that shell_quote uses subprocess.list2cmdline on Windows."""
+    monkeypatch.setattr(sys, "platform", "win32")
+    quoted = shell_quote("C:/Program Files/tool.exe")
+    assert quoted == '"C:/Program Files/tool.exe"'

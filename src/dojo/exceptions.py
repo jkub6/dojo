@@ -78,8 +78,6 @@ class SourceRequiresToolError(OutputConfigSourceError):
 class OutputConfigDefaultError(ConfigError):
     """Raised when output default configuration is invalid."""
 
-    pass
-
 
 class DefaultsRequiredError(OutputConfigDefaultError):
     """Raised when defaults are missing."""

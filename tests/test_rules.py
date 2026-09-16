@@ -112,3 +112,66 @@ def test_builtin_rules_crunch():
     assert "wrap.py" in crunch_rule.command
     assert "-m dojo.crunch" in crunch_rule.command
     assert crunch_rule.pool == "heavy"
+
+
+def test_typst_flags(tmp_path, monkeypatch):
+    """Test get_typst_flags with font_paths, pandoc_data_dir fonts, and TYPST_FONT_PATHS."""
+    from dojo.rules import _get_typst_flags
+
+    font_dir = tmp_path / "fonts"
+    font_dir.mkdir()
+
+    data_dir = tmp_path / "data"
+    (data_dir / "fonts").mkdir(parents=True)
+
+    monkeypatch.setenv("TYPST_FONT_PATHS", str(tmp_path / "env_fonts"))
+
+    cfg = Config.model_construct(
+        src_dir=str(tmp_path / "src"),
+        font_paths=[str(font_dir)],
+        pandoc_data_dir=str(data_dir),
+    )
+
+    flags = _get_typst_flags(cfg)
+    flags_str = " ".join(flags)
+    assert str(font_dir.resolve().as_posix()) in flags_str
+    assert str((tmp_path / "env_fonts").as_posix()) in flags_str
+
+
+def test_typst_flags_pandoc_data_dir_fonts(tmp_path):
+    """Test get_typst_flags includes pandoc_data_dir/fonts when font_paths is not set."""
+    from dojo.rules import _get_typst_flags
+
+    data_dir = tmp_path / "data"
+    (data_dir / "fonts").mkdir(parents=True)
+
+    cfg = Config.model_construct(
+        src_dir=str(tmp_path / "src"),
+        font_paths=[],
+        pandoc_data_dir=str(data_dir),
+    )
+
+    flags = _get_typst_flags(cfg)
+    flags_str = " ".join(flags)
+    assert str((data_dir / "fonts").as_posix()) in flags_str
+
+
+def test_builtin_rules_decktape_log_file(tmp_path):
+    """Test decktape rule includes --log-file when config.log_file is set."""
+    log_file = tmp_path / "decktape.log"
+    cfg = Config.model_construct(
+        src_dir="src",
+        output_dir="site",
+        build_dir="build",
+        default_type="page",
+        types={},
+        tools=ToolPaths.model_construct(pandoc="pandoc", decktape="decktape"),
+        root_ref_dir=".",
+        add_resource_path=True,
+        rule_pools={},
+        log_file=str(log_file),
+    )
+    rules = get_builtin_rules(cfg, Path("config.yaml"))
+    decktape_rule = next(r for r in rules if r.name == "decktape")
+    assert "--log-file" in decktape_rule.command
+    assert log_file.resolve().as_posix() in decktape_rule.command

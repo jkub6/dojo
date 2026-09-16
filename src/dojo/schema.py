@@ -8,9 +8,12 @@ from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .config import Config
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def generate_schema() -> dict[str, object]:

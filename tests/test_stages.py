@@ -70,7 +70,7 @@ class TestRenderStage:
             extension="pdf", source="html", tool="decktape", id="pdf", defaults=["d.yaml"]
         )
         # Manually set tool to None AFTER pydantic validation to trigger runtime check
-        out_config.tool = None  # type: ignore
+        object.__setattr__(out_config, "tool", None)
 
         with pytest.raises(OutputToolMissingError):
             stage.render(out_config, Path("any.json"), Path("any"), {"html": Path("in.html")})
@@ -114,7 +114,7 @@ class TestRenderStage:
         stage = RenderStage(mock_config, Path("/out"), Path("/build"), mock_emitter, [])
         out_config = OutputConfig(extension="pdf", source="html", tool="decktape")
         # Manually break it
-        out_config.source = None  # type: ignore
+        object.__setattr__(out_config, "source", None)
         # Call private method directly for coverage of the safety check
         with pytest.raises(OutputSourceMissingError):
             stage._derive_output(out_config, Path("idx"), {})
@@ -377,3 +377,65 @@ class TestAssetProcessor:
         assert mock_emitter.build.call_args.kwargs["outputs"] == out / "link.jpg"
         # The input should be the symlink itself (let Ninja/cp handle it)
         assert mock_emitter.build.call_args.kwargs["inputs"] == link_file
+
+    def test_process_assets_queue_deduplication(self, mock_emitter, tmp_path):
+        """Verify that nested dependencies already in processed_assets are skipped."""
+        src = tmp_path / "src"
+        src.mkdir()
+        out = tmp_path / "out"
+        out.mkdir()
+
+        css1 = src / "style1.css"
+        css2 = src / "style2.css"
+        shared_img = src / "shared.png"
+        css1.touch()
+        css2.touch()
+        shared_img.touch()
+
+        processor = AssetProcessor(
+            src=src,
+            out_dir=out,
+            emitter=mock_emitter,
+            copied_assets=set(),
+            all_outputs=[],
+        )
+
+        with (
+            patch("dojo.stages.assets.get_frontmatter_assets", return_value=[css1, css2]),
+            patch(
+                "dojo.stages.assets.scan_css_dependencies", side_effect=[[shared_img], [shared_img]]
+            ),
+        ):
+            outputs = processor.process_assets(src / "index.md")
+
+        assert out / "shared.png" in outputs
+
+    def test_process_static_assets_hidden_files_and_directories(self, mock_emitter, tmp_path):
+        """Verify process_static_assets skips directories, hidden files, and already copied assets."""
+        src = tmp_path / "src"
+        src.mkdir()
+        out = tmp_path / "out"
+        out.mkdir()
+
+        static_dir = src / "static"
+        static_dir.mkdir()
+        (static_dir / "visible.txt").touch()
+        (static_dir / ".hidden.txt").touch()
+        sub = static_dir / ".hidden_dir"
+        sub.mkdir()
+        (sub / "nested.txt").touch()
+
+        # Mark visible.txt as already copied to test deduplication
+        copied_assets = {out / "visible.txt"}
+        processor = AssetProcessor(
+            src=src,
+            out_dir=out,
+            emitter=mock_emitter,
+            copied_assets=copied_assets,
+            all_outputs=[],
+        )
+
+        results = processor.process_static_assets(["static"])
+        assert out / "visible.txt" in results
+        # Emitter should NOT have built visible.txt since it was in copied_assets
+        mock_emitter.build.assert_not_called()

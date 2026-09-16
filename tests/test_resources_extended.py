@@ -67,10 +67,9 @@ def test_find_resource_case_sensitivity(tmp_path):
     f = tmp_path / "Uppercase.yaml"
     f.touch()
 
-    # On most Linux filesystems, this should be None
-    # We just check that it doesn't crash
-    find_resource("defaults", str(tmp_path / "uppercase.yaml"))
-
-    # If the filesystem is case-insensitive (like some CI environments), this might pass.
-    # We don't assert either way, just ensure no error.
-    pass
+    result = find_resource("defaults", str(tmp_path / "uppercase.yaml"))
+    is_case_insensitive = (tmp_path / "uppercase.yaml").exists()
+    if is_case_insensitive:
+        assert result == f.resolve()
+    else:
+        assert result is None

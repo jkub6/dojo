@@ -277,3 +277,81 @@ def test_dry_run_many_outputs(core_config, caplog):
         gen._log_dry_run_summary(5)
 
     assert "and 5 more" in caplog.text
+
+
+def test_write_if_changed_oserror(core_config, monkeypatch, caplog):
+    """Test _write_if_changed logs warning when reading existing file raises OSError."""
+    import logging
+
+    cfg, path = core_config
+    gen = NinjaGenerator(cfg, path)
+    target = Path(cfg.build_dir) / "target.txt"
+    target.write_text("old content", encoding="utf-8")
+
+    def mock_read_text(*args, **kwargs):
+        raise OSError
+
+    monkeypatch.setattr(Path, "read_text", mock_read_text)
+
+    with caplog.at_level(logging.WARNING, logger="dojo.core"):
+        written = gen._write_if_changed(target, "new content")
+    assert written is True
+    assert "Failed to read" in caplog.text
+
+
+def test_apply_format_link_defaults_variations(core_config, tmp_path):
+    """Test _apply_format_link_defaults with None and list existing defaults."""
+    cfg, path = core_config
+    gen = NinjaGenerator(cfg, path)
+    gen._format_link_defaults = {("page", "html"): tmp_path / "fl_defaults.yaml"}
+
+    # Case 1: out_config.defaults is None
+    out_none = OutputConfig.model_construct(id="html", extension="html", defaults=None, source=None)
+    modified_none = gen._apply_format_link_defaults(out_none, "page")
+    assert modified_none.defaults == [str(tmp_path / "fl_defaults.yaml")]
+
+    # Case 2: out_config.defaults is a list
+    out_list = OutputConfig(
+        id="html",
+        extension="html",
+        defaults=[str(tmp_path / "user1.yaml"), str(tmp_path / "user2.yaml")],
+        source=None,
+    )
+    modified_list = gen._apply_format_link_defaults(out_list, "page")
+    assert modified_list.defaults == [
+        str(tmp_path / "fl_defaults.yaml"),
+        str(tmp_path / "user1.yaml"),
+        str(tmp_path / "user2.yaml"),
+    ]
+
+
+def test_generate_with_static_assets_stamp(tmp_path):
+    """Test that static assets trigger generation of the static asset stamp rule and dependency."""
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "index.md").write_text("# Hello", encoding="utf-8")
+
+    static_dir = src / "assets"
+    static_dir.mkdir()
+    (static_dir / "logo.png").touch()
+
+    defaults = tmp_path / "defaults.yaml"
+    defaults.touch()
+
+    cfg = Config(
+        src_dir=str(src),
+        output_dir=str(tmp_path / "site"),
+        build_dir=str(tmp_path / "build"),
+        default_type="page",
+        static_dirs=["assets"],
+        types={
+            "page": {"outputs": [{"id": "html", "extension": "html", "defaults": str(defaults)}]},
+        },
+    )
+
+    gen = NinjaGenerator(cfg, tmp_path / "dojo.yaml")
+    gen.generate()
+
+    ninja_content = gen.ninja_file.read_text(encoding="utf-8")
+    assert ".static_assets.stamp" in ninja_content
+    assert "rule stamp" in ninja_content

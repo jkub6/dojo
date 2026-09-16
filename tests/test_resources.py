@@ -147,3 +147,26 @@ def test_resource_cache_works(tmp_path):
     clear_resource_cache()
     result3 = find_resource("defaults", str(f))
     assert result3 == f.resolve()
+
+
+def test_find_resource_relative_with_root_context(tmp_path):
+    """Test find_resource resolves multi-part relative path using root_contexts."""
+    clear_resource_cache()
+    root = tmp_path / "project_root"
+    root.mkdir()
+    sub = root / "sub"
+    sub.mkdir()
+    f = sub / "defaults.yaml"
+    f.touch()
+
+    # Pass multi-part relative path and root_contexts
+    found = find_resource("defaults", "sub/defaults.yaml", root_contexts=[root])
+    assert found == f.resolve()
+
+
+def test_find_resource_nonexistent_root_context(tmp_path):
+    """Test find_resource skips non-existent directories in root_contexts without error."""
+    clear_resource_cache()
+    non_existent_root = tmp_path / "does_not_exist"
+    found = find_resource("defaults", "some_file.yaml", root_contexts=[non_existent_root])
+    assert found is None

@@ -328,7 +328,7 @@ def test_scan_css_dependencies_resolve_oserror(tmp_path, monkeypatch):
 
     # Mock Path.resolve to raise OSError
     def mock_resolve(*args, **kwargs):
-        raise OSError()
+        raise OSError
 
     # Path is from pathlib, so we mock it directly on the Path object or globally
     monkeypatch.setattr(Path, "resolve", mock_resolve)
@@ -344,7 +344,7 @@ def test_scan_html_dependencies_resolve_oserror(tmp_path, monkeypatch):
     (tmp_path / "image.jpg").touch()
 
     def mock_resolve(*args, **kwargs):
-        raise OSError()
+        raise OSError
 
     monkeypatch.setattr(Path, "resolve", mock_resolve)
 
@@ -364,5 +364,13 @@ def test_scan_html_empty_href(tmp_path):
     """Test HTML scanner ignores empty href/src."""
     html_file = tmp_path / "index.html"
     html_file.write_text('<a href="">Empty</a><img src="   ">')
+    assets = scan_html_dependencies(html_file)
+    assert assets == []
+
+
+def test_scan_html_dependencies_missing_file_ignored(tmp_path):
+    """Missing files referenced in HTML should be gracefully ignored by the scanner."""
+    html_file = tmp_path / "index.html"
+    html_file.write_text('<img src="missing.jpg"><link rel="stylesheet" href="missing.css">')
     assets = scan_html_dependencies(html_file)
     assert assets == []

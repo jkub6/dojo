@@ -100,3 +100,10 @@ def test_emitter_multiple_outputs():
     emitter.build(outputs=["out1.html", "out2.html"], rule="pandoc", inputs="in.md")
     content = fp.getvalue()
     assert "build out1.html out2.html: pandoc in.md\n" in content
+
+
+def test_emitter_no_inputs():
+    fp = io.StringIO()
+    emitter = NinjaEmitter(fp)
+    emitter.build(outputs="out.stamp", rule="stamp")
+    assert fp.getvalue() == "build out.stamp: stamp\n"
