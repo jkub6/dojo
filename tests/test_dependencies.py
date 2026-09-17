@@ -1,3 +1,4 @@
+import logging
 import shutil
 import subprocess
 from pathlib import Path
@@ -133,8 +134,6 @@ def test_scan_html_dependencies(tmp_path):
 
 def test_scan_html_dependencies_malformed_ignored(tmp_path, caplog):
     """Errors reading HTML files should be logged and ignored."""
-    import logging
-
     html_file = tmp_path / "bad.html"
     # Testing graceful skip when file physically doesn't exist
     with caplog.at_level(logging.WARNING, logger="dojo.deps"):
@@ -145,8 +144,6 @@ def test_scan_html_dependencies_malformed_ignored(tmp_path, caplog):
 
 def test_scan_css_dependencies_malformed_ignored(tmp_path, caplog):
     """Errors reading CSS files should be logged and ignored."""
-    import logging
-
     css_file = tmp_path / "bad.css"
     with caplog.at_level(logging.WARNING, logger="dojo.deps"):
         assets = scan_css_dependencies(css_file)
@@ -374,3 +371,23 @@ def test_scan_html_dependencies_missing_file_ignored(tmp_path):
     html_file.write_text('<img src="missing.jpg"><link rel="stylesheet" href="missing.css">')
     assets = scan_html_dependencies(html_file)
     assert assets == []
+
+
+def test_resolve_glob_dependencies_absolute_pattern_and_directory_skip(tmp_path: Path):
+    """Test resolve_glob_dependencies handles absolute patterns and ignores directories."""
+    base_dir = tmp_path / "glob_test"
+    base_dir.mkdir()
+    target_file = base_dir / "file.txt"
+    target_file.touch()
+    sub_dir = base_dir / "sub_dir"
+    sub_dir.mkdir()
+
+    # Absolute pattern matching file
+    abs_pattern = str(base_dir / "*.txt")
+    results = resolve_glob_dependencies(base_dir, [abs_pattern])
+    assert results == [target_file.resolve()]
+
+    # Pattern matching a directory: directory should be skipped
+    dir_results = resolve_glob_dependencies(base_dir, ["*"])
+    assert target_file.resolve() in dir_results
+    assert sub_dir.resolve() not in dir_results

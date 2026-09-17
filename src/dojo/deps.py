@@ -7,7 +7,6 @@ to file paths.
 
 from __future__ import annotations
 
-import glob
 import logging
 import re
 from pathlib import Path
@@ -50,15 +49,19 @@ def resolve_glob_dependencies(
         # If the pattern is absolute, warn and skip? Or treat as absolute?
         # Standard convention for deps is relative to the file.
 
-        full_pattern = base_dir / pattern
-        full_pattern_str = str(full_pattern)
-
-        matches = glob.glob(full_pattern_str, recursive=True)
+        pat = Path(pattern)
+        if pat.is_absolute():
+            search_dir = Path(pat.anchor)
+            rel_pattern = str(pat.relative_to(pat.anchor))
+            matches = search_dir.glob(rel_pattern)
+        else:
+            clean_pattern = pattern.removeprefix("./").removeprefix(".\\")
+            matches = base_dir.glob(clean_pattern)
 
         for match in matches:
-            path = Path(match).resolve()
-            if path.is_file():
-                resolved_paths.append(path)
+            resolved_path = match.resolve()
+            if resolved_path.is_file():
+                resolved_paths.append(resolved_path)
 
     return sorted(set(resolved_paths))
 

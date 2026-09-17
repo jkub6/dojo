@@ -119,7 +119,7 @@ def test_format_link_defaults_file_content(multi_output_config, tmp_path):
     html_defaults_path = gen._format_link_defaults[("note", "html")]
     assert html_defaults_path.exists()
 
-    with open(html_defaults_path) as f:
+    with html_defaults_path.open() as f:
         data = yaml.safe_load(f)
 
     # Should have filters referencing the bundled Lua filter
@@ -176,7 +176,7 @@ def test_format_link_defaults_custom_label(tmp_path):
     gen._generate_format_link_defaults()
 
     html_defaults_path = gen._format_link_defaults[("page", "html")]
-    with open(html_defaults_path) as f:
+    with html_defaults_path.open() as f:
         data = yaml.safe_load(f)
 
     siblings = data["metadata"]["dojo-sibling-formats"]
@@ -290,7 +290,7 @@ def test_generate_with_format_links_slides_suffix(multi_output_config, tmp_path)
     gen._generate_format_link_defaults()
 
     slides_defaults_path = gen._format_link_defaults[("note", "slides")]
-    with open(slides_defaults_path) as f:
+    with slides_defaults_path.open() as f:
         data = yaml.safe_load(f)
 
     assert data["metadata"]["dojo-current-suffix"] == "-slides"
@@ -358,7 +358,7 @@ def _run_pandoc_with_filter(
     if document_stem:
         defaults_data["metadata"]["dojo-document-stem"] = document_stem
     defaults_file = tmp_path / "format-links.yaml"
-    with open(defaults_file, "w", encoding="utf-8") as f:
+    with defaults_file.open("w", encoding="utf-8") as f:
         yaml.dump(defaults_data, f, default_flow_style=False, allow_unicode=True)
 
     # Run Pandoc: Markdown → JSON AST with the filter applied

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from dojo.config import Config, ToolPaths, TypeConfig
-from dojo.rules import get_builtin_rules
+from dojo.rules import _get_typst_flags, get_builtin_rules
 
 
 def test_builtin_rules_basic():
@@ -116,8 +116,6 @@ def test_builtin_rules_crunch():
 
 def test_typst_flags(tmp_path, monkeypatch):
     """Test get_typst_flags with font_paths, pandoc_data_dir fonts, and TYPST_FONT_PATHS."""
-    from dojo.rules import _get_typst_flags
-
     font_dir = tmp_path / "fonts"
     font_dir.mkdir()
 
@@ -140,8 +138,6 @@ def test_typst_flags(tmp_path, monkeypatch):
 
 def test_typst_flags_pandoc_data_dir_fonts(tmp_path):
     """Test get_typst_flags includes pandoc_data_dir/fonts when font_paths is not set."""
-    from dojo.rules import _get_typst_flags
-
     data_dir = tmp_path / "data"
     (data_dir / "fonts").mkdir(parents=True)
 

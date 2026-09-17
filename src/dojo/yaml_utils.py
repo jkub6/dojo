@@ -76,7 +76,7 @@ def _load_and_validate_yaml_dict(yaml_path: Path) -> dict[str, object] | None:
         return None
 
     try:
-        with open(yaml_path, encoding="utf-8") as f:
+        with yaml_path.open(encoding="utf-8") as f:
             raw_data: object = yaml.safe_load(f)
 
         if not isinstance(raw_data, dict):
@@ -102,7 +102,7 @@ def parse_frontmatter(md_path: Path) -> dict[str, object] | None:
     Efficiency: Only reads until the end of the frontmatter block.
     """
     try:
-        with open(md_path, encoding="utf-8") as f:
+        with md_path.open(encoding="utf-8") as f:
             # Skip optional leading whitespace/newlines
             line = f.readline()
             while line and not line.strip():

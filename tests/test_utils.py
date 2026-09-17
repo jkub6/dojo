@@ -6,6 +6,7 @@ import pytest
 from dojo.exceptions import CircularDependencyError, SecurityError
 from dojo.paths import ninja_escape, sanitize_path
 from dojo.yaml_utils import (
+    extract_paths,
     get_frontmatter_assets,
     get_recursive_yaml_deps,
     parse_frontmatter,
@@ -46,14 +47,9 @@ def test_get_recursive_yaml_deps(tmp_path):
     dep1 = tmp_path / "dep1.yaml"
     dep2 = tmp_path / "dep2.yaml"
 
-    with open(root, "w") as f:
-        f.write(f"defaults: {dep1}")
-
-    with open(dep1, "w") as f:
-        f.write(f"defaults: {dep2}")
-
-    with open(dep2, "w") as f:
-        f.write("foo: bar")
+    root.write_text(f"defaults: {dep1}")
+    dep1.write_text(f"defaults: {dep2}")
+    dep2.write_text("foo: bar")
 
     # Test recursion
     deps = get_recursive_yaml_deps(root)
@@ -67,11 +63,8 @@ def test_circular_deps(tmp_path):
     a = tmp_path / "a.yaml"
     b = tmp_path / "b.yaml"
 
-    with open(a, "w") as f:
-        f.write(f"defaults: {b}")
-
-    with open(b, "w") as f:
-        f.write(f"defaults: {a}")
+    a.write_text(f"defaults: {b}")
+    b.write_text(f"defaults: {a}")
 
     with pytest.raises(CircularDependencyError, match="Circular dependency detected"):
         get_recursive_yaml_deps(a)
@@ -87,8 +80,7 @@ def test_frontmatter_with_whitespace(tmp_path):
     # Content
     """
     # Write with leading newline/spaces (simulating user error)
-    with open(f, "w") as file:
-        file.write(content)
+    f.write_text(content)
 
     assert parse_frontmatter_type(f, "default") == "slide"
 
@@ -124,7 +116,7 @@ def test_parse_frontmatter_exception(tmp_path, caplog):
 
     # Create a situation where yaml loading fails violently or file read fails in a way caught by generic exception
     # Mocking open might be easiest but we are inside a context manager in implementation
-    with patch("builtins.open", side_effect=OSError("Read failed")):
+    with patch("pathlib.Path.open", side_effect=OSError("Read failed")):
         t = parse_frontmatter_type(f, "default")
         assert t == "default"
         assert "Could not parse frontmatter" in caplog.text
@@ -216,8 +208,48 @@ def test_recursive_yaml_deps_diamond_and_metadata_files(tmp_path):
 
 def test_extract_paths_non_string_non_list():
     """Test extract_paths skips values that are neither strings nor lists."""
-    from dojo.yaml_utils import extract_paths
-
     data = {"key_int": 123, "key_dict": {"nested": "value"}, "key_str": "path.txt"}
     paths = extract_paths(data, ["key_int", "key_dict", "key_str"])
     assert paths == ["path.txt"]
+
+
+def test_frontmatter_assets_absolute_and_missing(tmp_path):
+    """Test get_frontmatter_assets handles absolute paths and ignores missing files."""
+    real_asset = tmp_path / "real.css"
+    real_asset.touch()
+    md = tmp_path / "doc.md"
+    md.write_text(
+        f"---\ncss:\n  - {real_asset.resolve()}\n  - missing.css\n---\n# Content\n",
+        encoding="utf-8",
+    )
+    assets = get_frontmatter_assets(md)
+    assert assets == [real_asset.resolve()]
+
+
+def test_recursive_yaml_deps_data_dir_override_and_relative_metadata(tmp_path, monkeypatch):
+    """Test get_recursive_yaml_deps with data_dir_override, relative/missing metadata, and missing assets."""
+    monkeypatch.chdir(tmp_path)
+    custom_dir = tmp_path / "custom"
+    defaults_dir = custom_dir / "defaults"
+    defaults_dir.mkdir(parents=True)
+    default_in_custom = defaults_dir / "custom_default.yaml"
+    default_in_custom.write_text("variable: 123\n", encoding="utf-8")
+
+    meta_rel = tmp_path / "relative_meta.yaml"
+    meta_rel.write_text("title: Test\n", encoding="utf-8")
+
+    root = tmp_path / "root.yaml"
+    root.write_text(
+        "defaults:\n"
+        "  - custom_default.yaml\n"
+        "css:\n"
+        "  - missing_asset.css\n"
+        "metadata-files:\n"
+        "  - relative_meta.yaml\n"
+        "  - missing_meta.yaml\n",
+        encoding="utf-8",
+    )
+
+    deps = get_recursive_yaml_deps(root, data_dir_override=custom_dir)
+    assert default_in_custom.resolve() in deps
+    assert meta_rel.resolve() in deps

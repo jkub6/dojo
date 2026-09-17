@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import json
 
+import jsonschema
 import pytest
+
+from dojo.cli import main
+from dojo.schema import generate_schema, write_schema
 
 
 class TestSchemaGeneration:
@@ -12,8 +16,6 @@ class TestSchemaGeneration:
 
     def test_generate_schema_returns_dict(self) -> None:
         """Test that generate_schema returns a valid dict."""
-        from dojo.schema import generate_schema
-
         schema = generate_schema()
 
         assert isinstance(schema, dict)
@@ -22,8 +24,6 @@ class TestSchemaGeneration:
 
     def test_schema_has_expected_properties(self) -> None:
         """Test that schema contains expected configuration properties."""
-        from dojo.schema import generate_schema
-
         schema = generate_schema()
         props = schema.get("properties", {})
 
@@ -34,8 +34,6 @@ class TestSchemaGeneration:
 
     def test_write_schema_returns_json_string(self) -> None:
         """Test that write_schema returns valid JSON."""
-        from dojo.schema import write_schema
-
         schema_json = write_schema()
 
         # Should be valid JSON
@@ -44,8 +42,6 @@ class TestSchemaGeneration:
 
     def test_write_schema_pretty_formatting(self) -> None:
         """Test that pretty=True adds indentation."""
-        from dojo.schema import write_schema
-
         pretty_json = write_schema(pretty=True)
         compact_json = write_schema(pretty=False)
 
@@ -56,8 +52,6 @@ class TestSchemaGeneration:
 
     def test_write_schema_to_file(self, tmp_path) -> None:
         """Test writing schema to file."""
-        from dojo.schema import write_schema
-
         output_file = tmp_path / "schema.json"
         write_schema(output_file)
 
@@ -68,13 +62,6 @@ class TestSchemaGeneration:
 
     def test_schema_validates_valid_config(self) -> None:
         """Test that generated schema can validate a valid config."""
-        try:
-            import jsonschema
-        except ImportError:
-            pytest.skip("jsonschema not installed")
-
-        from dojo.schema import generate_schema
-
         schema = generate_schema()
 
         # Create a minimal valid config
@@ -91,13 +78,6 @@ class TestSchemaGeneration:
 
     def test_schema_rejects_invalid_config(self) -> None:
         """Test that generated schema rejects invalid config."""
-        try:
-            import jsonschema
-        except ImportError:
-            pytest.skip("jsonschema not installed")
-
-        from dojo.schema import generate_schema
-
         schema = generate_schema()
 
         # Missing required field
@@ -115,8 +95,6 @@ class TestSchemaCliCommand:
 
     def test_schema_command_stdout(self, capsys) -> None:
         """Test that schema command prints to stdout."""
-        from dojo.cli import main
-
         main(["schema"])
 
         captured = capsys.readouterr()
@@ -128,8 +106,6 @@ class TestSchemaCliCommand:
 
     def test_schema_command_with_output_file(self, tmp_path, capsys) -> None:
         """Test schema command with -o flag."""
-        from dojo.cli import main
-
         output_file = tmp_path / "test-schema.json"
         main(["schema", "-o", str(output_file)])
 

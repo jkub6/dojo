@@ -262,3 +262,18 @@ types:
     assert "Dry-run" in output
     # Should show the build plan
     assert "source file" in output.lower() or "Build plan" in output
+
+
+def test_check_verbose_invalid_config(tmp_path, monkeypatch, capsys):
+    """Test check command in verbose mode logs exception when config is invalid."""
+    monkeypatch.chdir(tmp_path)
+    bad_config = tmp_path / "bad_dojo.yaml"
+    bad_config.write_text("not a valid yaml: [unclosed")
+    with pytest.raises(SystemExit) as exc:
+        main(["-v", "check", "-c", str(bad_config)])
+    assert exc.value.code == 1
+    captured = capsys.readouterr()
+    assert (
+        "Unexpected error during configuration check" in captured.out
+        or "Unexpected error during configuration check" in captured.err
+    )

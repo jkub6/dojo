@@ -27,6 +27,7 @@ format:
 [doc('Run all static analysis checks')]
 check:
 	ruff check .
+	ruff format --check .
 	mypy
 	vulture
 	statix check .

@@ -65,19 +65,12 @@ def test_cli_version_in_process(capsys):
     assert "dojo" in captured.out or "dojo" in captured.err
 
 
-def test_build_no_config_in_process(tmp_path, capsys):
+def test_build_no_config_in_process(tmp_path, capsys, monkeypatch):
     """Test failure when no config found in-process."""
-    # Run in empty temp dir
-    import os
-
-    old_cwd = os.getcwd()
-    os.chdir(tmp_path)
-    try:
-        with pytest.raises(SystemExit) as exc:
-            main(["build"])
-        assert exc.value.code != 0
-    finally:
-        os.chdir(old_cwd)
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(SystemExit) as exc:
+        main(["build"])
+    assert exc.value.code != 0
 
     captured = capsys.readouterr()
     assert "Error" in captured.out or "Error" in captured.err

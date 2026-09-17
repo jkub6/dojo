@@ -3,7 +3,13 @@ from unittest.mock import patch
 
 import pytest
 
-from dojo.config import OutputConfig
+from dojo.config import OutputConfig, PipelineStep
+from dojo.exceptions import (
+    DependencyError,
+    OutputSourceMissingError,
+    OutputToolMissingError,
+    SourceRequiresToolError,
+)
 from dojo.stages.assets import AssetProcessor
 from dojo.stages.render import RenderStage
 
@@ -43,16 +49,12 @@ class TestRenderStage:
 
     def test_derive_output_missing_tool_raises(self, mock_config, mock_emitter):
         """Verify that missing a requested tool raises SourceRequiresToolError."""
-        from dojo.exceptions import SourceRequiresToolError
-
         # source requires tool (pydantic validation)
         with pytest.raises(SourceRequiresToolError):
             OutputConfig(extension="pdf", source="html", tool=None, id="pdf")
 
     def test_derive_output_missing_source_in_registry_raises(self, mock_config, mock_emitter):
         """Verify that referencing a missing source ID in the registry raises DependencyError."""
-        from dojo.exceptions import DependencyError
-
         stage = RenderStage(mock_config, Path("/out"), Path("/build"), mock_emitter, [])
         out_config = OutputConfig(
             extension="pdf", source="missing_id", tool="decktape", id="pdf", defaults=["d.yaml"]
@@ -63,8 +65,6 @@ class TestRenderStage:
 
     def test_derive_output_missing_tool_at_runtime_raises(self, mock_config, mock_emitter):
         """Verify that a missing tool at runtime raises OutputToolMissingError."""
-        from dojo.exceptions import OutputToolMissingError
-
         stage = RenderStage(mock_config, Path("/out"), Path("/build"), mock_emitter, [])
         out_config = OutputConfig(
             extension="pdf", source="html", tool="decktape", id="pdf", defaults=["d.yaml"]
@@ -77,8 +77,6 @@ class TestRenderStage:
 
     def test_standard_render_with_post_process(self, mock_config, mock_emitter):
         """Verify that post-processing pipeline steps are correctly emitted as Ninja rules."""
-        from dojo.config import PipelineStep
-
         stage = RenderStage(mock_config, Path("/out"), Path("/build"), mock_emitter, [])
 
         out_config = OutputConfig(
@@ -109,8 +107,6 @@ class TestRenderStage:
 
     def test_derive_output_missing_source_raises(self, mock_config, mock_emitter):
         """Verify that a missing source during output derivation raises OutputSourceMissingError."""
-        from dojo.exceptions import OutputSourceMissingError
-
         stage = RenderStage(mock_config, Path("/out"), Path("/build"), mock_emitter, [])
         out_config = OutputConfig(extension="pdf", source="html", tool="decktape")
         # Manually break it
@@ -438,4 +434,27 @@ class TestAssetProcessor:
         results = processor.process_static_assets(["static"])
         assert out / "visible.txt" in results
         # Emitter should NOT have built visible.txt since it was in copied_assets
+        mock_emitter.build.assert_not_called()
+
+    def test_process_static_assets_relative_to_value_error(self, mock_emitter, tmp_path):
+        """Verify process_static_assets skips files if relative_to raises ValueError."""
+        src = tmp_path / "src"
+        src.mkdir()
+        out = tmp_path / "out"
+        out.mkdir()
+        static_dir = src / "static"
+        static_dir.mkdir()
+        (static_dir / "asset.png").touch()
+
+        processor = AssetProcessor(
+            src=src,
+            out_dir=out,
+            emitter=mock_emitter,
+            copied_assets=set(),
+            all_outputs=[],
+        )
+
+        with patch("pathlib.Path.relative_to", side_effect=ValueError("Cannot make relative")):
+            results = processor.process_static_assets(["static"])
+        assert results == []
         mock_emitter.build.assert_not_called()

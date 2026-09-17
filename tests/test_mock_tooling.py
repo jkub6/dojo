@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from dojo.cli import main
+from dojo.wrap import run_wrap
 
 
 @pytest.fixture
@@ -77,8 +78,6 @@ def test_wrap_log_file_redirection(tmp_path, mock_tool_path, monkeypatch):
     """Verify that dojo wrap correctly redirects output to a log file."""
     log_file = tmp_path / "dojo.log"
     # We want to test dojo wrap directly
-    from dojo.wrap import run_wrap
-
     env = os.environ.copy()
     env["MOCK_TOOL_STDOUT"] = "Log this message"
     monkeypatch.setitem(os.environ, "MOCK_TOOL_STDOUT", "Log this message")

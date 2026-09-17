@@ -16,6 +16,8 @@ if TYPE_CHECKING:
 
 import pytest
 
+from dojo.cli import main
+
 
 def ninja_available() -> bool:
     """Check if ninja is available in PATH."""
@@ -79,8 +81,6 @@ types:
 tools:
   minify: {mock_minify}
 """)
-
-    from dojo.cli import main
 
     # First build
     main(["build", "-c", str(config_path)])

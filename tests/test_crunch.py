@@ -15,6 +15,7 @@ import zstandard as zstd
 from dojo.cli import main as dojo_cli_main
 from dojo.crunch import (
     BASE91_ALPHABET,
+    _ChunkBuffer,
     _write_output_chunks,
     base36_encode,
     chunked_reader,
@@ -274,3 +275,50 @@ def test_crunch_cli_error_exit(mocker):
     with pytest.raises(SystemExit) as exc:
         crunch_main(["some_input.html", "-o", "some_output.html"])
     assert "Disk full" in str(exc.value)
+
+
+def test_chunk_buffer_flush_empty():
+    """Test _ChunkBuffer flush on empty buffer yields nothing."""
+    buf = _ChunkBuffer(lambda _d: b"")
+    assert list(buf.flush()) == []
+
+
+def test_crunch_file_from_stdin(tmp_path: Path, mocker):
+    """Test crunch_file reading HTML from stdin."""
+    fake_stdin = mocker.MagicMock()
+    fake_stdin.buffer = io.BytesIO(b"<h1>Stdin Test</h1>")
+    mocker.patch("sys.stdin", fake_stdin)
+    out_file = tmp_path / "out_stdin.html"
+    crunch_file("-", out_file)
+    assert out_file.exists()
+    assert "Decompressing HTML..." in out_file.read_text(encoding="utf-8")
+
+
+def test_write_output_chunks_temp_cleanup_on_error(tmp_path: Path, mocker):
+    """Test temporary file is removed if error occurs during output writing."""
+    out_file = tmp_path / "out_fail.html"
+    mocker.patch("dojo.crunch.generate_payloads", side_effect=ValueError("Compression fail"))
+    with pytest.raises(ValueError, match="Compression fail"):
+        _write_output_chunks(io.BytesIO(b"data"), str(out_file), 4, level=1, window_log=26)
+    temp_files = list(tmp_path.glob(".crunch-html-*.tmp"))
+    assert len(temp_files) == 0
+
+
+def test_generate_payloads_streaming_chunks():
+    """Test generate_payloads yields intermediate chunks for larger inputs."""
+    big_data = b"<h1>Big content for streaming</h1>" * 50000
+    payloads = list(generate_payloads(io.BytesIO(big_data), level=1, window_log=20))
+    assert len(payloads) > 2
+
+
+def test_generate_payloads_incremental_compress_and_empty_flush(mocker):
+    """Test generate_payloads when compressor yields chunks during feed and nothing on flush."""
+    mock_comp = mocker.MagicMock()
+    mock_comp.compress.return_value = b"compressed_data_chunk"
+    mock_comp.flush.return_value = b""
+    mock_cctx = mocker.MagicMock()
+    mock_cctx.compressobj.return_value = mock_comp
+    mocker.patch("zstandard.ZstdCompressor", return_value=mock_cctx)
+
+    payloads = list(generate_payloads(io.BytesIO(b"<h1>Sample</h1>"), level=1, window_log=20))
+    assert len(payloads) >= 2

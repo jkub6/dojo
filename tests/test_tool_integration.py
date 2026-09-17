@@ -1,7 +1,8 @@
 from pathlib import Path
 
-from dojo.config import OutputConfig
+from dojo.config import CustomRule, OutputConfig, TypeConfig
 from dojo.core import NinjaGenerator
+from dojo.stages.compile import CompileStage
 
 
 def test_render_command_line_args(minimal_config, tmp_path, mock_emitter):
@@ -23,9 +24,6 @@ def test_render_command_line_args(minimal_config, tmp_path, mock_emitter):
 
 def test_compile_command_line_filters(minimal_config, tmp_path, mock_emitter):
     """Verify that filters are correctly included in the compile rule."""
-    from dojo.config import TypeConfig
-    from dojo.stages.compile import CompileStage
-
     stage = CompileStage(minimal_config, tmp_path / "build", mock_emitter)
 
     type_cfg = TypeConfig(
@@ -50,8 +48,6 @@ def test_ninja_generator_pool_emission(minimal_config, tmp_path, mock_emitter):
 
 def test_custom_rule_emission(minimal_config, tmp_path, mock_emitter):
     """Verify that custom rules from config are emitted."""
-    from dojo.config import CustomRule
-
     minimal_config.custom_rules = [
         CustomRule(name="my-rule", command="touch $out", description="My Rule")
     ]

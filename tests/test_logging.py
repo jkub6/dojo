@@ -90,6 +90,11 @@ def test_json_formatter_extra_fields():
     assert data["output_count"] == EXPECTED_OUTPUT_COUNT
 
 
+def _raise_test_error() -> None:
+    msg = "Test error"
+    raise ValueError(msg)
+
+
 def _create_test_exception() -> tuple[type, BaseException, object]:
     """Create a test exception and return its exc_info.
 
@@ -97,8 +102,7 @@ def _create_test_exception() -> tuple[type, BaseException, object]:
     exc_info for testing the JsonFormatter's exception handling.
     """
     try:
-        msg = "Test error"
-        raise ValueError(msg)
+        _raise_test_error()
     except ValueError:
         return sys.exc_info()
 

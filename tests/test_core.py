@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -6,7 +7,12 @@ import pytest
 from dojo.config import Config, OutputConfig
 from dojo.constants import RuleName
 from dojo.core import NinjaGenerator
-from dojo.exceptions import DefaultsRequiredError, DependencyError, SourceRequiresToolError
+from dojo.exceptions import (
+    DefaultsRequiredError,
+    DependencyError,
+    PluginLoadError,
+    SourceRequiresToolError,
+)
 from dojo.stages._defaults import format_defaults_var, merge_defaults
 
 
@@ -138,7 +144,7 @@ def test_plugin_integration(core_config, tmp_path):
     # Mock a plugin
     plugin = MagicMock()
     plugin.get_custom_rules.return_value = []
-    plugin.modify_output_config.side_effect = lambda c, t: c
+    plugin.modify_output_config.side_effect = lambda c, _t: c
     plugin.post_process_ninja.side_effect = lambda n: n + "\n# Plugin was here"
 
     gen = NinjaGenerator(cfg, path)
@@ -191,7 +197,7 @@ def test_generate_write_failure(core_config, caplog):
 
     # Mock open to raise exception
     with (
-        patch("builtins.open", side_effect=OSError("Write failed")),
+        patch("pathlib.Path.open", side_effect=OSError("Write failed")),
         pytest.raises(OSError, match="Write failed"),
     ):
         gen.generate()
@@ -215,8 +221,6 @@ def test_plugin_loading_success(core_config):
 def test_plugin_loading_failure(core_config):
     cfg, path = core_config
     cfg.plugins = ["bad_plugin"]
-
-    from dojo.exceptions import PluginLoadError
 
     with (
         patch("dojo.core.load_plugin", side_effect=PluginLoadError("bad_plugin", "not found")),
@@ -264,8 +268,6 @@ def test_external_emitter_path(core_config):
 
 
 def test_dry_run_many_outputs(core_config, caplog):
-    import logging
-
     cfg, path = core_config
     gen = NinjaGenerator(cfg, path, dry_run=True, quiet=False)
 
@@ -281,8 +283,6 @@ def test_dry_run_many_outputs(core_config, caplog):
 
 def test_write_if_changed_oserror(core_config, monkeypatch, caplog):
     """Test _write_if_changed logs warning when reading existing file raises OSError."""
-    import logging
-
     cfg, path = core_config
     gen = NinjaGenerator(cfg, path)
     target = Path(cfg.build_dir) / "target.txt"
@@ -355,3 +355,34 @@ def test_generate_with_static_assets_stamp(tmp_path):
     ninja_content = gen.ninja_file.read_text(encoding="utf-8")
     assert ".static_assets.stamp" in ninja_content
     assert "rule stamp" in ninja_content
+
+
+def test_write_if_changed_content_modified(core_config):
+    """Test _write_if_changed writes new content and returns True when content has changed."""
+    cfg, path = core_config
+    gen = NinjaGenerator(cfg, path)
+    target = Path(cfg.build_dir) / "test_modified.txt"
+    target.write_text("old version", encoding="utf-8")
+    assert gen._write_if_changed(target, "new version") is True
+    assert target.read_text(encoding="utf-8") == "new version"
+
+
+def test_apply_format_link_defaults_key_not_found(core_config):
+    """Test _apply_format_link_defaults returns original config when key is not in defaults."""
+    cfg, path = core_config
+    gen = NinjaGenerator(cfg, path)
+    gen._format_link_defaults = {("other_type", "html"): Path("/some/path")}
+    out_cfg = OutputConfig(extension="html", defaults="page.yaml", id="my_html")
+    res = gen._apply_format_link_defaults(out_cfg, "page")
+    assert res is out_cfg
+
+
+def test_generate_for_markdown_with_static_deps_list(core_config, tmp_path):
+    """Test process_content properly handles static_deps as a list."""
+    cfg, path = core_config
+    gen = NinjaGenerator(cfg, path)
+    md_file = Path(cfg.src_dir) / "test.md"
+    static_file = tmp_path / "extra_static.css"
+    static_file.touch()
+    gen.process_content(md_file, static_deps=[static_file])
+    assert "extra_static.css" in gen._buffer.getvalue()

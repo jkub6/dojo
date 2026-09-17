@@ -110,6 +110,6 @@ def test_load_plugin_spec_none(tmp_path, monkeypatch):
     """Test load_plugin raises PluginLoadError when spec_from_file_location returns None."""
     f = tmp_path / "dummy_plugin.py"
     f.touch()
-    monkeypatch.setattr("importlib.util.spec_from_file_location", lambda *args, **kwargs: None)
+    monkeypatch.setattr("importlib.util.spec_from_file_location", lambda *_args, **_kwargs: None)
     with pytest.raises(PluginLoadError, match="failed to create import spec"):
         load_plugin(str(f))

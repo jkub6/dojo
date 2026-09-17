@@ -299,9 +299,9 @@ class Config(BaseModel):
         """Validate that all rule pools are defined."""
         for rule, pool in self.rule_pools.items():
             if pool not in self.pools:
-                raise ConfigInvalidError(
-                    "", ValueError(f"Rule '{rule}' references undefined pool '{pool}'")
-                )
+                err_msg = f"Rule '{rule}' references undefined pool '{pool}'"
+                path_str = ""
+                raise ConfigInvalidError(path_str, ValueError(err_msg))
         return self
 
     def _auto_exclude(self, child: Path, parent: Path) -> None:
@@ -445,7 +445,7 @@ def load_config(config_path: str | None = None) -> tuple[Config, Path]:
     """
     selected_path = _find_config_path(config_path)
 
-    with open(selected_path) as f:
+    with selected_path.open() as f:
         try:
             raw_data: object = yaml.safe_load(f)
             if not isinstance(raw_data, dict):

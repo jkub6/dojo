@@ -223,7 +223,7 @@ class NinjaGenerator:
                 logger.warning("Failed to read %s for change detection: %s", target, e)
 
         try:
-            with open(target, "w", encoding="utf-8") as f:
+            with target.open("w", encoding="utf-8") as f:
                 f.write(content)
         except OSError:
             logger.exception("Failed to write %s", target)

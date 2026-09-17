@@ -1,4 +1,5 @@
 import logging
+import re
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -97,7 +98,6 @@ def normalize_ninja():
     Replaces absolute project and dojo paths with placeholders to keep
     snapshots stable across different environments.
     """
-    import re
 
     def _normalize(content: str, project_root: Path, dojo_root: Path) -> str:
         # Normalize project root

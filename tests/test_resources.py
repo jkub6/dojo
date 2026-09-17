@@ -170,3 +170,27 @@ def test_find_resource_nonexistent_root_context(tmp_path):
     non_existent_root = tmp_path / "does_not_exist"
     found = find_resource("defaults", "some_file.yaml", root_contexts=[non_existent_root])
     assert found is None
+
+
+def test_find_resource_multi_part_relative_root_contexts_branch_coverage(tmp_path):
+    """Test multi-part relative path when root_contexts is empty, misses first root, or misses all."""
+    clear_resource_cache()
+    dir1 = tmp_path / "root1"
+    dir1.mkdir()
+    dir2 = tmp_path / "root2"
+    dir2.mkdir()
+    target_sub = dir2 / "sub"
+    target_sub.mkdir()
+    target_file = target_sub / "found.yaml"
+    target_file.touch()
+
+    # 1. root_contexts is empty / None
+    assert find_resource("defaults", "sub/not_here.yaml", root_contexts=None) is None
+    assert find_resource("defaults", "sub/not_here.yaml", root_contexts=[]) is None
+
+    # 2. Misses first root, hits second root
+    found = find_resource("defaults", "sub/found.yaml", root_contexts=[dir1, dir2])
+    assert found == target_file.resolve()
+
+    # 3. Misses all roots
+    assert find_resource("defaults", "sub/missing.yaml", root_contexts=[dir1, dir2]) is None

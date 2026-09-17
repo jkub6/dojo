@@ -197,7 +197,7 @@ def _handle_exec(
             env=env,
             cwd=cwd,
             check=False,
-            stdout=log_handler if log_handler else sys.stdout,
+            stdout=log_handler or sys.stdout,
             stderr=subprocess.STDOUT if log_handler else sys.stderr,
         )
 
@@ -290,7 +290,7 @@ def _inject_metadata_overrides(cmd: list[str], in_file: str | None) -> None:
         return
 
     try:
-        with open(in_file, encoding="utf-8") as f:
+        with Path(in_file).open(encoding="utf-8") as f:
             ast = json.load(f)
             meta = ast.get("meta", {})
             _inject_slide_level(cmd, meta)
@@ -327,7 +327,7 @@ def run_wrap(argv: list[str]) -> None:
         if args.log_file:
             log_path = Path(_p(args.log_file, ctx))
             log_path.parent.mkdir(parents=True, exist_ok=True)
-            log_handler = stack.enter_context(open(log_path, "a", encoding="utf-8"))
+            log_handler = stack.enter_context(log_path.open("a", encoding="utf-8"))
 
         server: ThreadingHTTPServer | None = None
         if args.serve_dir:

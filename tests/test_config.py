@@ -1,12 +1,22 @@
+import logging
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 import yaml
 
-from dojo.config import Config, OutputConfig, ToolPaths, load_config
+from dojo.config import (
+    Config,
+    CustomRule,
+    OutputConfig,
+    ToolPaths,
+    _apply_config_file_exclusion,
+    load_config,
+)
+from dojo.constants import RuleName
 from dojo.exceptions import (
     ConfigError,
+    ConfigLoadError,
     CustomRuleConflictError,
     DefaultsNotFoundError,
     DefaultsRequiredError,
@@ -47,7 +57,7 @@ def test_tool_paths_missing_optional():
     # Minify is optional
     with patch("shutil.which") as mock_which:
         # Mock essential tools to be found, but minify missing
-        mock_which.side_effect = lambda x: "/bin/found" if x in ["pandoc"] else None
+        mock_which.side_effect = lambda x: "/bin/found" if x == "pandoc" else None
 
         tp = ToolPaths(minify="nonexistent")
         # should not raise, just keep what was passed
@@ -375,9 +385,6 @@ def test_normalize_post_process_variations(tmp_path):
 
 def test_custom_rule_conflict_with_builtin(valid_config_data):
     """Test that defining a custom rule named after a built-in rule raises CustomRuleConflictError."""
-    from dojo.config import CustomRule
-    from dojo.constants import RuleName
-
     valid_config_data["custom_rules"] = [
         CustomRule(name=RuleName.COMPILE.value, command="custom_compile $in")
     ]
@@ -416,8 +423,6 @@ def test_load_config_non_dict_yaml(tmp_path):
 
 def test_exception_messages_edge_cases():
     """Verify exception formatting for various error conditions."""
-    from dojo.exceptions import ConfigLoadError, DirectoryConflictError, EssentialToolNotFoundError
-
     err1 = EssentialToolNotFoundError("pandoc", "/opt/pandoc")
     assert "/opt/pandoc" in str(err1)
 
@@ -426,3 +431,70 @@ def test_exception_messages_edge_cases():
 
     err3 = ConfigLoadError("Failed", "/path/to/cfg", ValueError("inner"))
     assert "inner" in str(err3)
+
+
+def test_output_config_post_process_none():
+    """Test that post_process=None normalizes to an empty list."""
+    out = OutputConfig(extension="html", defaults="page.yaml", post_process=None)
+    assert out.post_process == []
+
+
+def test_config_pandoc_data_dir_none(valid_config_data):
+    """Test that pandoc_data_dir=None validates successfully."""
+    valid_config_data["pandoc_data_dir"] = None
+    cfg = Config(**valid_config_data)
+    assert cfg.pandoc_data_dir is None
+
+
+def test_custom_rules_valid_list():
+    """Test that validate_custom_rules successfully returns valid custom rules."""
+    rules = [
+        CustomRule(name="custom1", command="cmd1 $in"),
+        CustomRule(name="custom2", command="cmd2 $in"),
+    ]
+    validated = Config.validate_custom_rules(rules)
+    assert validated == rules
+
+
+def test_auto_exclude_duplicate(valid_config_data):
+    """Test _auto_exclude does not add duplicate exclusion patterns."""
+    cfg = Config(**valid_config_data)
+    child = Path(cfg.src_dir).resolve() / "sub"
+    parent = Path(cfg.src_dir).resolve()
+    cfg._auto_exclude(child, parent)
+    count_before = len(cfg.exclude)
+    # Calling it again should skip duplicates
+    cfg._auto_exclude(child, parent)
+    assert len(cfg.exclude) == count_before
+
+
+def test_apply_config_file_exclusion_already_excluded(valid_config_data):
+    """Test _apply_config_file_exclusion skips pattern if already present."""
+    cfg = Config(**valid_config_data)
+    config_file = Path(cfg.src_dir).resolve() / "dojo.yaml"
+    _apply_config_file_exclusion(cfg, config_file)
+    count_before = len(cfg.exclude)
+    _apply_config_file_exclusion(cfg, config_file)
+    assert len(cfg.exclude) == count_before
+
+
+def test_load_config_unexpected_exception(tmp_path, caplog):
+    """Test load_config logs unexpected error when validation fails with generic exception."""
+    cfg_file = tmp_path / "valid.yaml"
+    cfg_file.write_text("src_dir: content\n")
+    with patch("dojo.config.Config.model_validate", side_effect=RuntimeError("Unexpected boom")):
+        with (
+            caplog.at_level(logging.ERROR),
+            pytest.raises(ConfigLoadError, match="Unexpected boom"),
+        ):
+            load_config(str(cfg_file))
+        assert "Unexpected error validating configuration" in caplog.text
+
+
+def test_exceptions_edge_cases():
+    """Test EssentialToolNotFoundError without path and ConfigLoadError without exc."""
+    err1 = EssentialToolNotFoundError("ninja")
+    assert str(err1) == "Essential tool 'ninja' not found"
+
+    err2 = ConfigLoadError("Failed to open", Path("dojo.yaml"))
+    assert str(err2) == "Failed to open: dojo.yaml"
