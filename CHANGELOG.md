@@ -11,18 +11,37 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Initial release of Dojo.
-- Ninja build generator for static site generation.
-- Pandoc integration for Markdown processing.
-- Multi-stage pipeline: Compile (Markdown to AST), Render (AST to Output), and Assets (recursive
-  dependency discovery).
-- Pydantic-based configuration validation with cross-field checks.
-- Plugin system for custom Ninja rules and build orchestration.
-- Support for HTML and PDF (via Decktape) outputs.
-- Post-processing pipeline steps (Ghostscript, Minification).
-- Nix flake for reproducible development environments.
-- Comprehensive test suite including end-to-end integration tests.
-- Path security and sanitization.
+- **Ninja Build Generator**: Incremental static site and document build orchestration powered by
+  Ninja.
+- **Pandoc Markdown Compilation**: Decoupled multi-stage pipeline compiling Markdown into Pandoc
+  JSON AST with automatic Makefile-style depfile generation (`dependencies.lua`).
+- **Multi-Format Rendering**: Support for standalone HTML, Reveal.js slides, and PDF outputs (via
+  Decktape and Typst).
+- **Post-Processing Pipelines**: Multi-step chained post-processing steps (`PipelineStep`),
+  including HTML/CSS/JS minification (`minify`), PDF optimization (`ghostscript`), and offline HTML
+  compression (`crunch`).
+- **Offline HTML Compression (`crunch`)**: In-process Zstandard compression and embedded Web Worker
+  decoder generating self-extracting offline HTML with no CDN or external dependencies.
+- **Cross-Format Sibling Links**: Automatic generation of format-switcher navigation menus
+  (`format_links`) via injected defaults and bundled Lua filter (`format_links.lua`).
+- **Smart Asset Discovery**: Automatic tracking and deduplication of frontmatter assets, recursive
+  CSS `url()` references, recursive HTML `src`/`href` links, and static asset directory
+  synchronization with `.static_assets.stamp`.
+- **Subprocess Execution Wrapper (`wrap.py`)**: Portable execution wrapper providing path
+  placeholder resolution, directory pre-creation, failure cleanup, ephemeral localhost HTTP serving
+  for Decktape, and dynamic AST metadata overrides (`slide-level`, `toc`).
+- **Concurrency Resource Pools**: Named concurrency limits (`pools` and `rule_pools`) to throttle
+  resource-intensive jobs in Ninja.
+- **Strict Configuration Schema**: Pydantic v2-backed `dojo.yaml` validation with path traversal
+  prevention, directory collision checks, and JSON Schema export (`dojo schema`).
+- **Extensible Plugin System**: Python plugin API (`PluginInterface`) supporting custom Ninja rules,
+  dynamic output configuration modifications, and Ninja file post-processing with priority ordering.
+- **Logging & Diagnostics**: Human-readable Rich console logging and single-line structured JSON
+  logging for CI integration.
+- **Reproducible Nix Environment**: Complete Nix flake providing dev shells, package derivations,
+  checks, and treefmt formatting.
+- **Comprehensive Quality Assurance**: 100% branch test coverage enforcement with pytest and
+  Hypothesis.
 
 [0.1.0]: https://github.com/jkub6/dojo/releases/tag/v0.1.0
 [unreleased]: https://github.com/jkub6/dojo/compare/v0.1.0...HEAD

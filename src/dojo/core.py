@@ -69,7 +69,7 @@ class NinjaGenerator:
         dry_run: bool = False,
         emitter: NinjaEmitter | None = None,
     ) -> None:
-        """Initialize the NinjaBuilder."""
+        """Initialize the NinjaGenerator."""
         self.config = config
         self.config_path = Path(config_path).absolute()
         self.quiet = quiet
