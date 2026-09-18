@@ -201,8 +201,11 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
                 command=(
                     f"{dojo_wrap_base} --ensure-dir {{out_abs_dir}} -- "
                     f"{shell_quote(config.tools.ghostscript)} -sDEVICE=pdfwrite "
-                    "-dCompatibilityLevel=1.4 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET "
-                    "-dBATCH -dSAFER $args -sOutputFile={out_abs} {in_abs}"
+                    "-dCompatibilityLevel=1.7 -dPDFSETTINGS=/printer "
+                    "-sColorConversionStrategy=LeaveColorUnchanged "
+                    "-dCompressFonts=true -dSubsetFonts=true "
+                    "-dDetectDuplicateImages=true "
+                    "-dNOPAUSE -dQUIET -dBATCH $args -sOutputFile={out_abs} {in_abs}"
                 ),
                 description="🗜️  COMPRESS $out",
                 pool=get_pool(RuleName.GHOSTSCRIPT.value),

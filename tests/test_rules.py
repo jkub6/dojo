@@ -114,6 +114,36 @@ def test_builtin_rules_crunch():
     assert crunch_rule.pool == "heavy"
 
 
+def test_builtin_rules_ghostscript():
+    c = Config.model_construct(
+        src_dir="src",
+        output_dir="site",
+        build_dir="build",
+        default_type="page",
+        types={},
+        tools=ToolPaths.model_construct(pandoc="pandoc", ghostscript="gs"),
+        root_ref_dir=".",
+        add_resource_path=True,
+        rule_pools={"ghostscript": "heavy"},
+    )
+    rules = get_builtin_rules(c, Path("config.yaml"))
+    gs_rule = next(r for r in rules if r.name == "ghostscript")
+    assert "wrap.py" in gs_rule.command
+    assert "gs -sDEVICE=pdfwrite" in gs_rule.command
+    assert "-dCompatibilityLevel=1.7" in gs_rule.command
+    assert "-dPDFSETTINGS=/printer" in gs_rule.command
+    assert "-sColorConversionStrategy=LeaveColorUnchanged" in gs_rule.command
+    assert "-dCompressFonts=true" in gs_rule.command
+    assert "-dSubsetFonts=true" in gs_rule.command
+    assert "-dDetectDuplicateImages=true" in gs_rule.command
+    assert "-dFastWebView" not in gs_rule.command
+    assert "-dNOPAUSE" in gs_rule.command
+    assert "-dQUIET" in gs_rule.command
+    assert "-dBATCH" in gs_rule.command
+    assert "$args -sOutputFile={out_abs} {in_abs}" in gs_rule.command
+    assert gs_rule.pool == "heavy"
+
+
 def test_typst_flags(tmp_path, monkeypatch):
     """Test get_typst_flags with font_paths, pandoc_data_dir fonts, and TYPST_FONT_PATHS."""
     font_dir = tmp_path / "fonts"
