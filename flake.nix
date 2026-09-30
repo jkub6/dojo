@@ -128,6 +128,7 @@
 
           packages = with localPkgs; [
             just
+            nvd
             ninja
             pandoc
             typst

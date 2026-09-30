@@ -63,3 +63,30 @@ clean:
 	rm -rf _build _site _cache .pytest_cache .ruff_cache .mypy_cache \
 	       .hypothesis .coverage coverage.xml htmlcov result node_modules
 	find . -type d -name "__pycache__" -exec rm -rf {} +
+
+[group('Maintenance')]
+[doc('Update flake inputs and show package version diffs')]
+update:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  # Determine the current system architecture
+  SYS=$(nix eval --raw --impure --expr 'builtins.currentSystem')
+  
+  echo "=> Building current environment..."
+  OLD_ENV=$(nix build .#devShells.$SYS.default --print-out-paths --no-link)
+  
+  echo "=> Updating flake inputs..."
+  nix flake update
+  
+  echo "=> Building new environment..."
+  NEW_ENV=$(nix build .#devShells.$SYS.default --print-out-paths --no-link)
+  
+  echo "=> Diffing packages..."
+  nvd diff "$OLD_ENV" "$NEW_ENV"
+  
+  # Reload direnv if it's active
+  if command -v direnv >/dev/null 2>&1; then
+      echo "=> Reloading direnv..."
+      direnv reload
+  fi
