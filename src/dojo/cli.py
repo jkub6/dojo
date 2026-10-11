@@ -184,7 +184,7 @@ def cmd_check_output(args: DojoArgs) -> None:
         )
         if errors:
             for error in errors:
-                console.print(f"[bold red]Validation error:[/bold red] {error}")
+                console.print(f"[bold red]Validation error:[/bold red] {error}", soft_wrap=True)
             sys.exit(1)
 
         console.print(
@@ -194,7 +194,7 @@ def cmd_check_output(args: DojoArgs) -> None:
         if args.verbose:
             logger.exception("Unexpected error during output validation")
         else:
-            console.print(f"[bold red]Validation error:[/bold red] {e}")
+            console.print(f"[bold red]Validation error:[/bold red] {e}", soft_wrap=True)
         sys.exit(1)
 
 
