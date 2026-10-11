@@ -56,6 +56,28 @@
                     python-final.hatchling
                   ];
 
+                  # Dojo spawns external tools (Ninja, Pandoc, Pandoc filters, Typst, ...)
+                  # that resolve programs such as `python3` from PATH, so it must pass the
+                  # caller's environment through untouched. The default wrapPythonPrograms
+                  # launcher prepends the bare build interpreter and every dependency's
+                  # bin/ directory to PATH and exports PYTHONNOUSERSITE; both leak into
+                  # child processes and shadow the user's interpreter, e.g. Pandoc filters
+                  # can no longer import panflute. Instead, bake the dependency search path
+                  # into the entry point (as wrapPythonPrograms does internally) and pass
+                  # `-s` on the shebang so user site-packages stay isolated for this process
+                  # only. Covered by checks.environment-passthrough.
+                  dontWrapPythonPrograms = true;
+                  postFixup = ''
+                    buildPythonPath "$out"
+                    patchPythonScript "$out/bin/dojo"
+
+                    if ! head -n 1 "$out/bin/dojo" | grep -q '^#!/nix/store/[^ ]*/bin/python[0-9.]*$'; then
+                      echo "error: unexpected shebang in $out/bin/dojo: $(head -n 1 "$out/bin/dojo")" >&2
+                      exit 1
+                    fi
+                    sed -i '1s/$/ -s/' "$out/bin/dojo"
+                  '';
+
                   nativeCheckInputs = with python-final; [
                     pytestCheckHook
                     pytest-cov
@@ -115,6 +137,9 @@
         # CI Checks
         checks = {
           build = python.pkgs.dojo;
+          environment-passthrough = localPkgs.callPackage ./nix/checks/environment-passthrough.nix {
+            inherit python;
+          };
         };
 
         # 5. Treefmt configuration mapped flawlessly via module system
