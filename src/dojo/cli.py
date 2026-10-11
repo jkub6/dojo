@@ -20,6 +20,7 @@ from .core import NinjaGenerator
 from .crunch import crunch_file
 from .log_config import setup_logging
 from .schema import print_schema, write_schema
+from .validation import validate_output
 
 console = Console()
 
@@ -49,6 +50,10 @@ class DojoArgs(argparse.Namespace):
     input: str | None = None
     level: int = 22
     window_log: int = 26
+    path: str | None = None
+    links: bool = False
+    offline: bool = False
+    site_root: str | None = None
 
 
 def setup_cli_logging(*, verbose: bool, quiet: bool, json_output: bool = False) -> None:
@@ -153,6 +158,43 @@ def cmd_check(args: DojoArgs) -> None:
             logger.exception("Unexpected error during configuration check")
         else:
             console.print(f"[bold red]Configuration invalid:[/bold red] {e}")
+        sys.exit(1)
+
+
+def cmd_check_output(args: DojoArgs) -> None:
+    """Handle the check-output command to validate compiled site resources."""
+    try:
+        if args.path:
+            target_path = Path(args.path)
+        else:
+            try:
+                config, _ = load_config(args.config)
+                target_path = Path(config.output_dir)
+            except Exception:
+                if args.config:
+                    raise
+                target_path = Path("_site")
+
+        site_root = Path(args.site_root) if args.site_root else None
+        errors = validate_output(
+            target_path,
+            links=args.links,
+            offline=args.offline,
+            resource_root=site_root,
+        )
+        if errors:
+            for error in errors:
+                console.print(f"[bold red]Validation error:[/bold red] {error}")
+            sys.exit(1)
+
+        console.print(
+            f"[bold green]✓ Output resources and identifiers are valid:[/bold green] {target_path}"
+        )
+    except Exception as e:
+        if args.verbose:
+            logger.exception("Unexpected error during output validation")
+        else:
+            console.print(f"[bold red]Validation error:[/bold red] {e}")
         sys.exit(1)
 
 
@@ -266,6 +308,43 @@ def cmd_crunch(args: DojoArgs) -> None:
         sys.exit(1)
 
 
+def _register_check_output_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    """Register the check-output and validate subcommands."""
+    check_output_parser = subparsers.add_parser(
+        "check-output",
+        aliases=["validate"],
+        help="Validate compiled site output resources and identifiers",
+    )
+    check_output_parser.add_argument(
+        "path",
+        nargs="?",
+        default=None,
+        help="Path to output directory or HTML file to validate",
+    )
+    check_output_parser.add_argument(
+        "-c",
+        "--config",
+        help="Path to configuration file",
+    )
+    check_output_parser.add_argument(
+        "--links",
+        action="store_true",
+        help="Validate internal anchor links and fragment targets",
+    )
+    check_output_parser.add_argument(
+        "--offline",
+        action="store_true",
+        help="Disallow external resources (excluding <a> links) for offline output",
+    )
+    check_output_parser.add_argument(
+        "--site-root",
+        help="Root directory for local resources when validating a single HTML file",
+    )
+    check_output_parser.set_defaults(func=cmd_check_output)
+
+
 def main(argv: list[str] | None = None) -> None:
     """CLI entry point for dojo."""
     parser = argparse.ArgumentParser(
@@ -335,6 +414,9 @@ def main(argv: list[str] | None = None) -> None:
     check_parser = subparsers.add_parser("check", help="Validate configuration")
     check_parser.add_argument("-c", "--config", help="Path to configuration file")
     check_parser.set_defaults(func=cmd_check)
+
+    # Check-output command (with alias validate)
+    _register_check_output_parser(subparsers)
 
     # Init command
     init_parser = subparsers.add_parser("init", help="Create a sample configuration")

@@ -332,3 +332,94 @@ def test_run_ninja_options_and_failure(monkeypatch):
         cwd=None,
         check=False,
     )
+
+
+def test_check_output_success_default_site(tmp_path, monkeypatch, capsys):
+    """Test check-output succeeds on a valid site defaulting to _site."""
+    monkeypatch.chdir(tmp_path)
+    site = tmp_path / "_site"
+    site.mkdir()
+    (site / "index.html").write_text("<!DOCTYPE html><html><body><h1>OK</h1></body></html>")
+
+    main(["check-output"])
+    captured = capsys.readouterr()
+    assert "Output resources and identifiers are valid" in captured.out
+
+
+def test_check_output_explicit_path(tmp_path, monkeypatch, capsys):
+    """Test check-output with explicit path argument."""
+    monkeypatch.chdir(tmp_path)
+    custom = tmp_path / "custom_output"
+    custom.mkdir()
+    (custom / "index.html").write_text("<!DOCTYPE html><html><body><h1>OK</h1></body></html>")
+
+    main(["check-output", str(custom)])
+    captured = capsys.readouterr()
+    assert "Output resources and identifiers are valid" in captured.out
+
+
+def test_check_output_validate_alias_with_config(tmp_path, monkeypatch, capsys):
+    """Test validate alias resolves output directory from dojo.yaml."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "content").mkdir()
+    custom_out = tmp_path / "dist"
+    custom_out.mkdir()
+    (custom_out / "index.html").write_text("<!DOCTYPE html><html><body><h1>OK</h1></body></html>")
+
+    (tmp_path / "dojo.yaml").write_text(f"""
+src_dir: content
+output_dir: {custom_out}
+build_dir: _build
+default_type: page
+types:
+  page:
+    outputs: []
+""")
+
+    main(["validate"])
+    captured = capsys.readouterr()
+    assert "Output resources and identifiers are valid" in captured.out
+
+
+def test_check_output_failure_exits_1(tmp_path, monkeypatch, capsys):
+    """Test check-output exits 1 when errors are found."""
+    monkeypatch.chdir(tmp_path)
+    site = tmp_path / "_site"
+    site.mkdir()
+    (site / "index.html").write_text("""
+    <!DOCTYPE html><html><body>
+    <div id="dup">A</div><div id="dup">B</div>
+    <img src="missing.png">
+    </body></html>
+    """)
+
+    with pytest.raises(SystemExit) as exc:
+        main(["check-output"])
+    assert exc.value.code == 1
+
+    captured = capsys.readouterr()
+    assert "duplicate HTML id dup" in captured.out
+    assert "missing local resource missing.png" in captured.out
+
+
+def test_check_output_exception_non_verbose(tmp_path, monkeypatch, capsys):
+    """Test check-output without verbose logs clean error message when config is missing."""
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(SystemExit) as exc:
+        main(["check-output", "-c", "nonexistent.yaml"])
+    assert exc.value.code == 1
+
+    captured = capsys.readouterr()
+    assert "Validation error" in captured.out
+
+
+def test_check_output_verbose_error(tmp_path, monkeypatch, capsys):
+    """Test check-output with verbose logs exception when bad config path is passed."""
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(SystemExit) as exc:
+        main(["-v", "check-output", "-c", "nonexistent.yaml"])
+    assert exc.value.code == 1
+
+    captured = capsys.readouterr()
+    output = captured.out + captured.err
+    assert "Unexpected error during output validation" in output
