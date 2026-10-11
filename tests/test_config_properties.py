@@ -81,7 +81,10 @@ def st_config(draw):
     }
 
 
-@settings(max_examples=20, suppress_health_check=[HealthCheck.function_scoped_fixture])
+@settings(
+    max_examples=20,
+    suppress_health_check=[HealthCheck.function_scoped_fixture, HealthCheck.too_slow],
+)
 @given(st_config())
 def test_config_robustness(config_dict):
     """Verify that validated config objects can at least be initialized without crashing if filesystem checks are bypassed."""

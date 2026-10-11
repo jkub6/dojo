@@ -87,8 +87,10 @@ class TestFullBuildPipeline:
         sample_project: tuple[Path, Path],
         file_regression,
         normalize_ninja,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test that dojo generates build.ninja and ninja produces HTML output."""
+        monkeypatch.delenv("TYPST_FONT_PATHS", raising=False)
         project, config_path = sample_project
 
         # Step 1: Run dojo build

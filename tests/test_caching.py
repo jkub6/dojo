@@ -82,8 +82,8 @@ tools:
   minify: {mock_minify}
 """)
 
-    # First build
-    main(["build", "-c", str(config_path)])
+    # First build (generate-only to isolate generator mtime stability)
+    main(["build", "-c", str(config_path), "--generate-only"])
 
     # Run ninja first time to populate cache
     subprocess.run(
@@ -93,7 +93,7 @@ tools:
     )
 
     # Second build (immediate re-run)
-    main(["build", "-c", str(config_path)])
+    main(["build", "-c", str(config_path), "--generate-only"])
 
     # Run ninja second time - should do nothing
     result = subprocess.run(

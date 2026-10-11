@@ -94,9 +94,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     # REGENERATE rule uses the full dojo CLI
     dojo_src = Path(__file__).parent.parent.resolve().as_posix()
     python_env = f"PYTHONPATH={shell_quote(dojo_src)}"
-    regen_cmd = (
-        f"{python_env} {shell_quote(sys.executable)} -m dojo build -c {config_path.as_posix()}"
-    )
+    regen_cmd = f"{python_env} {shell_quote(sys.executable)} -m dojo build --generate-only -c {config_path.as_posix()}"
 
     base_flags = "-V root={root_val} -M root={root_val}"
     if config.pandoc_data_dir:

@@ -165,6 +165,11 @@ indent-style = "space"
   "PLR0913",
 ] # Ninja build format has many optional fields
 
+"src/dojo/plugins.py" = [
+  "ARG002",
+] # Base interface methods define standard arguments for subclasses
+
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
@@ -225,3 +230,4 @@ fail_under = 100
 [tool.vulture]
 min_confidence = 80
 paths = ["src"]
+ignore_names = ["source_ast", "target_ast", "target_output"]

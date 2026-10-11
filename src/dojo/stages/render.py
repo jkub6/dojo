@@ -20,8 +20,11 @@ if TYPE_CHECKING:
 
     from dojo.config import Config, OutputConfig, PipelineStep
     from dojo.emitter import NinjaEmitter
+    from dojo.plugins import PluginInterface
 
 logger = logging.getLogger(__name__)
+
+EXPECTED_HOOK_RESULT_SIZE = 2
 
 
 class RenderStage:
@@ -63,13 +66,15 @@ class RenderStage:
         self.emitter = emitter
         self.all_outputs = all_outputs
 
-    def render(
+    def render(  # noqa: PLR0913
         self,
         out_config: OutputConfig,
         json_node: Path,
         rel_stem: Path,
         local_registry: dict[str, Path],
+        *,
         implicit_deps: list[Path] | None = None,
+        plugins: list[PluginInterface] | None = None,
     ) -> None:
         """Convert JSON to output format or derived output.
 
@@ -79,20 +84,30 @@ class RenderStage:
             rel_stem: Relative path without extension
             local_registry: Registry of output IDs to paths for this content
             implicit_deps: Extra implicit dependencies (e.g. assets)
+            plugins: Optional list of loaded plugins
 
         """
         if out_config.source:
             self._derive_output(out_config, rel_stem, local_registry, implicit_deps)
         else:
-            self._standard_render(out_config, rel_stem, json_node, local_registry, implicit_deps)
+            self._standard_render(
+                out_config,
+                rel_stem,
+                json_node,
+                local_registry,
+                implicit_deps=implicit_deps,
+                plugins=plugins,
+            )
 
-    def _standard_render(
+    def _standard_render(  # noqa: PLR0913
         self,
         out_config: OutputConfig,
         rel_stem: Path,
         json_node: Path,
         local_registry: dict[str, Path],
+        *,
         implicit_deps: list[Path] | None = None,
+        plugins: list[PluginInterface] | None = None,
     ) -> None:
         """Render standard Pandoc with optional post-processing."""
         filename = f"{rel_stem.name}{out_config.suffix}.{out_config.extension}"
@@ -122,6 +137,18 @@ class RenderStage:
         all_implicit = list(implicit)
         if implicit_deps:
             all_implicit.extend(implicit_deps)
+
+        if plugins:
+            for plugin in plugins:
+                res = plugin.modify_render_edge(
+                    source_ast=json_node,
+                    rel_stem=rel_stem,
+                    target_output=render_target,
+                    variables=variables,
+                    implicit_deps=all_implicit,
+                )
+                if len(res) == EXPECTED_HOOK_RESULT_SIZE:
+                    variables, all_implicit = res
 
         self.emitter.build(
             outputs=render_target,

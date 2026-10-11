@@ -17,6 +17,9 @@ if TYPE_CHECKING:
 
     from dojo.config import Config, TypeConfig
     from dojo.emitter import NinjaEmitter
+    from dojo.plugins import PluginInterface
+
+EXPECTED_HOOK_RESULT_SIZE = 2
 
 
 class CompileStage:
@@ -52,6 +55,7 @@ class CompileStage:
         md_path: Path,
         rel_stem: Path,
         type_config: TypeConfig,
+        plugins: list[PluginInterface] | None = None,
     ) -> Path:
         """Convert Markdown to JSON (Pandoc AST).
 
@@ -59,6 +63,7 @@ class CompileStage:
             md_path: Absolute path to source Markdown file
             rel_stem: Relative path without extension
             type_config: Type configuration for this content
+            plugins: Optional list of loaded plugins
 
         Returns:
             Path to the generated JSON AST file
@@ -82,6 +87,18 @@ class CompileStage:
                 "out_shell": ninja_quote(json_node),
             }
         )
+
+        if plugins:
+            for plugin in plugins:
+                res = plugin.modify_compile_edge(
+                    source=md_path,
+                    rel_stem=rel_stem,
+                    target_ast=json_node,
+                    variables=variables,
+                    implicit_deps=implicit,
+                )
+                if len(res) == EXPECTED_HOOK_RESULT_SIZE:
+                    variables, implicit = res
 
         self.emitter.build(
             outputs=json_node,

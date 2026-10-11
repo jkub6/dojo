@@ -41,7 +41,7 @@ types:
 
     start_time = time.perf_counter()
 
-    main(["--quiet", "build", "-c", str(config_path)])
+    main(["--quiet", "build", "--generate-only", "-c", str(config_path)])
 
     end_time = time.perf_counter()
     duration = end_time - start_time

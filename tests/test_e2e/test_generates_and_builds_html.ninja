@@ -9,7 +9,7 @@ pool test_pool
 
 # Rules
 rule regenerate
-  command = PYTHONPATH=[DOJO_ROOT]/src [PYTHON_BIN] -m dojo build -c [PROJECT_ROOT]/dojo.yaml
+  command = PYTHONPATH=[DOJO_ROOT]/src [PYTHON_BIN] -m dojo build --generate-only -c [PROJECT_ROOT]/dojo.yaml
   description = ⚙️  REGENERATE build.ninja
   generator = 1
 

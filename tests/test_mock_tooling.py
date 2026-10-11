@@ -49,7 +49,7 @@ types:
 
     # Mock shutil.which to return our mock tool string if it matches
     with patch("shutil.which", side_effect=lambda x: x if "mock_tool" in x else "/usr/bin/echo"):
-        main(["build", "-c", "dojo.yaml"])
+        main(["build", "-c", "dojo.yaml", "--generate-only"])
 
     build_ninja = project / "_build" / "build.ninja"
     assert build_ninja.exists()

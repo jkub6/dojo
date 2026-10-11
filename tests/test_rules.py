@@ -32,9 +32,14 @@ def test_builtin_rules_with_custom_tool_paths(tmp_path):
     bin_dir.mkdir()
     pandoc_exe = bin_dir / "pandoc"
     pandoc_exe.touch()
+    minify_exe = bin_dir / "minify"
+    minify_exe.touch()
 
     # Use model_construct to avoid validation that might fail in test env
-    tools = ToolPaths.model_construct(pandoc=str(pandoc_exe), python="python3")
+    tools = ToolPaths.model_construct(
+        pandoc=str(pandoc_exe),
+        minify=str(minify_exe),
+    )
 
     config = Config.model_construct(
         tools=tools,

@@ -1,8 +1,10 @@
-from unittest.mock import patch
+import subprocess
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from dojo.cli import entry_point, main
+from dojo.cli import entry_point, main, run_ninja
 
 
 def test_cli_help(capsys):
@@ -144,6 +146,28 @@ types:
     assert "Build configuration generated successfully" in captured.out
 
 
+def test_build_generate_only(tmp_path, monkeypatch, capsys):
+    """Test build command with --generate-only flag."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "dojo.yaml").write_text("""
+src_dir: content
+output_dir: _site
+build_dir: _build
+default_type: page
+types:
+  page:
+    outputs: []
+""")
+    (tmp_path / "content").mkdir()
+
+    main(["build", "-c", "dojo.yaml", "--generate-only"])
+
+    assert (tmp_path / "_build" / "build.ninja").exists()
+    captured = capsys.readouterr()
+    assert "Build configuration generated successfully" in captured.out
+    assert "Running build via Ninja" not in captured.out
+
+
 def test_build_quiet(tmp_path, monkeypatch, capsys):
     """Test build command with quiet flag."""
     monkeypatch.chdir(tmp_path)
@@ -276,4 +300,35 @@ def test_check_verbose_invalid_config(tmp_path, monkeypatch, capsys):
     assert (
         "Unexpected error during configuration check" in captured.out
         or "Unexpected error during configuration check" in captured.err
+    )
+
+
+def test_run_ninja_missing(monkeypatch, capsys):
+    """Test run_ninja exits when ninja binary is not found."""
+    monkeypatch.setattr("shutil.which", lambda _bin: None)
+    with pytest.raises(SystemExit) as exc:
+        run_ninja(Path("build.ninja"))
+    assert exc.value.code == 1
+    captured = capsys.readouterr()
+    assert "not found in PATH" in captured.out
+
+
+def test_run_ninja_options_and_failure(monkeypatch):
+    """Test run_ninja passes targets, jobs, quiet, and exits on failure."""
+    monkeypatch.setattr("shutil.which", lambda _bin: "/bin/ninja")
+    mock_run = MagicMock(return_value=subprocess.CompletedProcess(args=[], returncode=42))
+    monkeypatch.setattr("subprocess.run", mock_run)
+
+    with pytest.raises(SystemExit) as exc:
+        run_ninja(
+            Path("build.ninja"),
+            targets=["out.html"],
+            jobs=8,
+            quiet=True,
+        )
+    assert exc.value.code == 42
+    mock_run.assert_called_once_with(
+        ["/bin/ninja", "-f", "build.ninja", "-j", "8", "out.html"],
+        cwd=None,
+        check=False,
     )

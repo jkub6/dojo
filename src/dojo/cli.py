@@ -6,6 +6,8 @@ dispatching for build configuration, validation, and initialization.
 
 import argparse
 import logging
+import shutil
+import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -38,6 +40,10 @@ class DojoArgs(argparse.Namespace):
     quiet: bool = False
     version: bool = False
     dry_run: bool = False
+    generate_only: bool = False
+    jobs: int | None = None
+    refresh: bool = False
+    targets: list[str] | None = None
     json_output: bool = False
     output: str | None = None
     input: str | None = None
@@ -58,6 +64,34 @@ def setup_cli_logging(*, verbose: bool, quiet: bool, json_output: bool = False) 
     setup_logging(level=level, json_output=json_output)
 
 
+def run_ninja(
+    ninja_file: Path,
+    *,
+    cwd: Path | None = None,
+    targets: list[str] | None = None,
+    jobs: int | None = None,
+    quiet: bool = False,
+) -> None:
+    """Execute Ninja to build targets."""
+    ninja_bin = shutil.which("ninja")
+    if not ninja_bin:
+        console.print("[bold red]Error:[/bold red] 'ninja' executable not found in PATH.")
+        sys.exit(1)
+
+    cmd = [ninja_bin, "-f", str(ninja_file)]
+    if jobs is not None:
+        cmd.extend(["-j", str(jobs)])
+    if targets:
+        cmd.extend(targets)
+
+    if not quiet:
+        console.print("[bold cyan]🚀 Running build via Ninja...[/bold cyan]")
+
+    result = subprocess.run(cmd, cwd=cwd, check=False)  # noqa: S603
+    if result.returncode != 0:
+        sys.exit(result.returncode)
+
+
 def cmd_build(args: DojoArgs) -> None:
     """Handle the build command."""
     try:
@@ -66,7 +100,13 @@ def cmd_build(args: DojoArgs) -> None:
         if not args.quiet:
             console.print(f"[bold green]Using configuration:[/bold green] {config_path}")
 
-        generator = NinjaGenerator(config, config_path, quiet=args.quiet, dry_run=args.dry_run)
+        generator = NinjaGenerator(
+            config,
+            config_path,
+            quiet=args.quiet,
+            dry_run=args.dry_run,
+            refresh=args.refresh,
+        )
 
         generator.generate()
 
@@ -77,6 +117,15 @@ def cmd_build(args: DojoArgs) -> None:
                 console.print(
                     "[bold green]✨ Build configuration generated successfully![/bold green]"
                 )
+
+        if not args.dry_run and not args.generate_only:
+            run_ninja(
+                generator.ninja_file,
+                cwd=config_path.parent,
+                targets=args.targets,
+                jobs=args.jobs,
+                quiet=args.quiet,
+            )
 
     except FileNotFoundError as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
@@ -244,7 +293,7 @@ def main(argv: list[str] | None = None) -> None:
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
 
     # Build command
-    build_parser = subparsers.add_parser("build", help="Generate Ninja build file (default)")
+    build_parser = subparsers.add_parser("build", help="Generate Ninja build file and compile site")
     build_parser.add_argument("-c", "--config", help="Path to configuration file")
     build_parser.add_argument(
         "-n",
@@ -252,6 +301,33 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         dest="dry_run",
         help="Show what would be built without generating files",
+    )
+    build_parser.add_argument(
+        "-g",
+        "--generate-only",
+        action="store_true",
+        dest="generate_only",
+        help="Generate build.ninja without executing Ninja",
+    )
+    build_parser.add_argument(
+        "-j",
+        "--jobs",
+        type=int,
+        default=None,
+        dest="jobs",
+        help="Limit number of concurrent Ninja jobs",
+    )
+    build_parser.add_argument(
+        "--refresh",
+        action="store_true",
+        dest="refresh",
+        help="Bypass plugin preparation caches",
+    )
+    build_parser.add_argument(
+        "targets",
+        nargs="*",
+        default=[],
+        help="Specific targets to build",
     )
     build_parser.set_defaults(func=cmd_build)
 

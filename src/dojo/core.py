@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from .config import Config, CustomRule, OutputConfig
 
-from .paths import should_process_file
+from .paths import ninja_quote, should_process_file
 from .plugins import PluginInterface, load_plugin
 from .rules import get_builtin_rules
 from .stages import AssetProcessor, CompileStage, RenderStage
@@ -60,20 +60,23 @@ class NinjaGenerator:
     All paths emitted as variables are pre-quoted using `shlex.quote`.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         config: Config,
         config_path: Path,
         *,
         quiet: bool = False,
         dry_run: bool = False,
+        refresh: bool = False,
         emitter: NinjaEmitter | None = None,
+        plugins: list[PluginInterface] | None = None,
     ) -> None:
         """Initialize the NinjaGenerator."""
         self.config = config
         self.config_path = Path(config_path).absolute()
         self.quiet = quiet
         self.dry_run = dry_run
+        self.refresh = refresh
 
         # Configure paths
         self.src = Path(self.config.src_dir).absolute()
@@ -97,7 +100,12 @@ class NinjaGenerator:
         self.copied_assets: set[Path] = set()
 
         # Load plugins
-        self.plugins: list[PluginInterface] = [load_plugin(path) for path in self.config.plugins]
+        if plugins is not None:
+            self.plugins = list(plugins)
+        else:
+            self.plugins = [
+                load_plugin(path, base_dir=self.config_path.parent) for path in self.config.plugins
+            ]
 
         # Sort plugins by priority (lower = earlier)
         self.plugins.sort(key=lambda p: p.priority)
@@ -337,7 +345,12 @@ class NinjaGenerator:
             src_comment = md_path
 
         self.emitter.comment(f"Source: {src_comment}")
-        json_node = self._compile_stage.compile(md_path, rel_stem, type_config)
+        json_node = self._compile_stage.compile(
+            md_path,
+            rel_stem,
+            type_config,
+            plugins=self.plugins,
+        )
         self.emitter.newline()
 
         if not type_config.outputs:
@@ -375,9 +388,38 @@ class NinjaGenerator:
                 rel_stem,
                 local_registry,
                 implicit_deps=all_deps,
+                plugins=self.plugins,
             )
 
         self.emitter.newline()
+
+    def _run_pre_generate_hooks(self) -> None:
+        """Execute pre_generate hooks for all loaded plugins."""
+        for plugin in self.plugins:
+            plugin.pre_generate(
+                self.config,
+                self.build_dir,
+                refresh=self.refresh,
+                src_dir=self.src,
+            )
+
+    def _process_plugin_extra_assets(self) -> None:
+        """Process extra assets declared by plugins."""
+        for plugin in self.plugins:
+            extra_assets = plugin.get_extra_assets(self.config, self.out_dir)
+            for dest, src in sorted(extra_assets.items()):
+                if dest not in self.copied_assets:
+                    self.copied_assets.add(dest)
+                    self.all_outputs.append(dest)
+                    self.emitter.build(
+                        outputs=dest,
+                        rule=RuleName.COPY.value,
+                        inputs=src,
+                        variables={
+                            "in_shell": ninja_quote(src),
+                            "out_shell": ninja_quote(dest),
+                        },
+                    )
 
     def generate(self) -> None:
         """Scan source files and generate build.ninja."""
@@ -387,11 +429,17 @@ class NinjaGenerator:
         if self.config.format_links:
             self._generate_format_link_defaults()
 
+        # Plugin Hook: Pre-generation lifecycle hook
+        self._run_pre_generate_hooks()
+
         self.emit_header()
 
         # Stage 2: Static assets
         # Process these first so they can be used as dependencies for content rendering
         static_outputs = self._asset_processor.process_static_assets(self.config.static_dirs)
+
+        # Stage 2b: Plugin extra assets
+        self._process_plugin_extra_assets()
 
         # Optimization: Create a stamp file to represent all static assets.
         # This keeps the Ninja build edges for individual files compact (Professional Refinement).
