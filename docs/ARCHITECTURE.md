@@ -1,459 +1,125 @@
-# Dojo Architecture Guide
+# Build and publication architecture
 
-> Ninja Build Generator for Static Site Generation and Document Processing
+Dojo owns project discovery, Pandoc execution, the Ninja graph, output ownership, and publication
+validation. Plugins own domain-specific preparation. Research catalogs, citation selection, Bible
+data, and authoring UI belong in consumers such as Access; Dojo does not import or inspect those
+packages.
 
-## Overview
+## One supported build entry point
 
-Dojo bridges the gap between flexible markup conversion and high-performance, incremental build
-engineering. It transforms Markdown and structured content into static websites, multi-format
-documents, and presentation slide decks by compiling Markdown to an intermediate
-[Pandoc](https://pandoc.org/) JSON AST, analyzing asset and dependency graphs, and emitting
-optimized [Ninja](https://ninja-build.org/) build files.
+`dojo build -c /path/to/dojo.yaml` resolves all configuration paths against that file's directory.
+Each invocation discovers sources, asks plugins to prepare their inputs, writes the graph only if it
+changed, and runs Ninja incrementally. This also detects additions, removals, and changes to
+preparation inputs. A successful full build finalizes the publication inventory. Specific-target
+builds and `--generate-only` do not finalize a complete publication.
 
-By offloading dependency resolution, file-change detection, and process concurrency to Ninja, Dojo
-achieves near-instantaneous incremental rebuilds even for complex pipelines involving PDF rendering,
-image optimization, and offline compression.
-
-______________________________________________________________________
-
-## Architecture Diagram
+Raw Ninja invocation is useful for graph diagnostics, but does not discover new sources, run
+preparation, or finalize ownership. Use `dojo build` for development, watchers, and CI. `--dry-run`
+validates configuration and reports discovery without running preparation hooks, tools, or writing
+build products.
 
 ```mermaid
-flowchart TB
-    subgraph Inputs ["Inputs"]
-        MD["Markdown Sources<br>(content/*.md)"]
-        CFG["dojo.yaml<br>Configuration"]
-        DEFAULTS["Pandoc Defaults<br>(defaults/*.yaml)"]
-        STATIC["Static Assets & CSS"]
-        PLUGINS["Python Plugins"]
-    end
-
-    subgraph CLI ["CLI Interface"]
-        ENTRY["cli.py<br>dojo build | check | init | schema | crunch"]
-    end
-
-    subgraph CoreEngine ["Dojo Core Engine"]
-        CONFIG["config.py<br>Pydantic Models & Validation"]
-        CORE["core.py<br>NinjaGenerator"]
-        
-        subgraph Stages ["Pipeline Stages"]
-            COMPILE["stages/compile.py<br>CompileStage (Markdown → JSON AST)"]
-            RENDER["stages/render.py<br>RenderStage (JSON → Output / Derived)"]
-            ASSETS["stages/assets.py<br>AssetProcessor (CSS/HTML/Glob Deps)"]
-            STAGEDEF["stages/_defaults.py<br>Defaults Merging & Resolution"]
-        end
-
-        RULES["rules.py<br>Built-in Ninja Rules"]
-        WRAPPER["wrap.py<br>Subprocess Execution Wrapper"]
-        EMITTER["emitter.py<br>NinjaEmitter"]
-        PLUGINMGR["plugins.py<br>Plugin Loader & Priority Sort"]
-        CRUNCH["crunch.py<br>In-Process Zstd Compressor"]
-    end
-
-    subgraph ExternalTools ["External Build Executors"]
-        NINJA["Ninja (Build Engine)"]
-        PANDOC["Pandoc"]
-        DECKTAPE["Decktape (Slide PDF)"]
-        TYPST["Typst (Document PDF)"]
-        MINIFY["Minify"]
-        GS["Ghostscript"]
-    end
-
-    subgraph Outputs ["Outputs"]
-        BUILD["_build/build.ninja<br>Generated Build File"]
-        CACHE["_build/*.json<br>Pandoc AST Cache & .d Depfiles"]
-        STAMP["_build/.static_assets.stamp"]
-        SITE["_site/*<br>Compiled Static Site & Documents"]
-    end
-
-    %% Flows
-    MD --> ENTRY
-    CFG --> ENTRY
-    ENTRY --> CONFIG
-    CONFIG --> CORE
-    PLUGINS --> PLUGINMGR
-    PLUGINMGR --> CORE
-
-    CORE --> COMPILE
-    CORE --> RENDER
-    CORE --> ASSETS
-    STAGEDEF --> COMPILE
-    STAGEDEF --> RENDER
-
-    COMPILE --> EMITTER
-    RENDER --> EMITTER
-    ASSETS --> EMITTER
-    RULES --> EMITTER
-    CORE --> CRUNCH
-
-    EMITTER --> BUILD
-    COMPILE -.-> CACHE
-    ASSETS -.-> STAMP
-
-    BUILD --> NINJA
-    NINJA --> WRAPPER
-    WRAPPER --> PANDOC
-    WRAPPER --> DECKTAPE
-    WRAPPER --> TYPST
-    WRAPPER --> MINIFY
-    WRAPPER --> GS
-    WRAPPER --> SITE
+flowchart LR
+    Source[Source inventory] --> Prepare[Plugin preparation]
+    Prepare --> Graph[Ninja graph]
+    Defaults[Resolved defaults and resources] --> Graph
+    Graph --> Compile[Pandoc AST]
+    Compile --> Render[Render and post-process]
+    Render --> Derived[Derived outputs]
+    Derived --> Inventory[Successful publication inventory]
+    Inventory --> Archive[Validate exact archive]
 ```
 
-______________________________________________________________________
+## Directory responsibilities
 
-## Module Directory and Responsibilities
+| Location                  | Contents                                                                                                  | Lifetime         |
+| ------------------------- | --------------------------------------------------------------------------------------------------------- | ---------------- |
+| Source/config directories | Authoritative inputs                                                                                      | User-managed     |
+| `_build/`                 | ASTs, depfiles, normalized defaults, intermediate render products, locks, caches, private ownership state | Disposable       |
+| `_site/`                  | Final outputs, copied assets, extracted media, public provenance and inventory                            | Published        |
+| `release.txz`             | Only inventory members, with normalized archive metadata                                                  | Release artifact |
 
-The following table summarizes the roles and key APIs of each module in the Dojo codebase:
+Keeping `_build` separate from `_site` is intentional: private state must never be selected for
+publication by filename heuristics. Hidden files explicitly declared as publication assets are
+valid. Render intermediates never enter `_site`.
 
-| Module                | Category       | Primary Purpose                                                                                            | Key Classes & Functions                                                                                                       |
-| --------------------- | -------------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `cli.py`              | CLI            | Argument parsing, command dispatching, and console presentation                                            | `main()`, `entry_point()`, `cmd_build()`, `cmd_check()`, `cmd_init()`, `cmd_schema()`, `cmd_version()`, `cmd_crunch()`        |
-| `config.py`           | Configuration  | Pydantic schema validation, tool path resolution, directory conflict checks                                | `Config`, `TypeConfig`, `OutputConfig`, `ToolPaths`, `PipelineStep`, `CustomRule`, `load_config()`                            |
-| `constants.py`        | Constants      | Shared enumerations for Ninja rules and asset tracking keys                                                | `RuleName`, `ASSET_KEYS`                                                                                                      |
-| `core.py`             | Orchestration  | High-level generator that drives stages, applies plugins, and writes `build.ninja`                         | `NinjaGenerator`                                                                                                              |
-| `crunch.py`           | Compression    | Standalone and pipeline offline HTML compression using in-process Zstd and Web Worker decoder              | `crunch_file()`, `generate_payloads()`, `encode_base91()`, `main()`                                                           |
-| `deps.py`             | Asset Scanning | Recursive scanning of CSS `url()` and HTML `src`/`href` links, glob pattern resolution                     | `scan_css_dependencies()`, `scan_html_dependencies()`, `resolve_glob_dependencies()`, `is_remote_url()`, `strip_url_params()` |
-| `emitter.py`          | Emission       | Low-level generation of Ninja syntax (rules, build edges, variables, pools)                                | `NinjaEmitter`                                                                                                                |
-| `exceptions.py`       | Exceptions     | Structured hierarchy of domain exceptions for configuration, security, and runtime errors                  | `DojoError`, `ConfigError`, `ConfigInvalidError`, `SecurityError`, `PluginLoadError`, `CrunchError`                           |
-| `log_config.py`       | Logging        | Rich terminal formatting and single-line structured JSON logging for CI                                    | `setup_logging()`, `JsonFormatter`                                                                                            |
-| `paths.py`            | Utilities      | Path sanitization (traversal prevention), shell quoting, Ninja escaping, file filtering                    | `sanitize_path()`, `shell_quote()`, `ninja_escape()`, `ninja_quote()`, `should_process_file()`                                |
-| `plugins.py`          | Extensibility  | Dynamic loading, validation, and priority sorting of Python plugins                                        | `PluginInterface`, `load_plugin()`                                                                                            |
-| `resources.py`        | Resources      | Resource discovery across project roots and XDG/Pandoc data directories                                    | `find_resource()`, `clear_resource_cache()`, `get_pandoc_data_dirs()`, `get_xdg_data_home()`                                  |
-| `rules.py`            | Rules          | Factory for built-in Ninja rules configured with tool paths and wrapper flags                              | `get_builtin_rules()`                                                                                                         |
-| `schema.py`           | Schema         | JSON Schema generation from Pydantic models for IDE autocomplete                                           | `generate_schema()`, `write_schema()`, `print_schema()`                                                                       |
-| `stages/__init__.py`  | Pipeline       | Module exports for decomposed build pipeline stages                                                        | `CompileStage`, `RenderStage`, `AssetProcessor`                                                                               |
-| `stages/_defaults.py` | Pipeline       | Shared default merging and Pandoc `-d` variable formatting across stages                                   | `resolve_stage_dependencies()`, `merge_defaults()`, `format_defaults_var()`                                                   |
-| `stages/assets.py`    | Pipeline       | Dependency copying, deduplication, recursive asset queuing, static asset stamps                            | `AssetProcessor`                                                                                                              |
-| `stages/compile.py`   | Pipeline       | Compiles Markdown to JSON AST via Pandoc with Lua dependency tracking                                      | `CompileStage`                                                                                                                |
-| `stages/render.py`    | Pipeline       | Renders JSON AST to final formats, executes derived builds and post-process steps                          | `RenderStage`                                                                                                                 |
-| `wrap.py`             | Subprocess     | Cross-platform command wrapper with directory creation, ephemeral HTTP serving, and AST override injection | `run_wrap()`, `PlaceholderContext`, `resolve_placeholders()`                                                                  |
-| `yaml_utils.py`       | YAML Parsing   | Frontmatter parsing, `${.}` and env expansion, recursive YAML defaults scanning                            | `parse_frontmatter()`, `parse_frontmatter_type()`, `get_frontmatter_assets()`, `get_recursive_yaml_deps()`                    |
+## Dependency model
 
-______________________________________________________________________
+Defaults are resolved recursively once per distinct stage configuration. The same resolver supplies
+execution paths and Ninja dependencies: inherited defaults, metadata files, templates and partials,
+filters, citation styles, bibliographies, includes, and reference documents. `${.}` refers to the
+containing defaults file. Ordinary relative configuration paths refer to the project root.
 
-## The Build Pipeline Lifecycle
+The compile filter records source-relative images, bibliography/CSL metadata, and explicit metadata
+dependencies in a depfile. Copied frontmatter assets and plugin assets are declared edges. Built-in
+rules depend on their wrapper implementation, bundled resources, and resolved tool executables.
+Render rules also track configured font files. Custom tools can declare additional `dependencies` on
+the rule or output. Directory membership is refreshed on every supported build invocation.
 
-Dojo executes build generation in five coordinated stages:
+Static assets are prerequisites for all renders. Plain HTML can link assets without embedding their
+bytes, so unrelated static edits do not invalidate it. PDF, derived, and embedded HTML outputs
+conservatively depend on the shared static stamp. `consumes_assets` explicitly overrides that
+policy; set it to false only when a custom tool's declared inputs fully describe its resource
+consumption. This deliberately favors correctness for arbitrary browser scripts over claiming a
+complete static analysis of JavaScript requests.
 
-```
-[1. Compile Stage] ──> [2. Asset Processing] ──> [3. Render & Derive] ──> [4. Post-Process] ──> [5. Plugin Hooks & Ninja Emission]
-```
+Ninja tracks modification times for ordinary inputs. Plugins may use content fingerprints where
+stronger identity is required. Replacing a source while preserving its timestamp is outside Ninja's
+general contract; Access's research preparation caches hash their semantic inputs.
 
-### 1. Compile Stage (`stages/compile.py`)
+## Transactions and ownership
 
-- **Input:** Source Markdown files (`content/**/*.md`)
-- **Output:** Pandoc JSON AST files (`_build/**/*.json`)
-- **Depfile:** Makefile-formatted dependency list (`_build/**/*.json.d`)
-- **Tool:** Pandoc (`-t json`) with `dependencies.lua`
+A POSIX file lock serializes graph generation, execution, and finalization for one build directory.
+Nested graph regeneration inherits the lock. Packaging acquires the same lock. Dry runs acquire no
+persistent lock or directory.
 
-The Compile Stage converts raw Markdown with YAML frontmatter into Pandoc's Abstract Syntax Tree
-(AST) in JSON format. This intermediate representation decouple content parsing from formatting and
-provides:
+Managed tools write to a temporary directory using the intended output basename; a successful exit
+replaces the final file. Failed tools preserve the previous output. Each render owns a separate
+extracted-media directory. Replacement removes obsolete derivatives, and the previous inventory
+invalidates a producer if one of its media files is missing or corrupt. These are per-output
+transactions, not an atomic swap of the entire site. A failed build may have updated some outputs;
+packaging rejects any mismatch against the last successful inventory.
 
-1. **AST Inspection**: Downstream stages can inspect document metadata without re-reading or re-parsing
-   Markdown.
-2. **Dynamic Depfiles**: Dojo's bundled Lua filter (`dependencies.lua`) inspects inline images and
-   frontmatter `dependencies`, emitting a `.json.d` depfile. Ninja uses this depfile to trigger
-   recompilations whenever linked local images or referenced files change on disk.
-3. **One-to-Many Rendering**: A single compiled JSON AST file serves as the input to multiple render
-   targets (e.g., HTML, PDF, presentation slides).
+Finalization records checksums and reconciles previously owned obsolete files. Independently
+modified or unowned files are preserved and excluded from archives. The public inventory survives
+deletion of `_build`; private producer paths are kept only in `_build/publication.json`. A one-time
+migration recognizes outputs in an existing Ninja graph and the old reserved `.dojo-tmp-*`
+intermediate names.
 
-### 2. Asset Processing Stage (`stages/assets.py`)
+`dojo package` verifies the inventory, creates a sorted archive with normalized ownership, mode, and
+timestamps, extracts it, validates those exact bytes, and only then replaces the archive and writes
+its SHA-256 sidecar. Archive repeatability assumes identical publication bytes; PDF engines and
+author-supplied timestamps may require their own reproducibility settings.
 
-- **Input:** Markdown frontmatter (`css`, `dependencies`), linked CSS stylesheets, HTML files, and
-  `static_dirs`
-- **Output:** Copied assets in `_site/` and a group stamp file `_build/.static_assets.stamp`
-- **Tool:** `dojo wrap --copy`
+## Validation and browser compression
 
-Assets are discovered through multiple mechanisms:
+`dojo check-output` checks resources and duplicate IDs, including hidden HTML/CSS. `--links` adds
+local navigation and fragment checks; recognized Reveal containers support Reveal hash routes.
+`--offline` rejects external resource URLs but permits outbound navigation. Both flags can also be
+passed to `dojo package`.
 
-- **Frontmatter references**: The `css` key and keys defined in `ASSET_KEYS` (`template`, `csl`,
-  `bibliography`, `metadata-files`).
-- **Glob patterns**: Paths matched by glob patterns in the `dependencies` frontmatter field.
-- **Recursive CSS scanning**: Parses `url(...)` declarations to discover nested fonts, images, and
-  sub-stylesheets.
-- **Recursive HTML scanning**: Parses local `src="..."` and `href="..."` attributes.
-- **Static asset directories**: Entire directories configured in `static_dirs` are copied to the
-  output directory. To keep Ninja build files compact and dependency graphs clean, static directory
-  outputs are aggregated into a single `.static_assets.stamp` dependency file.
+Embedded CSS/SVG/HTML resources are inspected recursively with a nesting limit. SVG fragments retain
+their embedded document scope. Static validation does not execute arbitrary JavaScript, evaluate
+conditional CSS selectors or fragment-only CSS effects, or infer dynamic network requests. The
+browser integration tests exercise the actual compressed loader with HTTP(S) blocked.
 
-### 3. Render and Derive Stage (`stages/render.py`)
+Crunch publications carry a validation manifest, ordered transport chunks, CRCs, and size checks.
+Validation decodes the real HTML before inspecting references. The vendored decoder's license,
+version, checksum, update instructions, and 32 MiB history limit are documented in
+`src/dojo/resources/README.md`.
 
-- **Input:** `_build/**/*.json` AST files (or sibling build products for derived outputs)
-- **Output:** Formatted documents (`.html`, `.pdf`, `.epub`, etc.) in `_site/`
-- **Tool:** Pandoc (for primary rendering), Decktape / Typst / custom tools (for derived outputs)
+## Modules and extension points
 
-The Render Stage transforms the intermediate JSON AST into target formats using Pandoc defaults
-files, templates, and format-specific command arguments.
+| Module                                         | Responsibility                                                    |
+| ---------------------------------------------- | ----------------------------------------------------------------- |
+| `config.py`, `schema.py`                       | Configuration contract, output DAG, schema export                 |
+| `defaults.py`, `yaml_utils.py`, `resources.py` | Resource resolution and normalized execution defaults             |
+| `core.py`, `stages/`, `emitter.py`             | Discovery, declarative contributions, graph generation            |
+| `plugins.py`                                   | Public preparation context, contributions, trusted module loading |
+| `wrap.py`, `rules.py`                          | Tool argv, URL context, atomic output and media replacement       |
+| `artifacts.py`, `locking.py`, `io.py`          | Publication ownership, archive transaction, local locking/writes  |
+| `validation.py`, `crunch.py`                   | Static validation and offline compressed HTML                     |
 
-#### Derived Outputs
-
-Outputs can be derived from other outputs rather than the JSON AST. For example, HTML slides
-produced by Pandoc can be converted to PDF via Decktape:
-
-```yaml
-types:
-  slide:
-    outputs:
-      - id: html
-        extension: html
-        defaults: defaults/slide.yaml
-      - id: pdf
-        extension: pdf
-        source: html # Derived from the 'html' output above
-        tool: decktape # Uses Decktape rule
-        args: ["--size", "1920x1080"]
-```
-
-### 4. Post-Processing Pipeline
-
-Outputs can define multi-step post-processing pipelines. Each step runs sequentially using
-intermediate temporary files (`.dojo-tmp-<filename>.<step>.<ext>`) before writing the final product:
-
-```yaml
-outputs:
-  - id: html
-    extension: html
-    defaults: defaults/page.yaml
-    post_process:
-      - tool: minify
-      - tool: crunch
-        args: ["-l", "22", "--window-log", "26"]
-```
-
-Built-in post-processing tools include:
-
-- `minify`: HTML, CSS, and JS minification via `minify`.
-- `crunch`: Self-extracting offline HTML compression with Zstandard and an embedded Web Worker.
-- `ghostscript`: PDF compression and optimization via Ghostscript (`gs`).
-- Any custom tool registered via `custom_rules` or plugins.
-
-### 5. Cross-Format Sibling Links (`format_links`)
-
-When `format_links: true` is enabled in `dojo.yaml`, Dojo automatically generates cross-format
-navigation links for content types with multiple outputs (e.g., linking from an HTML article to its
-PDF download):
-
-1. `NinjaGenerator._generate_format_link_defaults()` calculates sibling formats for each output.
-2. An intermediate defaults YAML file is generated in `_build/_dojo/format-links-<type>-<output>.yaml`.
-3. The defaults file injects the bundled `format_links.lua` filter and sets `dojo-sibling-formats`
-   metadata.
-4. The Lua filter populates `format-links` metadata in the document AST, which custom Pandoc templates
-   render using `$for(format-links)$ <a href="$it.href$">$it.label$</a> $endfor$`.
-
-______________________________________________________________________
-
-## Subprocess Execution Wrapper (`wrap.py`)
-
-Rather than invoking external CLI binaries directly in Ninja rules, Dojo routes commands through
-[`wrap.py`](../src/dojo/wrap.py). This wrapper provides several critical functions:
-
-1. **Cross-Platform Compatibility**: Resolves paths consistently across Linux, macOS, and Windows.
-2. **Directory Pre-Creation (`--ensure-dir`)**: Automatically creates target parent directories before
-   tools execute, preventing crashes from tools that expect the output directory to exist.
-3. **Failure Cleanup**: If a tool exits with a non-zero status code, `wrap.py` unlinks the target
-   output file to ensure Ninja does not treat a corrupt or partial file as up-to-date.
-4. **Environment Isolation (`--path-env`)**: Prepends configured tool directories to `$PATH`.
-5. **Ephemeral HTTP Server (`--serve-dir`)**: Decktape requires an HTTP server to capture Reveal.js or
-   HTML presentations. `wrap.py` spins up an ephemeral localhost HTTP server on an available port,
-   serves the build output directory during Decktape's execution, passes the temporary `{url}` to
-   Decktape, and shuts down the server upon completion.
-6. **AST Metadata Override Injection**: For Pandoc render commands, `wrap.py` reads the JSON AST input
-   and automatically injects CLI flags based on document frontmatter:
-   - Sets `--slide-level=<val>` if `slide-level` is defined in document metadata.
-   - Appends or strips `--toc` if `toc: true` or `toc: false` is defined.
-
-### Command Template Placeholders
-
-Ninja rules that use `dojo wrap` can use `{placeholder}` tokens that `wrap.py` expands at runtime:
-
-| Placeholder     | Description                                                                            |
-| --------------- | -------------------------------------------------------------------------------------- |
-| `{in_abs}`      | Absolute path to the input file (`$in`).                                               |
-| `{out_abs}`     | Absolute path to the output file (`$out`).                                             |
-| `{in_abs_dir}`  | Absolute directory containing the input file.                                          |
-| `{out_abs_dir}` | Absolute directory containing the output file.                                         |
-| `{root_val}`    | Relative path from `{out_abs_dir}` back to project root or build root.                 |
-| `{src_dir}`     | Absolute source directory path (`config.src_dir`).                                     |
-| `{out_dir}`     | Absolute output directory path (`config.output_dir`).                                  |
-| `{build_dir}`   | Absolute build directory path (`config.build_dir`).                                    |
-| `{rel_src_dir}` | Relative path from `{build_dir}` to `{in_abs_dir}`.                                    |
-| `{src_dir_val}` | Resolved source path combined with `{rel_src_dir}`.                                    |
-| `{serve_dir}`   | Root directory served by the ephemeral HTTP server.                                    |
-| `{url}`         | Localhost URL generated for Decktape slide capture (`http://127.0.0.1:<port>/<path>`). |
-
-______________________________________________________________________
-
-## Ninja Rule Variables
-
-Dojo defines a standard convention for Ninja rule variables:
-
-| Variable     | Scope          | Description                                                                 |
-| ------------ | -------------- | --------------------------------------------------------------------------- |
-| `$in`        | Ninja Built-in | Raw input file path(s).                                                     |
-| `$out`       | Ninja Built-in | Raw output file path(s).                                                    |
-| `$in_shell`  | Dojo Variable  | Shell-quoted input path (using `shlex.quote`) safe for shell commands.      |
-| `$out_shell` | Dojo Variable  | Shell-quoted output path.                                                   |
-| `$args`      | Dojo Variable  | Extra arguments specified on `OutputConfig` or `PipelineStep`.              |
-| `$defaults`  | Dojo Variable  | Resolved space-separated list of Pandoc defaults flags (`-d ...`).          |
-| `$dojo_stem` | Dojo Variable  | Base filename stem without suffix or extension (used for media extraction). |
-
-______________________________________________________________________
-
-## Resource Pools and Concurrency Control
-
-Static site generation often involves CPU-intensive or memory-heavy tasks (such as running headless
-Chromium via Decktape or processing large PDFs with Ghostscript). Running too many parallel
-instances can saturate memory or crash builds.
-
-Dojo leverages Ninja's native resource pooling. Pools are configured in `dojo.yaml`:
-
-```yaml
-pools:
-  heavy: 2 # Limit heavy tasks to 2 parallel processes
-  media: 4 # Limit image optimization to 4 parallel processes
-rule_pools:
-  decktape: heavy
-  ghostscript: heavy
-  optimize_png: media
-```
-
-Dojo emits `pool` definitions at the top of `build.ninja` and attaches each rule to its designated
-pool.
-
-______________________________________________________________________
-
-## Configuration Reference
-
-The following annotated `dojo.yaml` illustrates all available configuration options:
-
-```yaml
-# =============================================================================
-# Directories & Defaults
-# =============================================================================
-src_dir: content # Source directory containing Markdown files (default: "content")
-output_dir: _site # Destination directory for final site output (default: "_site")
-build_dir: _build # Directory for intermediate AST and build files (default: "_build")
-default_type: page # Content type assigned to files lacking frontmatter 'type'
-# =============================================================================
-# Concurrency Pools
-# =============================================================================
-pools:
-  heavy: 2 # Maximum concurrent jobs for this pool
-rule_pools:
-  decktape: heavy # Map rule name to pool name
-# =============================================================================
-# Tool Path Overrides (Optional)
-# =============================================================================
-tools:
-  pandoc: pandoc # Executable path or binary name
-  minify: minify
-  ghostscript: gs
-  decktape: decktape
-  typst: typst
-# =============================================================================
-# Filtering & Inclusion
-# =============================================================================
-include: [] # Glob patterns to include (empty = include all)
-exclude: # Glob patterns to exclude
-  - "drafts/*"
-  - "templates/*"
-# =============================================================================
-# Assets & Fonts
-# =============================================================================
-static_dirs: # Directories copied verbatim to output_dir
-  - assets
-font_paths: # Font directories for Typst rendering
-  - fonts
-# =============================================================================
-# Pandoc Options
-# =============================================================================
-pandoc_data_dir: null # Custom Pandoc data directory
-root_ref_dir: "." # Directory to calculate root variable relative to
-add_resource_path: true # Automatically add input directory to Pandoc resource path
-format_links: true # Auto-generate cross-format sibling navigation links
-log_file: "" # Path to log file for redirecting noisy subprocess output
-# =============================================================================
-# Content Type Definitions
-# =============================================================================
-types:
-  page:
-    outputs:
-      - id: html
-        extension: html
-        defaults: defaults/page.yaml
-        post_process:
-          - tool: minify
-  report:
-    outputs:
-      - id: html
-        extension: html
-        defaults: defaults/report.yaml
-      - id: pdf
-        extension: pdf
-        defaults: defaults/report-pdf.yaml
-  presentation:
-    outputs:
-      - id: html
-        extension: html
-        defaults: defaults/slides.yaml
-      - id: pdf
-        extension: pdf
-        source: html
-        tool: decktape
-        args: ["--size", "1920x1080"]
-        post_process:
-          - tool: ghostscript
-            args: ["-dPDFSETTINGS=/screen"]
-# =============================================================================
-# Plugins & Custom Rules
-# =============================================================================
-plugins:
-  - plugins/custom_plugin.py
-custom_rules:
-  - name: compress_data
-    command: gzip -9 -c $in > $out
-    description: 🗜️ GZIP $out
-```
-
-Run `dojo schema` to export the complete JSON Schema definition for VSCode, Neovim, or other IDEs.
-
-______________________________________________________________________
-
-## Directory Layout & Artifacts
-
-A typical Dojo project directory structure:
-
-```
-my-project/
-├── dojo.yaml                     # Primary project configuration
-├── content/                      # Source Markdown documents
-│   ├── index.md                  # Home page (frontmatter: type: page)
-│   ├── blog/
-│   │   └── post-1.md
-│   └── slides/
-│       └── talk.md               # Slides (frontmatter: type: presentation)
-├── defaults/                     # Pandoc YAML defaults files
-│   ├── page.yaml
-│   └── slides.yaml
-├── assets/                       # Static files (images, stylesheets)
-│   └── style.css
-├── _build/                       # Build artifacts (git-ignored)
-│   ├── build.ninja               # Generated Ninja build file
-│   ├── .static_assets.stamp      # Static asset synchronization stamp
-│   ├── _dojo/                    # Internal defaults for format links
-│   │   └── format-links-*.yaml
-│   └── content/
-│       ├── index.json            # Pandoc JSON AST cache
-│       └── index.json.d          # Discovered dependency depfile
-└── _site/                        # Final generated output (git-ignored)
-    ├── index.html
-    ├── blog/
-    │   └── post-1.html
-    ├── slides/
-    │   ├── talk.html
-    │   └── talk.pdf
-    └── assets/
-        └── style.css
-```
+Tests combine unit contracts, real Pandoc/Ninja workflows, failure injection, archive round trips,
+and Chromium execution. Subprocess coverage is enabled so CLI workflows count toward the unchanged
+100% branch coverage gate.

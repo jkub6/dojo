@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from dojo.config import Config
+from dojo.config import Config, ToolPaths
 from dojo.emitter import NinjaEmitter
 
 
@@ -34,7 +34,7 @@ def enable_logging_propagation():
 @pytest.fixture
 def mock_emitter():
     """Provide a MagicMock specialized for NinjaEmitter."""
-    return MagicMock(spec=NinjaEmitter)
+    return MagicMock(spec=NinjaEmitter, rule_dependencies={})
 
 
 @pytest.fixture
@@ -45,6 +45,8 @@ def mock_config():
     config.output_dir = Path("/out")
     config.build_dir = Path("/build")
     config.pandoc_data_dir = None
+    config.project_root = Path.cwd()
+    config.tools = ToolPaths()
     return config
 
 
@@ -118,6 +120,12 @@ def normalize_ninja():
         content = re.sub(r"/nix/store/\S*python\S*(?:-env)?/bin/python\S*", "[PYTHON_BIN]", content)
         # Normalize any Nix store hash to prevent snapshot drift
         content = re.sub(r"/nix/store/[a-z0-9]{32}-", "/nix/store/[HASH]-", content)
+
+        content = re.sub(r"/defaults/[a-f0-9]{64}\.yaml", "/defaults/[DEFAULTS_HASH].yaml", content)
+
+        # Tool store paths vary between development and the isolated package build.
+        content = re.sub(r"\S*/bin/pandoc(?= |$)", "[TOOL_PANDOC]", content, flags=re.MULTILINE)
+        content = re.sub(r"\S*/bin/typst(?= |$)", "[TOOL_TYPST]", content, flags=re.MULTILINE)
 
         # Normalize tool paths and commands
         content = re.sub(r"\S*pandoc {in_abs}", "[TOOL_PANDOC] {in_abs}", content)

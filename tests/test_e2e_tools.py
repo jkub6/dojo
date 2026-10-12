@@ -6,16 +6,15 @@ and derived outputs execute external binaries correctly.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from pathlib import Path
 
 import pytest
 
 from dojo.cli import main
+from dojo.validation import validate_output
 
 
 def tool_available(name: str) -> bool:
@@ -47,7 +46,18 @@ def tools_project(tmp_path: Path) -> tuple[Path, Path]:
 
     # Create defaults file for slides
     defaults_file = defaults / "slides.yaml"
-    defaults_file.write_text("standalone: true\nto: revealjs\n")
+    defaults_file.write_text(
+        "standalone: true\nto: revealjs\nvariables:\n  revealjs-url: revealjs\n"
+    )
+
+    # Declare framework assets instead of relying on the public CDN during tests.
+    framework_path = os.environ.get("DOJO_TEST_REVEALJS")
+    if framework_path is None:
+        pytest.fail("Run inside nix develop or set DOJO_TEST_REVEALJS to Reveal.js assets")
+    framework = Path(framework_path)
+    public = project / "public" / "revealjs"
+    for directory in ("dist", "plugin"):
+        shutil.copytree(framework / directory, public / directory)
 
     # Create sample content
     (content / "index.md").write_text(
@@ -61,6 +71,7 @@ src_dir: "{content}"
 output_dir: "{project / "_site"}"
 build_dir: "{project / "_build"}"
 default_type: presentation
+static_dirs: ["{project / "public"}"]
 types:
   presentation:
     outputs:
@@ -126,6 +137,7 @@ class TestOptionalToolsPipeline:
         assert output_html.exists(), "HTML output not created"
         html_content = output_html.read_text()
         assert "Presentation" in html_content
+        assert validate_output(output_html, offline=True) == []
 
         # Verify PDF was created via Decktape
         output_pdf = project / "_site" / "index.pdf"

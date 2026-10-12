@@ -21,6 +21,8 @@ class NinjaEmitter:
     def __init__(self, fp: TextIO) -> None:
         """Initialize the NinjaEmitter."""
         self.fp = fp
+        self.producers: set[str] = set()
+        self.rule_dependencies: dict[str, list[Path]] = {}
 
     def comment(self, text: str) -> None:
         """Write a comment."""
@@ -88,6 +90,12 @@ class NinjaEmitter:
                 return []
             return [x] if isinstance(x, (str, Path)) else x
 
+        for output in to_list(outputs):
+            key = str(output)
+            if key in self.producers:
+                message = f"Multiple build rules produce {output}"
+                raise ValueError(message)
+            self.producers.add(key)
         out_str = " ".join(ninja_escape(p) for p in to_list(outputs))
         in_str = " ".join(ninja_escape(p) for p in to_list(inputs))
 
@@ -95,7 +103,7 @@ class NinjaEmitter:
         if in_str:
             line += f" {in_str}"
 
-        impl_list = to_list(implicit)
+        impl_list = list(dict.fromkeys([*to_list(implicit), *self.rule_dependencies.get(rule, [])]))
         if impl_list:
             line += " | " + " ".join(ninja_escape(p) for p in impl_list)
 

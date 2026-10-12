@@ -10,7 +10,10 @@ def test_render_command_line_args(minimal_config, tmp_path, mock_emitter):
     gen = NinjaGenerator(minimal_config, tmp_path / "dojo.yaml", emitter=mock_emitter)
 
     out_config = OutputConfig(
-        extension="html", defaults="dummy.yaml", args=["--custom-flag", "value"], id="test"
+        extension="html",
+        defaults=minimal_config.types["page"].outputs[0].defaults,
+        args=["--custom-flag", "value"],
+        id="test",
     )
 
     # We can test the RenderStage directly or via NinjaGenerator
@@ -26,14 +29,15 @@ def test_compile_command_line_filters(minimal_config, tmp_path, mock_emitter):
     """Verify that filters are correctly included in the compile rule."""
     stage = CompileStage(minimal_config, tmp_path / "build", mock_emitter)
 
-    type_cfg = TypeConfig(
-        outputs=[OutputConfig(extension="html", defaults="dummy.yaml")],
-        filters=["filter1.lua", "filter2.lua"],
-    )
-
+    filters = [tmp_path / "filter1.lua", tmp_path / "filter2.lua"]
+    for path in filters:
+        path.write_text("function Pandoc(doc) return doc end")
+    defaults = tmp_path / "compile.yaml"
+    defaults.write_text("filters:\n" + "".join(f"  - {path}\n" for path in filters))
+    type_cfg = TypeConfig(outputs=minimal_config.types["page"].outputs, defaults=str(defaults))
     stage.compile(Path("src/test.md"), Path("test"), type_cfg)
-
-    mock_emitter.build.assert_called_once()
+    implicit = mock_emitter.build.call_args.kwargs["implicit"]
+    assert all(path in implicit for path in filters)
 
 
 def test_ninja_generator_pool_emission(minimal_config, tmp_path, mock_emitter):

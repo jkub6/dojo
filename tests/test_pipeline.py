@@ -60,5 +60,6 @@ def test_pipeline_generation(pipeline_config_data, tmp_path):
 
     # 4. Check the chain: decktape -> GS -> minify
     # We expect intermediate files
-    assert ".dojo-tmp-" in ninja_content
+    assert "/render/" in ninja_content
+    assert ".dojo-tmp-" not in ninja_content
     # Depending on implementation, we might see .1, .2 suffixes or similar

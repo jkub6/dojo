@@ -7,6 +7,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## 0.2.0 — coordinated authoring and publication API
+
+- Add declarative plugin preparation, shared discovery, explicit inputs/assets/provenance, unique
+  module loading, and configuration mutation diagnostics.
+- Resolve execution defaults and dependencies together; track filters, template partials, citation
+  inputs, relative images, tool implementations, and configured fonts.
+- Validate unknown fields, pools, output graphs, collisions, and config-relative paths.
+- Keep intermediates under `_build`, replace managed outputs atomically, repair extracted media,
+  reconcile owned deletions, and serialize builds and packaging.
+- Add publication inventories and deterministic, validated `dojo package` archives.
+- Inspect hidden files, srcset, embedded resources, Reveal routes, and decoded Crunch payloads.
+- Bound Crunch history to the bundled decoder's supported window, record vendor provenance, and add
+  real browser round-trip tests.
+- Add end-to-end incremental, failure-recovery, and archive tests with subprocess coverage.
+
+Migration: configuration typos and config-mutating plugins now fail. Consumers of the new
+preparation contract must require Dojo 0.2. Use `dojo build` as the build entry point.
+
 ## [0.1.0] - 2026-03-24
 
 ### Added

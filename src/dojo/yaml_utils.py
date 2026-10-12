@@ -9,13 +9,15 @@ from __future__ import annotations
 import logging
 import os
 import re
+import shutil
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
 import yaml
 
-from dojo.constants import ASSET_KEYS
+from dojo.constants import ASSET_KEYS, PUBLIC_ASSET_KEYS
 
 from .exceptions import CircularDependencyError
 from .resources import find_resource as _find_resource
@@ -66,7 +68,9 @@ def extract_paths(data: dict[str, object], keys: list[str]) -> list[str]:
         if isinstance(val, str):
             paths.append(val)
         elif isinstance(val, list):
-            paths.extend(str(v) for v in val)
+            paths.extend(
+                str(v["path"]) if isinstance(v, dict) and "path" in v else str(v) for v in val
+            )
     return paths
 
 
@@ -169,7 +173,7 @@ def get_frontmatter_assets(md_path: Path) -> list[Path]:
     # 'bibliography' and 'csl' are used for citation processing, not output assets usually?
     # Actually bibliography are read by pandoc, not linked in HTML (unless served?)
     # But files referenced in `css` definitely need to be served.
-    asset_keys = ASSET_KEYS
+    asset_keys = PUBLIC_ASSET_KEYS
 
     raw_assets = extract_paths(frontmatter, asset_keys)
 
@@ -193,12 +197,17 @@ class _ScannerState:
     visited: set[Path] = field(default_factory=set)
     stack: list[Path] = field(default_factory=list)
     deps: list[Path] = field(default_factory=list)
+    root: Path = field(default_factory=Path.cwd)
+    pandoc: str = "pandoc"
 
 
 def get_recursive_yaml_deps(
     yaml_path: Path,
     data_dir_override: Path | None = None,
     _state: _ScannerState | None = None,
+    *,
+    root: Path | None = None,
+    pandoc: str = "pandoc",
 ) -> list[Path]:
     """Recursively scans YAML files for dependencies to build dependency lists for Ninja.
 
@@ -208,6 +217,8 @@ def get_recursive_yaml_deps(
       Added as assets. Resolved relative to CWD (Pandoc's behavior).
 
     Args:
+        pandoc: Executable whose bundled template partials should be used.
+        root: Project directory for relative resource references.
         yaml_path: Path to the root YAML file
         data_dir_override: Directory to use as data-dir for this file's direct references
         _state: Internal recursion state (don't pass this in external calls)
@@ -217,7 +228,7 @@ def get_recursive_yaml_deps(
 
     """
     if _state is None:
-        _state = _ScannerState()
+        _state = _ScannerState(root=root or Path.cwd(), pandoc=pandoc)
 
     # Path should be absolute for reliable visiting/stack checks
     yaml_path = yaml_path.resolve()
@@ -242,7 +253,7 @@ def get_recursive_yaml_deps(
         local_data_dir_val = cast("str | None", data.get("data-dir"))
         current_data_dirs = []
         if local_data_dir_val:
-            current_data_dirs = [Path(local_data_dir_val).resolve()]
+            current_data_dirs = [(_state.root / local_data_dir_val).resolve()]
         elif data_dir_override:
             current_data_dirs = [data_dir_override]
 
@@ -251,24 +262,38 @@ def get_recursive_yaml_deps(
         _resolve_default_deps(defaults, yaml_path, current_data_dirs, _state)
 
         # 2. Handle Leaf Assets (CSS, templates, etc)
-        asset_keys = ASSET_KEYS
-        assets = extract_paths(data, asset_keys)
-        _resolve_assets(assets, _state.deps)
+        _collect_input_dependencies(data, _state, current_data_dirs)
 
         # 3. Handle Recursive Metadata Files
         metadata_files = extract_paths(data, ["metadata-files"])
         for meta_ref in metadata_files:
             meta_path = Path(meta_ref)
             if not meta_path.is_absolute():
-                meta_path = Path.cwd() / meta_path
+                meta_path = _state.root / meta_path
             meta_path = meta_path.resolve()
             if meta_path.exists():
-                _state.deps.extend(get_recursive_yaml_deps(meta_path, _state=_state))
+                _state.deps.extend(
+                    get_recursive_yaml_deps(
+                        meta_path, data_dir_override=data_dir_override, _state=_state
+                    )
+                )
 
     finally:
         _state.stack.pop()
 
     return sorted(set(_state.deps))
+
+
+def _collect_input_dependencies(
+    data: dict[str, object], state: _ScannerState, data_dirs: list[Path]
+) -> None:
+    for key in ASSET_KEYS:
+        for name in extract_paths(data, [key]):
+            found = resolve_input(key, name, state.root, data_dirs)
+            if found:
+                state.deps.append(found)
+                if key == "template":
+                    state.deps.extend(template_dependencies(found, pandoc=state.pandoc))
 
 
 def _resolve_default_deps(
@@ -285,14 +310,20 @@ def _resolve_default_deps(
         found = _find_resource(
             "defaults",
             default_ref,
-            root_contexts=[Path.cwd()],
+            root_contexts=[state.root],
             extra_data_dirs=current_data_dirs,
         )
 
         if found:
             state.deps.append(found)
-            # Recurse. Nested files do NOT inherit our data_dir_override.
-            state.deps.extend(get_recursive_yaml_deps(found, _state=state))
+            # Nested defaults inherit the effective data directory.
+            state.deps.extend(
+                get_recursive_yaml_deps(
+                    found,
+                    data_dir_override=current_data_dirs[0] if current_data_dirs else None,
+                    _state=state,
+                )
+            )
         else:
             logger.warning(
                 "Default file referenced in %s not found: %s",
@@ -301,17 +332,56 @@ def _resolve_default_deps(
             )
 
 
-def _resolve_assets(assets: list[str], deps: list[Path]) -> None:
-    """Resolve asset paths."""
-    for asset_ref in assets:
-        asset_path = Path(asset_ref)
-        if not asset_path.is_absolute():
-            asset_path = Path.cwd() / asset_path
+def resolve_input(key: str, name: str, root: Path, data_dirs: list[Path]) -> Path | None:
+    """Resolve a Pandoc file input in the same context used by execution."""
+    if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://|^data:", name):
+        return None
+    candidate = (root / name).resolve()
+    if candidate.is_file():
+        return candidate
+    category = {
+        "template": "templates",
+        "csl": "csl",
+        "filters": "filters",
+        "lua-filter": "filters",
+    }.get(key)
+    if category:
+        found = _find_resource(category, name, root_contexts=[root], extra_data_dirs=data_dirs)
+        if found:
+            return found
+    if key == "filters" and (executable := shutil.which(name)):
+        return Path(executable).resolve()
+    return None
 
-        asset_path = asset_path.resolve()
-        # We don't check if it exists here for assets as they might be build products,
-        # but we add them to Ninja deps anyway if they seem to be local files.
-        # However, for robustness, we only add them if they exist or look like they should.
-        # The original code checked .exists().
-        if asset_path.exists():
-            deps.append(asset_path)
+
+def template_dependencies(
+    path: Path, seen: set[Path] | None = None, *, pandoc: str = "pandoc"
+) -> list[Path]:
+    """Follow Pandoc template partials, including inherited template extensions."""
+    seen = seen if seen is not None else set()
+    if path in seen:
+        return []
+    seen.add(path)
+    result = []
+    for name in re.findall(r"\$\{?\s*([\w./-]+)\(\)\s*\}?\$", path.read_text(encoding="utf-8")):
+        partial = path.parent / name
+        if not partial.suffix:
+            partial = partial.with_suffix(path.suffix)
+        if not partial.is_file():
+            executable = shutil.which(pandoc)
+            builtin = (
+                subprocess.run(  # noqa: S603 - resolved executable and explicit argv
+                    [executable, "--print-default-data-file", "templates/" + partial.name],
+                    capture_output=True,
+                    check=False,
+                )
+                if executable
+                else None
+            )
+            if builtin and builtin.returncode == 0 and executable:
+                result.append(Path(executable).resolve())
+                continue
+            msg = f"Missing template partial {partial} referenced by {path}"
+            raise FileNotFoundError(msg)
+        result.extend([partial, *template_dependencies(partial, seen, pandoc=pandoc)])
+    return result

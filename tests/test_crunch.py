@@ -98,7 +98,7 @@ def test_make_header():
 
 
 def test_make_footer():
-    meta = {"size": 1000, "compressed": 500, "chunks": 2, "windowLog": 26}
+    meta = {"size": 1000, "compressed": 500, "chunks": 2, "windowLog": 25}
     footer = make_footer(meta)
     assert b"document.addEventListener" in footer
     assert b"DecompressionStream" in footer
@@ -122,7 +122,7 @@ def test_generate_payloads_decompression_fidelity():
 </html>"""
     original_bytes = original_html.encode("utf-8")
 
-    chunks = list(generate_payloads(io.BytesIO(original_bytes), level=22, window_log=26))
+    chunks = list(generate_payloads(io.BytesIO(original_bytes), level=22, window_log=25))
     full_output = b"".join(chunks).decode("utf-8")
 
     assert "<!doctype html>" in full_output
@@ -175,7 +175,7 @@ def test_generate_payloads_large_content():
     large_html = "<p>" + " </p><p> ".join(words) + "</p>"
     large_bytes = large_html.encode("utf-8")
 
-    chunks = list(generate_payloads(io.BytesIO(large_bytes), level=1, window_log=26))
+    chunks = list(generate_payloads(io.BytesIO(large_bytes), level=1, window_log=25))
     full_output = b"".join(chunks).decode("utf-8")
 
     script_pattern = re.compile(r'data-crunch="([^"]+)"')
@@ -256,7 +256,7 @@ def test_write_output_chunks_stdout(mocker):
     mocker.patch("sys.stdout", mock_stdout)
 
     data = b"<h1>Stdout stream test</h1>"
-    _write_output_chunks(io.BytesIO(data), "-", len(data), level=1, window_log=26)
+    _write_output_chunks(io.BytesIO(data), "-", len(data), level=1, window_log=25)
     assert len(fake_buffer.getvalue()) > 0
     assert b"Decompressing HTML..." in fake_buffer.getvalue()
 
@@ -299,7 +299,7 @@ def test_write_output_chunks_temp_cleanup_on_error(tmp_path: Path, mocker):
     out_file = tmp_path / "out_fail.html"
     mocker.patch("dojo.crunch.generate_payloads", side_effect=ValueError("Compression fail"))
     with pytest.raises(ValueError, match="Compression fail"):
-        _write_output_chunks(io.BytesIO(b"data"), str(out_file), 4, level=1, window_log=26)
+        _write_output_chunks(io.BytesIO(b"data"), str(out_file), 4, level=1, window_log=25)
     temp_files = list(tmp_path.glob(".crunch-html-*.tmp"))
     assert len(temp_files) == 0
 

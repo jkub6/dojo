@@ -9,7 +9,6 @@ from dojo.constants import RuleName
 from dojo.core import NinjaGenerator
 from dojo.exceptions import (
     DefaultsRequiredError,
-    DependencyError,
     PluginLoadError,
     SourceRequiresToolError,
 )
@@ -105,13 +104,8 @@ def test_derive_output_missing_dependency(core_config_data, tmp_path):
         {"id": "pdf", "extension": "pdf", "source": "missing_html", "tool": "decktape"},
     )
 
-    cfg = Config(**core_config_data)
-    gen = NinjaGenerator(cfg, tmp_path / "dojo.yaml")
-
-    md = Path(cfg.src_dir) / "test.md"
-
-    with pytest.raises(DependencyError, match="Missing dependency"):
-        gen.process_content(md)
+    with pytest.raises(ValueError, match="Unknown output source"):
+        Config(**core_config_data)
 
 
 def test_generate_no_files(core_config, tmp_path, caplog):
@@ -195,14 +189,11 @@ def test_generate_write_failure(core_config, caplog):
     cfg, path = core_config
     gen = NinjaGenerator(cfg, path)
 
-    # Mock open to raise exception
     with (
-        patch("pathlib.Path.open", side_effect=OSError("Write failed")),
+        patch("dojo.io.os.replace", side_effect=OSError("Write failed")),
         pytest.raises(OSError, match="Write failed"),
     ):
         gen.generate()
-
-    assert "Failed to write" in caplog.text
 
 
 def test_plugin_loading_success(core_config):
@@ -262,41 +253,38 @@ def test_external_emitter_path(core_config):
     gen._buffer = None
 
     # post_process_and_write should gracefully return without crashing or writing a ninja file
-    gen._post_process_and_write(1)
+    gen._post_process_and_write()
 
     assert not gen.ninja_file.exists()
 
 
-def test_dry_run_many_outputs(core_config, caplog):
+@pytest.mark.parametrize("count", [1, 15])
+def test_dry_run_many_outputs(core_config, caplog, count):
     cfg, path = core_config
     gen = NinjaGenerator(cfg, path, dry_run=True, quiet=False)
 
     # Mocking many outputs to hit the `> max_display` branch
-    for i in range(15):
+    for i in range(count):
         gen.all_outputs.append(Path(f"out_{i}.txt"))
 
     with caplog.at_level(logging.INFO):
         gen._log_dry_run_summary(5)
 
-    assert "and 5 more" in caplog.text
+    assert ("and 5 more" in caplog.text) == (count > 10)
 
 
-def test_write_if_changed_oserror(core_config, monkeypatch, caplog):
-    """Test _write_if_changed logs warning when reading existing file raises OSError."""
+def test_atomic_write_failure_preserves_existing_file(core_config):
     cfg, path = core_config
     gen = NinjaGenerator(cfg, path)
     target = Path(cfg.build_dir) / "target.txt"
-    target.write_text("old content", encoding="utf-8")
-
-    def mock_read_text(*args, **kwargs):
-        raise OSError
-
-    monkeypatch.setattr(Path, "read_text", mock_read_text)
-
-    with caplog.at_level(logging.WARNING, logger="dojo.core"):
-        written = gen._write_if_changed(target, "new content")
-    assert written is True
-    assert "Failed to read" in caplog.text
+    target.write_text("old content")
+    with (
+        patch("dojo.io.os.replace", side_effect=OSError("Write failed")),
+        pytest.raises(OSError, match="Write failed"),
+    ):
+        gen._write_if_changed(target, "new content")
+    assert target.read_text() == "old content"
+    assert not list(target.parent.glob(".dojo-*"))
 
 
 def test_apply_format_link_defaults_variations(core_config, tmp_path):

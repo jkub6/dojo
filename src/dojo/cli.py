@@ -15,9 +15,11 @@ from pathlib import Path
 from rich.console import Console
 
 from . import __version__
+from .artifacts import package_publication
 from .config import load_config
 from .core import NinjaGenerator
 from .crunch import crunch_file
+from .locking import build_lock
 from .log_config import setup_logging
 from .schema import print_schema, write_schema
 from .validation import validate_output
@@ -49,7 +51,7 @@ class DojoArgs(argparse.Namespace):
     output: str | None = None
     input: str | None = None
     level: int = 22
-    window_log: int = 26
+    window_log: int = 25
     path: str | None = None
     links: bool = False
     offline: bool = False
@@ -105,32 +107,35 @@ def cmd_build(args: DojoArgs) -> None:
         if not args.quiet:
             console.print(f"[bold green]Using configuration:[/bold green] {config_path}")
 
-        generator = NinjaGenerator(
-            config,
-            config_path,
-            quiet=args.quiet,
-            dry_run=args.dry_run,
-            refresh=args.refresh,
-        )
-
-        generator.generate()
-
-        if not args.quiet:
-            if args.dry_run:
-                console.print("[bold cyan]🔍 Dry-run complete. No files written.[/bold cyan]")
-            else:
-                console.print(
-                    "[bold green]✨ Build configuration generated successfully![/bold green]"
-                )
-
-        if not args.dry_run and not args.generate_only:
-            run_ninja(
-                generator.ninja_file,
-                cwd=config_path.parent,
-                targets=args.targets,
-                jobs=args.jobs,
+        with build_lock(Path(config.build_dir), dry_run=args.dry_run):
+            generator = NinjaGenerator(
+                config,
+                config_path,
                 quiet=args.quiet,
+                dry_run=args.dry_run,
+                refresh=args.refresh,
             )
+
+            generator.generate()
+
+            if not args.quiet:
+                if args.dry_run:
+                    console.print("[bold cyan]🔍 Dry-run complete. No files written.[/bold cyan]")
+                else:
+                    console.print(
+                        "[bold green]✨ Build configuration generated successfully![/bold green]"
+                    )
+
+            if not args.dry_run and not args.generate_only:
+                run_ninja(
+                    generator.ninja_file,
+                    cwd=config_path.parent,
+                    targets=args.targets,
+                    jobs=args.jobs,
+                    quiet=args.quiet,
+                )
+                if not args.targets:
+                    generator.finalize()
 
     except FileNotFoundError as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
@@ -276,7 +281,7 @@ Your site is ready. Edit this file or add more Markdown files to `content/`.
     console.print(f"  {target}")
     console.print(f"  {index_path}")
     console.print(f"  {defaults_path}")
-    console.print("\n[yellow]Next steps:[/yellow] Run 'dojo build' then 'ninja -C _build'")
+    console.print("\n[yellow]Next steps:[/yellow] Run 'dojo build'")
 
 
 def cmd_version(_args: DojoArgs) -> None:
@@ -343,6 +348,31 @@ def _register_check_output_parser(
         help="Root directory for local resources when validating a single HTML file",
     )
     check_output_parser.set_defaults(func=cmd_check_output)
+
+
+def cmd_package(args: DojoArgs) -> None:
+    """Package an already successful build without running it a second time."""
+    config, _ = load_config(args.config)
+    with build_lock(Path(config.build_dir)):
+        package_publication(
+            Path(config.output_dir),
+            Path(args.output or "release.txz"),
+            links=args.links,
+            offline=args.offline,
+        )
+
+
+def _register_package_parser(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    package_parser = subparsers.add_parser(
+        "package", help="Validate and archive the last successful publication"
+    )
+    package_parser.add_argument("-c", "--config")
+    package_parser.add_argument("-o", "--output", default="release.txz")
+    package_parser.add_argument("--links", action="store_true")
+    package_parser.add_argument("--offline", action="store_true")
+    package_parser.set_defaults(func=cmd_package)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -418,6 +448,8 @@ def main(argv: list[str] | None = None) -> None:
     # Check-output command (with alias validate)
     _register_check_output_parser(subparsers)
 
+    _register_package_parser(subparsers)
+
     # Init command
     init_parser = subparsers.add_parser("init", help="Create a sample configuration")
     init_parser.set_defaults(func=cmd_init)
@@ -457,10 +489,10 @@ def main(argv: list[str] | None = None) -> None:
     crunch_parser.add_argument(
         "--window-log",
         type=int,
-        default=26,
-        choices=range(10, 28),
-        metavar="10-27",
-        help="Decoder history: 2^N bytes (default: 26 = 64 MiB)",
+        default=25,
+        choices=range(10, 26),
+        metavar="10-25",
+        help="Decoder history: 2^N bytes (default: 25 = 32 MiB)",
     )
     crunch_parser.set_defaults(func=cmd_crunch)
 

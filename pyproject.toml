@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dojo-ssg"
-version = "0.1.0"
+version = "0.2.0"
 description = "A static site and document generator powered by Ninja and Pandoc"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -23,7 +23,7 @@ classifiers = [
   "Environment :: Console",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
-  "Operating System :: OS Independent",
+  "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
@@ -177,6 +177,7 @@ python_functions = "test_*"
 python_classes = "Test*"
 addopts = ["--strict-markers", "--strict-config", "--tb=short"]
 timeout = 30
+markers = ["browser: requires headless Chromium and Node.js"]
 pythonpath = "src"
 
 [tool.mypy]
@@ -212,6 +213,7 @@ module = ["tqdm", "zstandard", "zstandard.*"]
 ignore_missing_imports = true
 
 [tool.coverage.run]
+patch = ["subprocess"]
 branch = true
 source = ["src/dojo"]
 

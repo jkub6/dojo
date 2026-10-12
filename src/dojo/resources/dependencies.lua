@@ -14,7 +14,7 @@ local depfile = nil
 
 -- Helper to escape filenames for Makefile format
 local function escape_makefile(s)
-  return s:gsub(" ", "\\ ")
+  return s:gsub("\\", "\\\\"):gsub(" ", "\\ "):gsub("#", "\\#"):gsub("%$", "$$")
 end
 
 local function file_exists(filepath)
@@ -29,8 +29,22 @@ end
 -- Add a path to dependencies if it exists
 local function add_dep(p)
   if p and p ~= "" then
-    if file_exists(p) then
-      table.insert(dependencies, p)
+    if p:match("^%a[%w+.-]*:") then
+      return
+    end
+    local roots = { system.get_working_directory() }
+    for _, input in ipairs(PANDOC_STATE.input_files) do
+      table.insert(roots, 1, path.directory(input))
+    end
+    for _, root in ipairs(PANDOC_STATE.resource_path) do
+      table.insert(roots, root)
+    end
+    for _, root in ipairs(roots) do
+      local candidate = path.is_absolute(p) and p or path.join({ root, p })
+      if file_exists(candidate) then
+        table.insert(dependencies, path.normalize(candidate))
+        return path.normalize(candidate)
+      end
     end
   end
 end
@@ -87,6 +101,27 @@ function Pandoc(doc)
       target = depfile:sub(1, -3)
     else
       target = "output"
+    end
+  end
+
+  -- File-valued citation metadata travels with the AST to the render stage.
+  -- Resolve it against the author's source/resource path before changing cwd.
+  for _, key in ipairs({ "bibliography", "csl" }) do
+    local value = doc.meta[key]
+    if value then
+      if pandoc.utils.type(value) == "List" then
+        for i, item in ipairs(value) do
+          local resolved = add_dep(pandoc.utils.stringify(item))
+          if resolved then
+            value[i] = pandoc.MetaString(resolved)
+          end
+        end
+      else
+        local resolved = add_dep(pandoc.utils.stringify(value))
+        if resolved then
+          doc.meta[key] = pandoc.MetaString(resolved)
+        end
+      end
     end
   end
 
@@ -159,6 +194,7 @@ function Pandoc(doc)
     file:write("\n")
     file:close()
   else
-    io.stderr:write("Error: Could not write depfile to " .. depfile .. "\n")
+    error("Could not write dependency file " .. depfile)
   end
+  return doc
 end

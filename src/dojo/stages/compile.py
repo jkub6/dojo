@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
     from dojo.config import Config, TypeConfig
     from dojo.emitter import NinjaEmitter
-    from dojo.plugins import PluginInterface
+    from dojo.plugins import PluginInterface, PreparedInput
 
 EXPECTED_HOOK_RESULT_SIZE = 2
 
@@ -49,6 +49,7 @@ class CompileStage:
         self.config = config
         self.build_dir = build_dir
         self.emitter = emitter
+        self.defaults_cache: dict[tuple[Path, ...], tuple[str, tuple[Path, ...]]] = {}
 
     def compile(
         self,
@@ -56,10 +57,12 @@ class CompileStage:
         rel_stem: Path,
         type_config: TypeConfig,
         plugins: list[PluginInterface] | None = None,
+        prepared: PreparedInput | None = None,
     ) -> Path:
         """Convert Markdown to JSON (Pandoc AST).
 
         Args:
+            prepared: Declared plugin preparation products and metadata.
             md_path: Absolute path to source Markdown file
             rel_stem: Relative path without extension
             type_config: Type configuration for this content
@@ -69,12 +72,16 @@ class CompileStage:
             Path to the generated JSON AST file
 
         """
-        json_node = sanitize_path(self.build_dir, rel_stem.with_suffix(".json"))
+        json_node = sanitize_path(self.build_dir, rel_stem.parent / (rel_stem.name + ".json"))
 
         defaults_var, implicit = resolve_stage_dependencies(
             self.config.defaults,
             type_config.defaults,
             pandoc_data_dir=self.config.pandoc_data_dir,
+            project_root=self.config.project_root,
+            build_dir=self.build_dir,
+            cache=self.defaults_cache,
+            pandoc=self.config.tools.pandoc,
         )
 
         variables = {}
@@ -87,6 +94,13 @@ class CompileStage:
                 "out_shell": ninja_quote(json_node),
             }
         )
+
+        if prepared:
+            implicit.extend(prepared.inputs)
+            metadata = " ".join(
+                "-M " + ninja_quote(f"{key}={value}") for key, value in prepared.metadata.items()
+            )
+            variables["defaults"] = variables.get("defaults", "") + " " + metadata
 
         if plugins:
             for plugin in plugins:

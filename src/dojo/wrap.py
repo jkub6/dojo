@@ -14,6 +14,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 from dataclasses import dataclass
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -35,6 +36,7 @@ class PlaceholderContext:
     build_dir: str | None = None
     serve_dir: str | None = None
     serve_port: int | None = None
+    publication_file: str | None = None
 
 
 class WrapArgs(argparse.Namespace):
@@ -52,6 +54,10 @@ class WrapArgs(argparse.Namespace):
     log_file: str | None = None
     command: list[str] | None = None
     copy: bool = False
+    atomic: bool = False
+    media_dir: str | None = None
+    additional_in_file: list[str] | None = None
+    publication_file: str | None = None
 
 
 def _get_path_repls(ctx: PlaceholderContext) -> dict[str, str]:
@@ -67,6 +73,13 @@ def _get_path_repls(ctx: PlaceholderContext) -> dict[str, str]:
     if out_abs and out_abs_dir:
         repls.update({"{out_abs}": out_abs.as_posix(), "{out_abs_dir}": out_abs_dir.as_posix()})
 
+    if ctx.publication_file:
+        publication_dir = Path(ctx.publication_file).resolve().parent
+        repls["{publication_dir}"] = str(publication_dir)
+        repls["{root_val}"] = os.path.relpath(
+            Path(ctx.out_dir or ".").resolve(), publication_dir
+        ).replace("\\", "/")
+        return repls
     if ctx.out_dir and out_abs_dir:
         base_dir = Path(ctx.out_dir).resolve()
         if ctx.build_dir:
@@ -145,6 +158,18 @@ def _create_parser() -> argparse.ArgumentParser:
         help="Additional PATH entries to prepend (colon-separated, mapped to OS format).",
     )
     parser.add_argument("--in-file", help="Input file path for $in resolution.")
+    parser.add_argument(
+        "--media-dir", help="Owned relative extraction directory for this renderer."
+    )
+    parser.add_argument(
+        "--additional-in-file",
+        action="append",
+        help="Additional input for tools accepting {in_all}.",
+    )
+    parser.add_argument(
+        "--atomic", action="store_true", help="Replace output only on successful execution."
+    )
+    parser.add_argument("--publication-file", help="Final publication path for URL context.")
     parser.add_argument("--out-file", help="Output file path for $out resolution.")
     parser.add_argument("--src-dir", help="Absolute source directory.")
     parser.add_argument("--out-dir", help="Absolute output directory.")
@@ -299,6 +324,24 @@ def _inject_metadata_overrides(cmd: list[str], in_file: str | None) -> None:
         sys.stderr.write(f"dojo wrap warning: Failed to extract metadata from AST: {e}\n")
 
 
+def _publish_media(source: Path, destination: Path) -> None:
+    """Replace one renderer's private media tree, including obsolete derivatives."""
+    source.mkdir(parents=True, exist_ok=True)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="dojo-media-", dir=destination.parent) as directory:
+        backup = Path(directory) / "previous"
+        if destination.exists():
+            destination.rename(backup)
+        try:
+            staged = Path(directory) / "next"
+            shutil.copytree(source, staged)
+            staged.rename(destination)
+        except OSError:
+            if backup.exists():
+                backup.rename(destination)
+            raise
+
+
 def run_wrap(argv: list[str]) -> None:
     """Cross-platform command execution wrapper for Ninja rules."""
     parser = _create_parser()
@@ -320,6 +363,7 @@ def run_wrap(argv: list[str]) -> None:
         out_dir=args.out_dir,
         build_dir=args.build_dir,
         serve_dir=args.serve_dir,
+        publication_file=args.publication_file,
     )
 
     with contextlib.ExitStack() as stack:
@@ -343,6 +387,7 @@ def run_wrap(argv: list[str]) -> None:
                 build_dir=args.build_dir,
                 serve_dir=serve_path,
                 serve_port=port,
+                publication_file=args.publication_file,
             )
 
         if args.ensure_dir:
@@ -350,20 +395,77 @@ def run_wrap(argv: list[str]) -> None:
             if ed:
                 Path(ed).mkdir(parents=True, exist_ok=True)
 
-        final_cmd = [_p(c, ctx) or c for c in cmd]
+        if args.cwd:
+            Path(_p(args.cwd, ctx)).mkdir(parents=True, exist_ok=True)
+
+        _run_transaction(cmd, args, ctx, stack, log_handler)
+
+
+def _command_arguments(
+    cmd: list[str], args: WrapArgs, ctx: PlaceholderContext, temporary_output: Path | None
+) -> list[str]:
+    final_cmd: list[str] = []
+    for raw_argument in cmd:
+        argument = raw_argument
+        if argument == "{in_all}":
+            final_cmd.extend(
+                str(Path(path).resolve())
+                for path in [args.in_file, *(args.additional_in_file or [])]
+                if path
+            )
+        else:
+            if temporary_output:
+                argument = argument.replace("{out_abs}", str(temporary_output.resolve()))
+            final_cmd.append(_p(argument, ctx) or argument)
+    return final_cmd
+
+
+def _run_transaction(
+    cmd: list[str],
+    args: WrapArgs,
+    ctx: PlaceholderContext,
+    stack: contextlib.ExitStack,
+    log_handler: IO[str] | None,
+) -> None:
+    media_work: Path | None = None
+    if args.media_dir:
+        media_work = Path(
+            stack.enter_context(tempfile.TemporaryDirectory(prefix="media-", dir=args.build_dir))
+        )
+        args.cwd = str(media_work)
+    final_output = Path(args.out_file) if args.atomic and args.out_file else None
+    temporary_output: Path | None = None
+    if final_output:
+        temporary_dir = Path(
+            stack.enter_context(
+                tempfile.TemporaryDirectory(dir=final_output.parent, prefix=".dojo-")
+            )
+        )
+        temporary_output = temporary_dir / final_output.name
+    final_cmd = _command_arguments(cmd, args, ctx, temporary_output)
+    try:
         if args.copy:
             if len(final_cmd) < MIN_COPY_ARGS:
                 sys.stderr.write("Error: Copy requires source and destination\n")
                 sys.exit(1)
             _handle_copy(final_cmd[0], final_cmd[1])
-
-        _handle_exec(
-            final_cmd,
-            _setup_env(args.path_env),
-            _p(args.cwd, ctx),
-            _p(args.out_file, ctx),
-            log_handler=log_handler,
-        )
+        else:
+            _handle_exec(
+                final_cmd,
+                _setup_env(args.path_env),
+                _p(args.cwd, ctx),
+                str(temporary_output) if temporary_output else _p(args.out_file, ctx),
+                log_handler=log_handler,
+            )
+    except SystemExit as result:
+        if result.code == 0 and temporary_output and final_output:
+            if args.media_dir and media_work and args.publication_file:
+                _publish_media(
+                    media_work / args.media_dir,
+                    Path(args.publication_file).parent / args.media_dir,
+                )
+            temporary_output.replace(final_output)
+        raise
 
 
 if __name__ == "__main__":

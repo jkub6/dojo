@@ -27,7 +27,17 @@ ASSET_KEYS = [
     "bibliography",
     "csl",
     "template",
+    "filters",
+    "lua-filter",
+    "include-in-header",
+    "include-before-body",
+    "include-after-body",
+    "reference-doc",
+    "syntax-definition",
     "include-before",
     "include-after",
     "metadata-files",
 ]
+
+# Only these inputs are also linked publication assets.
+PUBLIC_ASSET_KEYS = ["css"]

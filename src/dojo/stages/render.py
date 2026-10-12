@@ -7,12 +7,13 @@ both standard rendering and derived outputs.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import TYPE_CHECKING
 
 from dojo.constants import RuleName
 from dojo.exceptions import DependencyError, OutputSourceMissingError, OutputToolMissingError
-from dojo.paths import ninja_quote, sanitize_path, shell_quote
+from dojo.paths import ninja_quote, sanitize_path
 from dojo.stages._defaults import resolve_stage_dependencies
 
 if TYPE_CHECKING:
@@ -64,7 +65,9 @@ class RenderStage:
         self.out_dir = out_dir
         self.build_dir = build_dir
         self.emitter = emitter
+        self.defaults_cache: dict[tuple[Path, ...], tuple[str, tuple[Path, ...]]] = {}
         self.all_outputs = all_outputs
+        self.media_producers: dict[Path, Path] = {}
 
     def render(  # noqa: PLR0913
         self,
@@ -75,10 +78,12 @@ class RenderStage:
         *,
         implicit_deps: list[Path] | None = None,
         plugins: list[PluginInterface] | None = None,
+        order_only: Path | list[Path] | None = None,
     ) -> None:
         """Convert JSON to output format or derived output.
 
         Args:
+            order_only: Assets that must exist without invalidating this render.
             out_config: Output configuration
             json_node: Path to JSON AST file
             rel_stem: Relative path without extension
@@ -88,7 +93,7 @@ class RenderStage:
 
         """
         if out_config.source:
-            self._derive_output(out_config, rel_stem, local_registry, implicit_deps)
+            self._derive_output(out_config, rel_stem, local_registry, implicit_deps, order_only)
         else:
             self._standard_render(
                 out_config,
@@ -97,6 +102,7 @@ class RenderStage:
                 local_registry,
                 implicit_deps=implicit_deps,
                 plugins=plugins,
+                order_only=order_only,
             )
 
     def _standard_render(  # noqa: PLR0913
@@ -108,6 +114,7 @@ class RenderStage:
         *,
         implicit_deps: list[Path] | None = None,
         plugins: list[PluginInterface] | None = None,
+        order_only: Path | list[Path] | None = None,
     ) -> None:
         """Render standard Pandoc with optional post-processing."""
         filename = f"{rel_stem.name}{out_config.suffix}.{out_config.extension}"
@@ -117,6 +124,10 @@ class RenderStage:
         defaults_var, implicit = resolve_stage_dependencies(
             out_config.defaults,
             pandoc_data_dir=self.config.pandoc_data_dir,
+            project_root=self.config.project_root,
+            build_dir=self.build_dir,
+            cache=self.defaults_cache,
+            pandoc=self.config.tools.pandoc,
         )
 
         variables: dict[str, str] = {}
@@ -128,11 +139,18 @@ class RenderStage:
                 "in_shell": ninja_quote(json_node),
                 "out_shell": ninja_quote(render_target),
                 "dojo_stem": ninja_quote(rel_stem.name),
+                "publication_shell": ninja_quote(final_path),
+                "media_dir": ninja_quote(
+                    "media/dojo/"
+                    + hashlib.sha256(
+                        str(final_path.relative_to(self.out_dir)).encode()
+                    ).hexdigest()[:20]
+                ),
             }
         )
 
         if out_config.args:
-            variables["args"] = " ".join(out_config.args)
+            variables["args"] = " ".join(ninja_quote(arg) for arg in out_config.args)
 
         all_implicit = list(implicit)
         if implicit_deps:
@@ -150,11 +168,18 @@ class RenderStage:
                 if len(res) == EXPECTED_HOOK_RESULT_SIZE:
                     variables, all_implicit = res
 
+        media_dir = (
+            final_path.parent
+            / "media/dojo"
+            / hashlib.sha256(str(final_path.relative_to(self.out_dir)).encode()).hexdigest()[:20]
+        )
+        self.media_producers[media_dir] = render_target
         self.emitter.build(
             outputs=render_target,
             rule=RuleName.RENDER.value,
             inputs=json_node,
             implicit=all_implicit,
+            order_only=order_only,
             variables=variables,
         )
 
@@ -172,6 +197,7 @@ class RenderStage:
         rel_stem: Path,
         local_registry: dict[str, Path],
         implicit_deps: list[Path] | None = None,
+        order_only: Path | list[Path] | None = None,
     ) -> None:
         """Derive output from other build products (e.g. HTML -> PDF)."""
         filename = f"{rel_stem.name}{out_config.suffix}.{out_config.extension}"
@@ -195,20 +221,27 @@ class RenderStage:
             source_paths.append(local_registry[parent_id])
 
         variables = {
-            "in_shell": ninja_quote(" ".join(shell_quote(p) for p in source_paths)),
+            "in_shell": " ".join(ninja_quote(p) for p in source_paths),
             "out_shell": ninja_quote(render_target),
         }
         if out_config.args:
-            variables["args"] = " ".join(out_config.args)
+            variables["args"] = " ".join(ninja_quote(arg) for arg in out_config.args)
 
         if out_config.tool is None:
             raise OutputToolMissingError
+
+        if out_config.tool in {rule.value for rule in RuleName}:
+            variables["in_shell"] = ninja_quote(source_paths[0])
+            variables["additional_inputs"] = " ".join(
+                "--additional-in-file " + ninja_quote(path) for path in source_paths[1:]
+            )
 
         self.emitter.build(
             outputs=render_target,
             rule=out_config.tool,
             inputs=source_paths,
             implicit=implicit_deps,
+            order_only=order_only,
             variables=variables,
         )
 
@@ -228,8 +261,8 @@ class RenderStage:
 
         if out_config.post_process:
             render_target = sanitize_path(
-                self.out_dir,
-                rel_stem.parent / f".dojo-tmp-{filename}.0.{out_config.extension}",
+                self.build_dir / "render",
+                rel_stem.parent / f"{filename}.0.{out_config.extension}",
             )
         else:
             render_target = final_path
@@ -276,8 +309,8 @@ class RenderStage:
                 step_output = final_output
             else:
                 step_output = sanitize_path(
-                    self.out_dir,
-                    base_path.parent / f".dojo-tmp-{base_path.name}.{i + 1}.{extension}",
+                    self.build_dir / "render",
+                    base_path.parent / f"{base_path.name}.{i + 1}.{extension}",
                 )
 
             variables = {
@@ -285,7 +318,7 @@ class RenderStage:
                 "out_shell": ninja_quote(step_output),
             }
             if step.args:
-                variables["args"] = " ".join(step.args)
+                variables["args"] = " ".join(ninja_quote(arg) for arg in step.args)
 
             self.emitter.build(
                 outputs=step_output,

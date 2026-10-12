@@ -32,12 +32,13 @@ check:
 	vulture
 	statix check .
 	typos --config .typos.toml .
-	nix flake check . --all-systems
+	nix flake check .
+	nix flake check . --all-systems --no-build
 
 [group('Quality')]
 [doc('Run all tests')]
 test:
-	pytest -nauto --cov=src --cov-report=term-missing --cov-report=xml
+	pytest -n4 --cov=src --cov-report=term-missing --cov-report=xml
 
 [group('Quality')]
 [doc('Run full CI pipeline: check, test, build')]

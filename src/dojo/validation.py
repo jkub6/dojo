@@ -7,11 +7,15 @@ resolve correctly without 404s or DOM ID collisions.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import re
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from typing import TYPE_CHECKING
-from urllib.parse import unquote, urlsplit
+from urllib.parse import unquote, unquote_to_bytes, urlsplit
+
+from .crunch import decode_html
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -27,10 +31,13 @@ class Page(HTMLParser):
         self.duplicates: set[str] = set()
         self.urls: list[tuple[str, str]] = []
         self.in_style = False
+        self.reveal_routes = False
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         """Record element IDs, resource URLs, and inline style declarations."""
         values = dict(attrs)
+        if tag == "div" and "reveal" in (values.get("class") or "").split():
+            self.reveal_routes = True
         identifier = values.get("id")
         if identifier:
             if identifier in self.ids:
@@ -45,10 +52,7 @@ class Page(HTMLParser):
             self.urls.extend(("css", url) for url in css_urls(str(style_val)))
         srcset_val = values.get("srcset")
         if srcset_val:
-            self.urls.extend(
-                (tag, url)
-                for url in re.findall(r"(?:^|,\s+)(\S+)(?:\s+[\d.]+[wx])?", str(srcset_val))
-            )
+            self.urls.extend((tag, url) for url in srcset_urls(str(srcset_val)))
         if tag == "style":
             self.in_style = True
 
@@ -63,12 +67,58 @@ class Page(HTMLParser):
             self.urls.extend(("css", url) for url in css_urls(data))
 
 
+def srcset_urls(value: str) -> list[str]:
+    """Parse candidates, retaining the comma within data URLs."""
+    result = []
+    while value := re.sub(r"^[\s,]+", "", value):
+        match = re.match(r"data:[^\s]+|[^\s,]+", value)
+        assert match is not None  # noqa: S101 - nonempty, non-whitespace input
+        url = match[0].rstrip(",")
+        result.append(url)
+        remainder = value[match.end() :]
+        if match[0].endswith(",") or remainder.startswith(","):
+            value = remainder
+        else:
+            _, _, value = remainder.partition(",")
+    return result
+
+
+def embedded_urls(url: str) -> list[tuple[str, str]]:
+    """Inspect embedded CSS, SVG, and HTML resources for nested references."""
+    header, _, payload = url.partition(",")
+    mime = header[5:].split(";")[0].lower()
+    if mime not in {"text/css", "text/html", "image/svg+xml"}:
+        return []
+    raw = (
+        base64.b64decode(payload, validate=True)
+        if ";base64" in header
+        else unquote_to_bytes(payload)
+    )
+    text = raw.decode("utf-8")
+    if mime == "text/css":
+        return [("css", item) for item in css_urls(text)]
+    page = Page()
+    page.feed(text)
+    external = []
+    for tag, reference in page.urls:
+        if reference.startswith("#"):
+            if unquote(reference[1:]) not in page.ids:
+                message = f"missing embedded anchor {reference}"
+                raise ValueError(message)
+        else:
+            external.append((tag, reference))
+    return external
+
+
 def css_urls(text: str) -> list[str]:
     """Extract url() and @import resource paths from CSS text."""
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
     urls = [match[1].strip() for match in re.findall(r"url\(\s*(['\"]?)([^)'\"]+)\1\s*\)", text)]
     urls.extend(re.findall(r"@import\s+['\"]([^'\"]+)['\"]", text))
-    return urls
+    # Fragment-only CSS values need selector/cascade evaluation, including states
+    # created by JavaScript. They are not resource files. SVG <use href> and HTML
+    # anchors remain validated in their own document scope.
+    return [url for url in urls if not url.startswith("#")]
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,10 +155,19 @@ class UrlChecker:
             self.links
             and parsed.fragment
             and target in self.pages
-            and unquote(parsed.fragment) not in self.pages[target].ids
+            and not valid_fragment(self.pages[target], unquote(parsed.fragment))
         ):
             return f"{path}: missing anchor {url}"
         return None
+
+
+def valid_fragment(page: Page, fragment: str) -> bool:
+    """Resolve standard anchors and Reveal's documented hash route form."""
+    if fragment in page.ids:
+        return True
+    if page.reveal_routes and fragment.startswith("/"):
+        return fragment[1:] in page.ids or re.fullmatch(r"/\d+(?:/\d+){0,2}", fragment) is not None
+    return False
 
 
 def linked_resources(
@@ -116,15 +175,7 @@ def linked_resources(
 ) -> list[tuple[Path, list[tuple[str, str]]]]:
     """Traverse all stylesheets and extract recursively linked resources."""
     resources = [(path, page.urls) for path, page in pages.items()]
-    queue: list[Path] = (
-        []
-        if single_file
-        else [
-            p
-            for p in sorted(root.rglob("*.css"))
-            if not any(part.startswith(".") for part in p.relative_to(root).parts)
-        ]
-    )
+    queue: list[Path] = [] if single_file else sorted(root.rglob("*.css"))
     seen: set[Path] = set()
     index = 0
     while index < len(resources) or queue:
@@ -171,15 +222,7 @@ def validate_output(
     """
     root = root.resolve()
     single_file = root.is_file()
-    paths = (
-        [root]
-        if single_file
-        else [
-            p
-            for p in sorted(root.rglob("*.html"))
-            if not any(part.startswith(".") for part in p.relative_to(root).parts)
-        ]
-    )
+    paths = [root] if single_file else sorted(root.rglob("*.html"))
     if not paths:
         return [f"{root}: no HTML output found"]
     if root.is_file():
@@ -188,7 +231,11 @@ def validate_output(
     pages: dict[Path, Page] = {}
     for path in paths:
         page = Page()
-        page.feed(path.read_text(encoding="utf-8"))
+        try:
+            page.feed(decode_html(path.read_text(encoding="utf-8")))
+        except (ValueError, KeyError, UnicodeError) as decode_error:
+            errors.append(f"{path}: invalid compressed output: {decode_error}")
+            continue
         pages[path] = page
         errors.extend(
             f"{path}: duplicate HTML id {identifier}" for identifier in sorted(page.duplicates)
@@ -196,8 +243,30 @@ def validate_output(
     resources = linked_resources(root, pages, single_file=single_file)
     checker = UrlChecker(root, pages, links=links, offline=offline)
     for path, urls in resources:
-        for tag, url in urls:
+        for tag, url in expand_embedded_urls(urls, path, errors):
             error = checker.check(path, tag, url)
             if error:
                 errors.append(error)
     return errors
+
+
+def expand_embedded_urls(
+    urls: list[tuple[str, str]], path: Path, errors: list[str]
+) -> list[tuple[str, str]]:
+    """Expand embedded resources with bounded nesting and explicit diagnostics."""
+    result = list(urls)
+    pending = list(urls)
+    for _ in range(16):
+        nested = []
+        for _, url in pending:
+            if url.startswith("data:"):
+                try:
+                    nested.extend(embedded_urls(url))
+                except (ValueError, UnicodeError, binascii.Error) as error:
+                    errors.append(f"{path}: malformed embedded resource: {error}")
+        if not nested:
+            return result
+        result.extend(nested)
+        pending = nested
+    errors.append(f"{path}: embedded resource nesting exceeds 16 levels")
+    return result

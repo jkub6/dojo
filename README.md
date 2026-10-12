@@ -9,17 +9,17 @@
 [Ninja](https://ninja-build.org/) and [Pandoc](https://pandoc.org/). It merges the flexible markup
 transformations of Pandoc with the minimal incremental rebuild times of Ninja's dependency graph.
 
-Traditional static site generators rebuild excessive pages or struggle with complex document
-workflows (like rendering HTML slides, compiling Typst PDFs, and chaining minifiers). Dojo treats
-your entire site as a directed acyclic graph (DAG): changing a single CSS variable, an image, or a
-slide only rebuilds what is strictly necessary.
+Dojo models document workflows as a dependency graph: compile Markdown, render HTML or PDF, then
+derive and post-process additional formats. Each build refreshes source discovery and plugin
+preparation before Ninja reuses unchanged outputs. Embedded documents and browser exports use
+conservative asset dependencies; ordinary linked HTML avoids unrelated asset rebuilds.
 
 ______________________________________________________________________
 
 ## Key Features
 
-- **Blazing Fast Incremental Builds**: Leverages Ninja to track file modification times, AST caches,
-  and compiler depfiles (`.d`) for instant partial rebuilds.
+- **Incremental Builds**: Uses Ninja to track file modification times, AST caches, and compiler
+  depfiles (`.d`) for incremental execution.
 - **Format Agnostic**: Generate HTML websites, standalone articles, Reveal.js presentations, and
   high-quality PDFs (via Typst or Decktape).
 - **Smart Asset Discovery**: Automatically discovers and copies assets referenced in frontmatter,
@@ -39,7 +39,8 @@ ______________________________________________________________________
   sanitization, directory conflict detection, and JSON Schema export (`dojo schema`) for IDE
   support.
 - **Extensible Plugin System**: Python-based plugin API (`PluginInterface`) with priority sorting to
-  register custom Ninja rules and mutate output configurations.
+  declare preparation inputs, metadata, assets, and provenance. See
+  [the plugin contract](docs/plugins.md).
 - **Reproducible Environments**: Packaged with a Nix flake for deterministic development, testing,
   and CI execution.
 
@@ -49,6 +50,8 @@ ______________________________________________________________________
 
 ### Prerequisites
 
+- **Platform**: Linux/POSIX; x86_64 Linux is tested. The Nix flake also evaluates aarch64 Linux.
+  Windows and macOS are not currently supported/tested build targets.
 - **Python**: `>= 3.13`
 - **[Ninja](https://ninja-build.org/)** (`>= 1.3`) — build executor
 - **[Pandoc](https://pandoc.org/)** (`>= 3.0`) — markup conversion engine
@@ -106,27 +109,32 @@ dojo check
 Verifies that `dojo.yaml` is valid, required directories exist, and tools are discoverable in
 `$PATH`.
 
-### 3. Generate the Build File
+### 3. Build and Package
 
 ```bash
 dojo build
 ```
 
-Scans your `content/` directory, compiles Markdown to Pandoc AST in `_build/`, and writes
-`_build/build.ninja`. You can also preview changes without writing files:
+The command discovers sources, refreshes plugin preparation, runs Ninja incrementally, and finalizes
+publication ownership. Paths are relative to `dojo.yaml`, regardless of the caller's working
+directory. Unknown fields, invalid pools, output collisions, and dependency cycles fail before
+execution.
 
 ```bash
-dojo build --dry-run
+dojo build --dry-run        # Validate/discover without writes or preparation hooks
+dojo build --generate-only  # Prepare inputs and write the graph, without executing tools
+dojo check-output           # Validate resources and duplicate IDs
+dojo check-output --links   # Also check authored local links and fragments
+dojo package -o release.txz # Validate and archive the last successful full build
 ```
 
-### 4. Execute the Build with Ninja
+`_build` holds disposable private state; `_site` holds publication files. Hidden assets are allowed
+when declared. Packaging selects files from `dojo-publication.json`, verifies checksums, and
+validates the extracted archive. It does not build again or use hidden-file exclusions.
 
-```bash
-ninja -C _build
-```
-
-Your compiled site and assets are generated in `_site/`. Subsequent executions only recompile
-documents or assets that have changed.
+Use `dojo build` in watchers and CI. Raw Ninja commands are graph diagnostics and do not perform
+source discovery, domain preparation, or publication finalization. See
+[the architecture and dependency contract](docs/ARCHITECTURE.md).
 
 ______________________________________________________________________
 
@@ -140,14 +148,14 @@ dojo [-h] [-v] [-q] [--version] [--json] <command> [options]
 
 ### Subcommands
 
-| Command   | Usage                             | Description                                                                          |
-| --------- | --------------------------------- | ------------------------------------------------------------------------------------ |
-| `build`   | `dojo build [-c CONFIG] [-n]`     | Generate `build.ninja` build graph. Use `-n / --dry-run` to preview without writing. |
-| `check`   | `dojo check [-c CONFIG]`          | Validate `dojo.yaml` schema, paths, and tool availability.                           |
-| `init`    | `dojo init`                       | Scaffold a new starter project in the current directory.                             |
-| `schema`  | `dojo schema [-o OUTPUT]`         | Print or export the JSON Schema definition for `dojo.yaml`.                          |
-| `version` | `dojo version`                    | Display installed version.                                                           |
-| `crunch`  | `dojo crunch [input] [-o OUTPUT]` | Compress HTML into a standalone self-extracting offline HTML file.                   |
+| Command   | Usage                             | Description                                                                                     |
+| --------- | --------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `build`   | `dojo build [-c CONFIG] [-n]`     | Refresh preparation and build incrementally. Use `-n / --dry-run` for discovery without writes. |
+| `check`   | `dojo check [-c CONFIG]`          | Validate `dojo.yaml` schema, paths, and tool availability.                                      |
+| `init`    | `dojo init`                       | Scaffold a new starter project in the current directory.                                        |
+| `schema`  | `dojo schema [-o OUTPUT]`         | Print or export the JSON Schema definition for `dojo.yaml`.                                     |
+| `version` | `dojo version`                    | Display installed version.                                                                      |
+| `crunch`  | `dojo crunch [input] [-o OUTPUT]` | Compress HTML into a standalone self-extracting offline HTML file.                              |
 
 ### Global Flags
 
@@ -220,7 +228,7 @@ Add `crunch` to any output's `post_process` pipeline in `dojo.yaml`:
 post_process:
   - tool: minify
   - tool: crunch
-    args: ["-l", "22", "--window-log", "26"]
+    args: ["-l", "22", "--window-log", "25"]
 ```
 
 ### Using `crunch` Standalone via CLI

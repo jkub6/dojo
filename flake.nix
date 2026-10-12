@@ -39,7 +39,7 @@
               (python-final: _python-prev: {
                 dojo = python-final.buildPythonPackage {
                   pname = "dojo-ssg";
-                  version = "0.1.0";
+                  version = (builtins.fromTOML (builtins.readFile ./pyproject.toml)).project.version;
                   pyproject = true;
 
                   src = final.lib.cleanSource ./.;
@@ -88,6 +88,8 @@
                     pytest-regressions
                     hypothesis
                     jsonschema
+                    final.chromium
+                    final.nodejs
                     final.ninja
                     final.pandoc
                     final.typst
@@ -96,10 +98,14 @@
                     final.ghostscript
                   ];
 
-                  # Disabled: requires tool execution that fails in the Nix build sandbox
-                  disabledTests = [
-                    "test_generates_and_executes_tools"
-                  ];
+                  dontUsePytestXdist = true; # Keep tool-heavy tests within a bounded worker count.
+                  pytestFlags = ["-n4"];
+
+                  # Browser tests need explicit fonts inside the isolated builder.
+                  FONTCONFIG_FILE = final.makeFontsConf {
+                    fontDirectories = [final.dejavu_fonts final.noto-fonts-cjk-sans];
+                  };
+                  DOJO_TEST_REVEALJS = final.callPackage ./nix/checks/revealjs.nix {};
 
                   preCheck = ''
                     export HOME=$(mktemp -d)
@@ -145,6 +151,7 @@
         # 5. Treefmt configuration mapped flawlessly via module system
         treefmt = {
           imports = [inputs.treefmt-nix-config.treefmtModule];
+          settings.global.excludes = ["src/dojo/resources/fzstd.js"];
         };
 
         devShells.default = localPkgs.mkShell {
@@ -154,6 +161,8 @@
           packages = with localPkgs; [
             just
             nvd
+            chromium
+            nodejs
             ninja
             pandoc
             typst
@@ -168,12 +177,7 @@
             config.treefmt.build.wrapper
 
             (python.withPackages (p: [
-              # Runtime
-              p.pyyaml
-              p.pydantic
-              p.tqdm
-              p.rich
-              p.zstandard
+              p.dojo
               # Test
               p.pytest
               p.pytest-cov
@@ -191,6 +195,10 @@
               p.vulture
             ]))
           ];
+
+          env = {
+            inherit (python.pkgs.dojo) FONTCONFIG_FILE DOJO_TEST_REVEALJS;
+          };
 
           shellHook = ''
             # Bind the local src directory globally for transparent editable execution.

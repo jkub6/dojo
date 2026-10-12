@@ -9,11 +9,12 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
 from typing import cast
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from .constants import RuleName
 from .exceptions import (
@@ -32,7 +33,7 @@ from .exceptions import (
     SourceDirNotFoundError,
     SourceRequiresToolError,
 )
-from .resources import find_resource
+from .resources import clear_resource_cache, find_resource
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ logger = logging.getLogger(__name__)
 def _resolve_defaults(
     v: str | list[str] | None,
     data_dir: str | None = None,
+    root: Path | None = None,
 ) -> str | list[str] | None:
     """Resolve default files using optional data-dir."""
     if v is None:
@@ -49,7 +51,9 @@ def _resolve_defaults(
     resolved_paths = []
     extra_dirs = [Path(data_dir).resolve()] if data_dir else None
     for p in paths:
-        found = find_resource("defaults", p, root_contexts=[Path.cwd()], extra_data_dirs=extra_dirs)
+        found = find_resource(
+            "defaults", p, root_contexts=[root or Path.cwd()], extra_data_dirs=extra_dirs
+        )
         if found:
             resolved_paths.append(str(found))
         else:
@@ -60,6 +64,8 @@ def _resolve_defaults(
 
 class ToolPaths(BaseModel):
     """Configurable paths to external tools."""
+
+    model_config = ConfigDict(extra="forbid")
 
     pandoc: str = Field(default="pandoc", description="Pandoc executable path")
     minify: str = Field(default="minify", description="Minify executable path")
@@ -99,12 +105,16 @@ class ToolPaths(BaseModel):
 class PipelineStep(BaseModel):
     """A single step in a build pipeline."""
 
+    model_config = ConfigDict(extra="forbid")
+
     tool: str = Field(description="Tool to use for this step")
     args: list[str] = Field(default_factory=list, description="Arguments for this tool")
 
 
 class OutputConfig(BaseModel):
     """Configuration for a single output format."""
+
+    model_config = ConfigDict(extra="forbid")
 
     id: str | None = Field(default=None, description="Unique identifier for this output")
     extension: str = Field(description="File extension for output")
@@ -126,6 +136,14 @@ class OutputConfig(BaseModel):
         description="Source output ID(s) for derived outputs",
     )
     tool: str | None = Field(default=None, description="Tool to use for derived outputs")
+    consumes_assets: bool | None = Field(
+        default=None,
+        description="Rebuild when copied assets change; auto for PDF, embedded HTML and derived outputs",
+    )
+    dependencies: list[str] = Field(
+        default_factory=list,
+        description="Additional project-relative files read by this output tool",
+    )
     label: str | None = Field(
         default=None,
         description="Display label for format links sidebar (defaults to ID uppercase)",
@@ -162,13 +180,15 @@ class OutputConfig(BaseModel):
 
         return self
 
-    def resolve_defaults(self, data_dir: str | None = None) -> None:
+    def resolve_defaults(self, data_dir: str | None = None, root: Path | None = None) -> None:
         """Resolve defaults paths for this output."""
-        self.defaults = _resolve_defaults(self.defaults, data_dir)
+        self.defaults = _resolve_defaults(self.defaults, data_dir, root)
 
 
 class TypeConfig(BaseModel):
     """Configuration for a content type."""
+
+    model_config = ConfigDict(extra="forbid")
 
     outputs: list[OutputConfig] = Field(description="List of output formats")
     defaults: str | list[str] | None = Field(
@@ -176,15 +196,17 @@ class TypeConfig(BaseModel):
         description="Default render settings for this type",
     )
 
-    def resolve_defaults(self, data_dir: str | None = None) -> None:
+    def resolve_defaults(self, data_dir: str | None = None, root: Path | None = None) -> None:
         """Resolve defaults paths for this type and its outputs."""
-        self.defaults = _resolve_defaults(self.defaults, data_dir)
+        self.defaults = _resolve_defaults(self.defaults, data_dir, root)
         for out_conf in self.outputs:
-            out_conf.resolve_defaults(data_dir)
+            out_conf.resolve_defaults(data_dir, root)
 
 
 class CustomRule(BaseModel):
     """Configuration for a custom Ninja rule."""
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str = Field(description="Rule name")
     command: str = Field(description="Command to execute")
@@ -201,12 +223,21 @@ class CustomRule(BaseModel):
         description="Rule-level variable defaults",
     )
 
+    dependencies: list[str] = Field(
+        default_factory=list,
+        description="Project-relative files used by each invocation of this rule",
+    )
+
     # Validation moved to Config to allow internal use of built-in names
     # for standard rules like REGENERATE
 
 
 class Config(BaseModel):
     """Main configuration schema."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    project_root: Path = Field(default_factory=Path.cwd, exclude=True)
 
     src_dir: str = Field(default="content", description="Source directory")
     output_dir: str = Field(default="_site", description="Output directory")
@@ -243,11 +274,6 @@ class Config(BaseModel):
     )
 
     # Pandoc Configuration Options
-    root_ref_dir: str = Field(
-        default=".",
-        description="Directory to calculate root variable relative to",
-    )
-
     add_resource_path: bool = Field(
         default=True,
         description="Whether to add the input file directory to the resource path",
@@ -297,6 +323,13 @@ class Config(BaseModel):
     @model_validator(mode="after")
     def validate_pools(self) -> Config:
         """Validate that all rule pools are defined."""
+        if any(depth <= 0 for depth in self.pools.values()):
+            msg = "Pool depths must be positive"
+            raise ValueError(msg)
+        for custom in self.custom_rules:
+            if custom.pool and custom.pool not in self.pools:
+                msg = f"Rule {custom.name!r} references undefined pool {custom.pool!r}"
+                raise ValueError(msg)
         for rule, pool in self.rule_pools.items():
             if pool not in self.pools:
                 err_msg = f"Rule '{rule}' references undefined pool '{pool}'"
@@ -331,14 +364,15 @@ class Config(BaseModel):
 
         # 3. Check for duplicate output IDs in each type
         self._validate_unique_ids()
+        self._validate_output_graphs()
 
         return self
 
     def _resolve_all_defaults(self) -> None:
         """Resolve all defaults paths."""
-        self.defaults = _resolve_defaults(self.defaults, self.pandoc_data_dir)
+        self.defaults = _resolve_defaults(self.defaults, self.pandoc_data_dir, self.project_root)
         for type_conf in self.types.values():
-            type_conf.resolve_defaults(self.pandoc_data_dir)
+            type_conf.resolve_defaults(self.pandoc_data_dir, self.project_root)
 
     def _validate_directories(self) -> None:
         """Validate that source/output/build directories do not conflict."""
@@ -385,6 +419,37 @@ class Config(BaseModel):
                 duplicates = {x for x in ids if ids.count(x) > 1}
                 raise DuplicateOutputIdError(type_name, duplicates)
 
+    def _validate_output_graphs(self) -> None:
+        for name, kind in self.types.items():
+            kind.outputs = order_outputs(name, kind.outputs)
+
+
+def order_outputs(name: str, outputs: list[OutputConfig]) -> list[OutputConfig]:
+    """Validate unique paths and return a topological execution order."""
+    paths = [(out.suffix, out.extension) for out in outputs]
+    if len(paths) != len(set(paths)):
+        message = f"Type {name!r} has colliding output paths"
+        raise ValueError(message)
+    for out in outputs:
+        if any(c in out.extension + out.suffix for c in "/\\\n\r"):
+            message = "Output extensions and suffixes cannot contain path separators"
+            raise ValueError(message)
+    by_id = {out.id or f"{out.suffix}.{out.extension}": out for out in outputs}
+    graph = {
+        key: [out.source] if isinstance(out.source, str) else out.source or []
+        for key, out in by_id.items()
+    }
+    references = {parent for parents in graph.values() for parent in parents}
+    declared = {out.id for out in outputs if out.id}
+    if unknown := references - declared:
+        message = f"Unknown output source in {name!r}: {sorted(unknown)}"
+        raise ValueError(message)
+    try:
+        return [by_id[key] for key in TopologicalSorter(graph).static_order()]
+    except CycleError as error:
+        message = f"Cyclic output dependency in {name!r}: {error}"
+        raise ValueError(message) from error
+
 
 def _find_config_path(explicit_path: str | None) -> Path:
     """Find the configuration file path to use."""
@@ -392,11 +457,14 @@ def _find_config_path(explicit_path: str | None) -> Path:
 
     # 1. CLI Argument
     if explicit_path:
-        paths_to_check.append(Path(explicit_path))
+        selected = Path(explicit_path)
+        if not selected.is_file():
+            raise ConfigFileNotFoundError(explicit_path)
+        return selected.resolve()
 
     # 2. Environment Variable
     if env_path := os.environ.get("DOJO_CONFIG"):
-        paths_to_check.append(Path(env_path))
+        return _find_config_path(env_path)
 
     # 3. Local and User config
     paths_to_check.extend(
@@ -411,8 +479,6 @@ def _find_config_path(explicit_path: str | None) -> Path:
         if path.is_file():
             return path.resolve()
 
-    if explicit_path:
-        raise ConfigFileNotFoundError(explicit_path)
     raise ConfigFileNotFoundError
 
 
@@ -430,6 +496,28 @@ def _apply_config_file_exclusion(config: Config, config_path: Path) -> None:
         pass
 
 
+def _root_config_paths(data: dict[str, object], root: Path) -> None:
+    data["project_root"] = root
+    for key, default in {
+        "src_dir": "content",
+        "output_dir": "_site",
+        "build_dir": "_build",
+    }.items():
+        data[key] = str((root / str(data.get(key, default))).resolve())
+    for key in ("pandoc_data_dir", "log_file"):
+        if data.get(key):
+            data[key] = str((root / str(data[key])).resolve())
+    tools = data.get("tools")
+    if isinstance(tools, dict):
+        for name, value in tools.items():
+            if isinstance(value, str) and "/" in value:
+                tools[name] = str((root / value).resolve())
+    for key in ("font_paths", "static_dirs", "plugins"):
+        values = data.get(key)
+        if isinstance(values, list):
+            data[key] = [str((root / str(value)).resolve()) for value in values]
+
+
 def load_config(config_path: str | None = None) -> tuple[Config, Path]:
     """Load configuration from multiple sources with priority.
 
@@ -443,6 +531,7 @@ def load_config(config_path: str | None = None) -> tuple[Config, Path]:
         Tuple containing (Config object, Path to loaded file)
 
     """
+    clear_resource_cache()
     selected_path = _find_config_path(config_path)
 
     with selected_path.open() as f:
@@ -457,6 +546,7 @@ def load_config(config_path: str | None = None) -> tuple[Config, Path]:
             raise ConfigParseError(selected_path, e) from e
 
     try:
+        _root_config_paths(data, selected_path.parent)
         config = Config.model_validate(data)
         _apply_config_file_exclusion(config, selected_path)
     except (ValidationError, DojoError) as e:

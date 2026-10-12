@@ -59,6 +59,11 @@ If you prefer using your system's package manager:
    pip install -e . --dependency-groups dev
    ```
 
+The optional presentation integration test uses local Reveal.js assets. Set `DOJO_TEST_REVEALJS` to
+an unpacked Reveal.js 5.2.1 distribution for manual test runs. Nix supplies the pinned distribution,
+Chromium, and Unicode fonts automatically; the tests do not download presentation assets or require
+Access. This fixture matches the default template in the pinned Pandoc 3.7 package.
+
 ______________________________________________________________________
 
 ## Development Workflow

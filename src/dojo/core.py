@@ -8,12 +8,20 @@ from __future__ import annotations
 
 import io
 import logging
+from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import yaml
 from tqdm import tqdm
 
+from .artifacts import (
+    MANIFEST_NAME,
+    finalize_publication,
+    import_legacy_publication,
+    load_publication,
+    repair_media,
+)
 from .constants import RuleName
 from .emitter import NinjaEmitter
 
@@ -22,10 +30,13 @@ if TYPE_CHECKING:
 
     from .config import Config, CustomRule, OutputConfig
 
-from .paths import ninja_quote, should_process_file
-from .plugins import PluginInterface, load_plugin
+from .io import write_changed
+from .paths import source_files
+from .plugins import BuildContext, BuildContribution, PluginInterface, PreparedInput, load_plugin
+from .resources import clear_resource_cache
 from .rules import get_builtin_rules
 from .stages import AssetProcessor, CompileStage, RenderStage
+from .stages._defaults import consumes_assets
 from .yaml_utils import parse_frontmatter_type
 
 logger = logging.getLogger(__name__)
@@ -83,9 +94,16 @@ class NinjaGenerator:
         self.out_dir = Path(self.config.output_dir).absolute()
         self.build_dir = Path(self.config.build_dir).absolute()
         self.ninja_file = self.build_dir / "build.ninja"
+        inventory = self.build_dir / "publication.json"
+        self.previous_publication = load_publication(
+            inventory if inventory.is_file() else self.out_dir / MANIFEST_NAME
+        )
+        if not self.previous_publication.artifacts and not self.dry_run:
+            self.previous_publication = import_legacy_publication(self.out_dir, self.ninja_file)
 
         # Create build directory
-        self.build_dir.mkdir(parents=True, exist_ok=True)
+        if not self.dry_run:
+            self.build_dir.mkdir(parents=True, exist_ok=True)
 
         # Buffer and Emitter
         if emitter:
@@ -139,6 +157,72 @@ class NinjaGenerator:
 
         # Format link defaults: populated by _generate_format_link_defaults()
         self._format_link_defaults: dict[tuple[str, str], Path] = {}
+        self.contributions: list[BuildContribution] = []
+        self.prepared: dict[Path, PreparedInput] = {}
+        self.sources: tuple[Path, ...] = ()
+        self.asset_consumption: dict[str, bool] = {}
+        self._validate_rules()
+        self._register_rule_dependencies()
+
+    def _validate_rules(self) -> None:
+        """Reject ambiguous rule ownership and invalid tool references."""
+        names = [rule.name for rule in self.rules]
+        if len(names) != len(set(names)):
+            msg = "Conflicting build rule names from configuration/plugins"
+            raise ValueError(msg)
+        for rule in self.rules:
+            if rule.pool and rule.pool not in self.config.pools:
+                message = f"Rule {rule.name!r} references undefined pool {rule.pool!r}"
+                raise ValueError(message)
+        if unknown := self.config.rule_pools.keys() - set(names):
+            message = f"Pool assignments reference unknown rules: {sorted(unknown)}"
+            raise ValueError(message)
+        for kind in self.config.types.values():
+            for output in kind.outputs:
+                for tool in [output.tool, *(step.tool for step in output.post_process)]:
+                    if tool and tool not in names:
+                        msg = f"Unknown output tool: {tool}"
+                        raise ValueError(msg)
+
+    def _register_rule_dependencies(self) -> None:
+        """Track tool binaries, bundled implementations, and explicit custom inputs."""
+        runtime = Path(__file__).parent
+        code = {
+            "compile": ["resources/dependencies.lua"],
+            "render": ["resources/fix_typst_csl.lua", "resources/format_links.lua"],
+            "crunch": [
+                "crunch.py",
+                "exceptions.py",
+                "resources/fzstd.js",
+                "resources/fzstd.LICENSE",
+            ],
+        }
+        tool_inputs = {
+            "compile": [self.config.tools.pandoc],
+            "render": [self.config.tools.pandoc, self.config.tools.typst],
+            "decktape": [self.config.tools.decktape],
+            "ghostscript": [self.config.tools.ghostscript],
+            "minify": [self.config.tools.minify],
+        }
+        fonts = [
+            path
+            for folder in self.config.font_paths
+            for path in Path(folder).rglob("*")
+            if path.is_file()
+        ]
+        for rule in self.rules:
+            declared = [self.config.project_root / name for name in rule.dependencies]
+            if rule.name in {name.value for name in RuleName} - {"regenerate", "stamp"}:
+                declared.append(runtime / "wrap.py")
+                declared.extend(runtime / name for name in code.get(rule.name, []))
+                declared.extend(
+                    Path(name) for name in tool_inputs.get(rule.name, []) if Path(name).is_file()
+                )
+            if rule.name == "render":
+                declared.extend(fonts)
+            self.emitter.rule_dependencies[rule.name] = sorted(
+                set(declared), key=lambda path: (path.name, str(path))
+            )
 
     def _generate_format_link_defaults(self) -> None:
         """Generate Pandoc defaults files for cross-format links.
@@ -222,22 +306,7 @@ class NinjaGenerator:
             True if the file was written, False if it was unchanged.
 
         """
-        if target.exists():
-            try:
-                current_content = target.read_text(encoding="utf-8")
-                if current_content == content:
-                    return False
-            except OSError as e:
-                logger.warning("Failed to read %s for change detection: %s", target, e)
-
-        try:
-            with target.open("w", encoding="utf-8") as f:
-                f.write(content)
-        except OSError:
-            logger.exception("Failed to write %s", target)
-            raise
-        else:
-            return True
+        return write_changed(target, content)
 
     def _apply_format_link_defaults(
         self,
@@ -333,10 +402,10 @@ class NinjaGenerator:
 
         # Identify content type
         content_type = parse_frontmatter_type(md_path, self.config.default_type)
-        type_config = self.config.types.get(
-            content_type,
-            self.config.types[self.config.default_type],
-        )
+        if content_type not in self.config.types:
+            message = f"{md_path}: unknown content type {content_type!r}"
+            raise ValueError(message)
+        type_config = self.config.types[content_type]
 
         # Stage 1: Compile
         try:
@@ -350,6 +419,7 @@ class NinjaGenerator:
             rel_stem,
             type_config,
             plugins=self.plugins,
+            prepared=self.prepared.get(md_path),
         )
         self.emitter.newline()
 
@@ -363,11 +433,10 @@ class NinjaGenerator:
 
         # Combine explicit asset deps with global static deps
         all_deps = list(asset_deps)
-        if static_deps:
-            if isinstance(static_deps, list):
-                all_deps.extend(static_deps)
-            else:
-                all_deps.append(static_deps)
+        prepared = self.prepared.get(md_path)
+        if prepared:
+            all_deps.extend(self.out_dir / relative for relative in prepared.assets.values())
+
         # Stage 3: Render/Derive
         local_registry: dict[str, Path] = {}
         for out_config in type_config.outputs:
@@ -382,48 +451,82 @@ class NinjaGenerator:
                 content_type,
             )
 
+            output_deps = list(all_deps)
+            output_deps.extend(
+                self.config.project_root / name for name in current_config.dependencies
+            )
+            if static_deps and self._consumes_assets(current_config):
+                output_deps.extend([static_deps] if isinstance(static_deps, Path) else static_deps)
             self._render_stage.render(
                 current_config,
                 json_node,
                 rel_stem,
                 local_registry,
-                implicit_deps=all_deps,
+                implicit_deps=output_deps,
+                order_only=static_deps,
                 plugins=self.plugins,
             )
 
         self.emitter.newline()
 
+    def _consumes_assets(self, output: OutputConfig) -> bool:
+        """Cache the resource-consumption decision per output configuration."""
+        key = output.model_dump_json()
+        if key not in self.asset_consumption:
+            self.asset_consumption[key] = consumes_assets(
+                output,
+                project_root=self.config.project_root,
+                data_dir=Path(self.config.pandoc_data_dir) if self.config.pandoc_data_dir else None,
+            )
+        return self.asset_consumption[key]
+
     def _run_pre_generate_hooks(self) -> None:
         """Execute pre_generate hooks for all loaded plugins."""
+        context = BuildContext(
+            config=self.config.model_copy(deep=True),
+            config_path=self.config_path,
+            project_root=self.config_path.parent,
+            src_dir=self.src,
+            build_dir=self.build_dir,
+            output_dir=self.out_dir,
+            sources=self.sources,
+            refresh=self.refresh,
+        )
         for plugin in self.plugins:
-            plugin.pre_generate(
-                self.config,
-                self.build_dir,
-                refresh=self.refresh,
-                src_dir=self.src,
-            )
+            isolated = context.config.model_copy(deep=True)
+            contribution = plugin.prepare(replace(context, config=isolated))
+            if isolated != context.config:
+                message = (
+                    f"{type(plugin).__name__}.prepare mutated config; return a BuildContribution"
+                )
+                raise ValueError(message)
+            self.contributions.append(contribution)
+            for prepared in contribution.prepared:
+                if prepared.source in self.prepared:
+                    msg = f"Multiple plugins prepare {prepared.source}"
+                    raise ValueError(msg)
+                self.prepared[prepared.source] = prepared
 
     def _process_plugin_extra_assets(self) -> None:
         """Process extra assets declared by plugins."""
         for plugin in self.plugins:
             extra_assets = plugin.get_extra_assets(self.config, self.out_dir)
-            for dest, src in sorted(extra_assets.items()):
-                if dest not in self.copied_assets:
-                    self.copied_assets.add(dest)
-                    self.all_outputs.append(dest)
-                    self.emitter.build(
-                        outputs=dest,
-                        rule=RuleName.COPY.value,
-                        inputs=src,
-                        variables={
-                            "in_shell": ninja_quote(src),
-                            "out_shell": ninja_quote(dest),
-                        },
-                    )
+            self._asset_processor.copy_assets(
+                {
+                    source: destination.relative_to(self.out_dir)
+                    for destination, source in extra_assets.items()
+                }
+            )
 
     def generate(self) -> None:
         """Scan source files and generate build.ninja."""
         logger.info("Scanning source directory: %s", self.src)
+
+        clear_resource_cache()
+        self.sources = tuple(self._get_filtered_files())
+        if self.dry_run:
+            self._log_dry_run_summary(len(self.sources))
+            return
 
         # Generate format link defaults before processing content
         if self.config.format_links:
@@ -436,13 +539,27 @@ class NinjaGenerator:
 
         # Stage 2: Static assets
         # Process these first so they can be used as dependencies for content rendering
-        static_outputs = self._asset_processor.process_static_assets(self.config.static_dirs)
+        static_dirs = list(self.config.static_dirs)
+        replacements = [
+            item.static_dirs for item in self.contributions if item.static_dirs is not None
+        ]
+        if len(replacements) > 1:
+            msg = "Only one plugin may select the project's static directories"
+            raise ValueError(msg)
+        if replacements:
+            static_dirs = [str(path) for path in replacements[0]]
+        static_outputs = self._asset_processor.process_static_assets(static_dirs)
+        for contribution in self.contributions:
+            self._asset_processor.copy_assets(contribution.assets)
+            static_outputs.extend(self.out_dir / path for path in contribution.assets.values())
+        for prepared in self.prepared.values():
+            self._asset_processor.copy_assets(prepared.assets)
 
         # Stage 2b: Plugin extra assets
         self._process_plugin_extra_assets()
 
         # Optimization: Create a stamp file to represent all static assets.
-        # This keeps the Ninja build edges for individual files compact (Professional Refinement).
+        # A shared prerequisite keeps generated edges compact.
         stamp_path = self.build_dir / ".static_assets.stamp"
         if static_outputs:
             self.emitter.comment("Group static assets into a single stamp for cleaner dependencies")
@@ -457,7 +574,7 @@ class NinjaGenerator:
             static_deps = None
 
         # Stage 3: Content processing
-        filtered_files = self._get_filtered_files()
+        filtered_files = list(self.sources)
         if not filtered_files:
             logger.warning("No Markdown files found in %s", self.src)
         else:
@@ -465,16 +582,11 @@ class NinjaGenerator:
             self._process_markdown_files(filtered_files, static_deps=static_deps)
 
         # Stage 4: Post-process the final content via plugins
-        self._post_process_and_write(len(filtered_files))
+        self._post_process_and_write()
 
     def _get_filtered_files(self) -> list[Path]:
         """Scan and filter Markdown source files."""
-        md_files = sorted(self.src.rglob("*.md"))
-        return [
-            f
-            for f in md_files
-            if should_process_file(f, self.src, self.config.include, self.config.exclude)
-        ]
+        return source_files(self.src, self.config.include, self.config.exclude)
 
     def _process_markdown_files(
         self,
@@ -490,7 +602,7 @@ class NinjaGenerator:
                 logger.exception("Failed to process %s", md_file)
                 raise
 
-    def _post_process_and_write(self, source_count: int) -> None:
+    def _post_process_and_write(self) -> None:
         """Handle Stage 5: Plugin post-processing and actual file output."""
         # If an external emitter was used, we don't have a buffer to post-process.
         if self._buffer is None:
@@ -504,11 +616,12 @@ class NinjaGenerator:
         for plugin in self.plugins:
             ninja_content = plugin.post_process_ninja(ninja_content)
 
-        # Dry-run mode: show plan without writing
-        if self.dry_run:
-            self._log_dry_run_summary(source_count)
-            return
-
+        repair_media(self.out_dir, self.build_dir, self.previous_publication)
+        inventory_path = self.build_dir / "publication.json"
+        if not inventory_path.exists() and self.previous_publication.artifacts:
+            write_changed(
+                inventory_path, self.previous_publication.model_dump_json(indent=2) + "\n"
+            )
         self._write_ninja_file(ninja_content)
         self._log_completion_summary()
 
@@ -539,6 +652,19 @@ class NinjaGenerator:
             logger.info("Generated: %s", self.ninja_file)
         else:
             logger.debug("Ninja file unchanged, skipping write")
+
+    def finalize(self) -> None:
+        """Publish ownership only after every requested build stage succeeds."""
+        finalize_publication(
+            self.out_dir,
+            self.build_dir,
+            self.all_outputs,
+            self._render_stage.media_producers,
+            self.previous_publication,
+            provenance=tuple(
+                path for contribution in self.contributions for path in contribution.provenance
+            ),
+        )
 
     def _log_completion_summary(self) -> None:
         """Log the completion summary after successful generation."""

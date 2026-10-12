@@ -108,7 +108,8 @@ types:
 
     captured = capsys.readouterr()
     assert "Configuration valid" in captured.out
-    assert "Src: content" in captured.out
+    assert "Src:" in captured.out
+    assert "/content" in captured.out
 
 
 def test_check_invalid_config(tmp_path, monkeypatch, capsys):

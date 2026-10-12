@@ -9,13 +9,14 @@ from __future__ import annotations
 import argparse
 import base64
 import codecs
+import io
 import json
 import re
 import sys
 import tempfile
 import zlib
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import zstandard as zstd
 
@@ -49,7 +50,13 @@ _BASE91_TAIL_VALUE = 90
 # Embedded Browser JavaScript
 # =============================================================================
 
-FZSTD_DECODER_CODE = """!function(f){typeof module!='undefined'&&typeof exports=='object'?module.exports=f():typeof define!='undefined'&&define.amd?define(['fzstd',f]):(typeof self!='undefined'?self:this).fzstd=f()}(function(){var _e={};"use strict";var r=ArrayBuffer,t=Uint8Array,e=Uint16Array,n=Int16Array,a=Uint32Array,s=Int32Array,i=function(r,e,n){if(t.prototype.slice)return t.prototype.slice.call(r,e,n);(null==e||e<0)&&(e=0),(null==n||n>r.length)&&(n=r.length);var a=new t(n-e);return a.set(r.subarray(e,n)),a},o=function(r,e,n,a){if(t.prototype.fill)return t.prototype.fill.call(r,e,n,a);for((null==n||n<0)&&(n=0),(null==a||a>r.length)&&(a=r.length);n<a;++n)r[n]=e;return r},u=function(r,e,n,a){if(t.prototype.copyWithin)return t.prototype.copyWithin.call(r,e,n,a);for((null==n||n<0)&&(n=0),(null==a||a>r.length)&&(a=r.length);n<a;)r[e++]=r[n++]};_e.ZstdErrorCode={InvalidData:0,WindowSizeTooLarge:1,InvalidBlockType:2,FSEAccuracyTooHigh:3,DistanceTooFarBack:4,UnexpectedEOF:5};var h=["invalid zstd data","window size too large (>2046MB)","invalid block type","FSE accuracy too high","match distance too far back","unexpected EOF"],f=function(r,t,e){var n=Error(t||h[r]);if(n.code=r,Error.captureStackTrace&&Error.captureStackTrace(n,f),!e)throw n;return n},l=function(r,t,e){for(var n=0,a=0;n<e;++n)a|=r[t++]<<(n<<3);return a},v=function(r,t){return(r[t]|r[t+1]<<8|r[t+2]<<16|r[t+3]<<24)>>>0},c=function(r,e){var n=r[0]|r[1]<<8|r[2]<<16;if(3126568==n&&253==r[3]){var a=r[4],i=a>>5&1,o=a>>2&1,u=3&a,h=a>>6;8&a&&f(0);var c=6-i,b=3==u?4:u,y=l(r,c,b),p=h?1<<h:i,w=l(r,c+=b,p)+(1==h&&256),g=w;if(!i){var d=1<<10+(r[5]>>3);g=d+(d>>3)*(7&r[5])}g>2145386496&&f(1);var m=new t((1==e?w||g:e?0:g)+12);return m[0]=1,m[4]=4,m[8]=8,{b:c+p,y:0,l:0,d:y,w:e&&1!=e?e:m.subarray(12),e:g,o:new s(m.buffer,0,3),u:w,c:o,m:Math.min(131072,g)}}if(25481893==(n>>4|r[3]<<20))return v(r,4)+8;f(0)},b=function(r){for(var t=0;1<<t<=r;++t);return t-1},y=function(a,s,i){var o=4+(s<<3),u=5+(15&a[s]);u>i&&f(3);for(var h=1<<u,l=h,v=-1,c=-1,y=-1,p=h,w=new r(512+(h<<2)),g=new n(w,0,256),d=new e(w,0,256),m=new e(w,512,h),z=512+(h<<1),E=new t(w,z,h),k=new t(w,z+h);v<255&&l>0;){var A=b(l+1),T=o>>3,x=(1<<A+1)-1,F=(a[T]|a[T+1]<<8|a[T+2]<<16)>>(7&o)&x,S=(1<<A)-1,B=x-l-1,I=F&S;if(I<B?(o+=A,F=I):(o+=A+1,F>S&&(F-=B)),g[++v]=--F,-1==F?(l+=F,E[--p]=v):l-=F,!F)do{var U=o>>3;c=(a[U]|a[U+1]<<8)>>(7&o)&3,o+=2,v+=c}while(3==c)}(v>255||l)&&f(0);for(var D=0,M=(h>>1)+(h>>3)+3,W=h-1,O=0;O<=v;++O){var j=g[O];if(j<1)d[O]=-j;else for(y=0;y<j;++y){E[D]=O;do{D=D+M&W}while(D>=p)}}for(D&&f(0),y=0;y<h;++y){var C=d[E[y]]++,H=k[y]=u-b(C);m[y]=(C<<H)-h}return[o+7>>3,{b:u,s:E,n:k,t:m}]},p=function(r,n){var a=0,s=-1,i=new t(292),u=r[n],h=i.subarray(0,256),l=i.subarray(256,268),v=new e(i.buffer,268);if(u<128){var c=y(r,n+1,6),p=c[1],w=c[0]<<3,g=r[n+=u];g||f(0);for(var d=0,m=0,z=p.b,E=z,k=(++n<<3)-8+b(g);!((k-=z)<w);){var A=k>>3;if(h[++s]=p.s[d+=(r[A]|r[A+1]<<8)>>(7&k)&(1<<z)-1],(k-=E)<w)break;h[++s]=p.s[m+=(r[A=k>>3]|r[A+1]<<8)>>(7&k)&(1<<E)-1],z=p.n[d],d=p.t[d],E=p.n[m],m=p.t[m]}++s>255&&f(0)}else{for(s=u-127;a<s;a+=2){var T=r[++n];h[a]=T>>4,h[a+1]=15&T}++n}var x=0;for(a=0;a<s;++a)(I=h[a])>11&&f(0),x+=I&&1<<I-1;var F=b(x)+1,S=1<<F,B=S-x;for(B&B-1&&f(0),h[s++]=b(B)+1,a=0;a<s;++a){var I;++l[h[a]=(I=h[a])&&F+1-I]}var U=new t(S<<1),D=U.subarray(0,S),M=U.subarray(S);for(v[F]=0,a=F;a>0;--a){var W=v[a];o(M,a,W,v[a-1]=W+l[a]*(1<<F-a))}for(v[0]!=S&&f(0),a=0;a<s;++a){var O=h[a];if(O){var j=v[O];o(D,a,j,v[O]=j+(1<<F-O))}}return[n,{n:M,b:F,s:D}]},w=y(new t([81,16,99,140,49,198,24,99,12,33,196,24,99,102,102,134,70,146,4]),0,6)[1],g=y(new t([33,20,196,24,99,140,33,132,16,66,8,33,132,16,66,8,33,68,68,68,68,68,68,68,68,36,9]),0,6)[1],d=y(new t([32,132,16,66,102,70,68,68,68,68,36,73,2]),0,5)[1],m=function(r,t){for(var e=r.length,n=new s(e),a=0;a<e;++a)n[a]=t,t+=1<<r[a];return n},z=new t(new s([0,0,0,0,16843009,50528770,134678020,202050057,269422093]).buffer,0,36),E=m(z,0),k=new t(new s([0,0,0,0,0,0,0,0,16843009,50528770,117769220,185207048,252579084,16]).buffer,0,53),A=m(k,3),T=function(r,t,e){var n=r.length,a=t.length,s=r[n-1],i=(1<<e.b)-1,o=-e.b;s||f(0);for(var u=0,h=e.b,l=(n<<3)-8+b(s)-h,v=-1;l>o&&v<a;){var c=l>>3;t[++v]=e.s[u=(u<<h|(r[c]|r[c+1]<<8|r[c+2]<<16)>>(7&l))&i],l-=h=e.n[u]}l==o&&v+1==a||f(0)},x=function(r,t,e){var n=6,a=t.length+3>>2,s=a<<1,i=a+s;T(r.subarray(n,n+=r[0]|r[1]<<8),t.subarray(0,a),e),T(r.subarray(n,n+=r[2]|r[3]<<8),t.subarray(a,s),e),T(r.subarray(n,n+=r[4]|r[5]<<8),t.subarray(s,i),e),T(r.subarray(n),t.subarray(i),e)},F=function(r,n,a){var s,u=n.b,h=r[u],l=h>>1&3;n.l=1&h;var v=h>>3|r[u+1]<<5|r[u+2]<<13,c=(u+=3)+v;if(1==l){if(u>=r.length)return;return n.b=u+1,a?(o(a,r[u],n.y,n.y+=v),a):o(new t(v),r[u])}if(!(c>r.length)){if(0==l)return n.b=c,a?(a.set(r.subarray(u,c),n.y),n.y+=v,a):i(r,u,c);if(2==l){var m=r[u],F=3&m,S=m>>2&3,B=m>>4,I=0,U=0;F<2?1&S?B|=r[++u]<<4|(2&S&&r[++u]<<12):B=m>>3:(U=S,S<2?(B|=(63&r[++u])<<4,I=r[u]>>6|r[++u]<<2):2==S?(B|=r[++u]<<4|(3&r[++u])<<12,I=r[u]>>2|r[++u]<<6):(B|=r[++u]<<4|(63&r[++u])<<12,I=r[u]>>6|r[++u]<<2|r[++u]<<10)),++u;var D=a?a.subarray(n.y,n.y+n.m):new t(n.m),M=D.length-B;if(0==F)D.set(r.subarray(u,u+=B),M);else if(1==F)o(D,r[u++],M);else{var W=n.h;if(2==F){var O=p(r,u);I+=u-(u=O[0]),n.h=W=O[1]}else W||f(0);(U?x:T)(r.subarray(u,u+=I),D.subarray(M),W)}var j=r[u++];if(j){255==j?j=32512+(r[u++]|r[u++]<<8):j>127&&(j=j-128<<8|r[u++]);var C=r[u++];3&C&&f(0);for(var H=[g,d,w],L=2;L>-1;--L){var Z=C>>2+(L<<1)&3;if(1==Z){var q=new t([0,0,r[u++]]);H[L]={s:q.subarray(2,3),n:q.subarray(0,1),t:new e(q.buffer,0,1),b:0}}else 2==Z?(u=(s=y(r,u,9-(1&L)))[0],H[L]=s[1]):3==Z&&(n.t||f(0),H[L]=n.t[L])}var G=n.t=H,J=G[0],K=G[1],N=G[2],P=r[c-1];P||f(0);var Q=(c<<3)-8+b(P)-N.b,R=Q>>3,V=0,X=(r[R]|r[R+1]<<8)>>(7&Q)&(1<<N.b)-1,Y=(r[R=(Q-=K.b)>>3]|r[R+1]<<8)>>(7&Q)&(1<<K.b)-1,$=(r[R=(Q-=J.b)>>3]|r[R+1]<<8)>>(7&Q)&(1<<J.b)-1;for(++j;--j;){var _=N.s[X],rr=N.n[X],tr=J.s[$],er=J.n[$],nr=K.s[Y],ar=K.n[Y],sr=1<<nr,ir=sr+((r[R=(Q-=nr)>>3]|r[R+1]<<8|r[R+2]<<16|r[R+3]<<24)>>>(7&Q)&sr-1);R=(Q-=k[tr])>>3;var or=A[tr]+((r[R]|r[R+1]<<8|r[R+2]<<16)>>(7&Q)&(1<<k[tr])-1);R=(Q-=z[_])>>3;var ur=E[_]+((r[R]|r[R+1]<<8|r[R+2]<<16)>>(7&Q)&(1<<z[_])-1);if(R=(Q-=rr)>>3,X=N.t[X]+((r[R]|r[R+1]<<8)>>(7&Q)&(1<<rr)-1),R=(Q-=er)>>3,$=J.t[$]+((r[R]|r[R+1]<<8)>>(7&Q)&(1<<er)-1),R=(Q-=ar)>>3,Y=K.t[Y]+((r[R]|r[R+1]<<8)>>(7&Q)&(1<<ar)-1),ir>3)n.o[2]=n.o[1],n.o[1]=n.o[0],n.o[0]=ir-=3;else{var hr=ir-(0!=ur);hr?(ir=3==hr?n.o[0]-1:n.o[hr],hr>1&&(n.o[2]=n.o[1]),n.o[1]=n.o[0],n.o[0]=ir):ir=n.o[0]}for(L=0;L<ur;++L)D[V+L]=D[M+L];M+=ur;var fr=(V+=ur)-ir;if(fr<0){var lr=-fr,vr=n.e+fr;for(lr>or&&(lr=or),L=0;L<lr;++L)D[V+L]=n.w[vr+L];V+=lr,or-=lr,fr=0}for(L=0;L<or;++L)D[V+L]=D[fr+L];V+=or}if(V!=M)for(;M<D.length;)D[V++]=D[M++];else V=D.length;a?n.y+=V:D=i(D,0,V)}else if(a){if(n.y+=B,M)for(L=0;L<B;++L)D[L]=D[M+L]}else M&&(D=i(D,M));return n.b=c,D}f(2)}},S=function(r,e){if(1==r.length)return r[0];for(var n=new t(e),a=0,s=0;a<r.length;++a){var i=r[a];n.set(i,s),s+=i.length}return n};function B(r,t){for(var e=[],n=+!t,a=0,s=0;r.length;){var i=c(r,n||t);if("object"==typeof i){for(n?(t=null,i.w.length==i.u&&(e.push(t=i.w),s+=i.u)):(e.push(t),i.e=0);!i.l;){var o=F(r,i,t);o||f(5),t?i.e=i.y:(e.push(o),s+=o.length,u(i.w,0,o.length),i.w.set(o,i.w.length-o.length))}a=i.b+4*i.c}else a=i;r=r.subarray(a)}return S(e,s)}_e.decompress=B;var I=function(){function r(r){this.ondata=r,this.c=[],this.l=0,this.z=0}return r.prototype.push=function(r,e){if("number"==typeof this.s){var n=Math.min(r.length,this.s);r=r.subarray(n),this.s-=n}var a=r.length+this.l;if(!this.s){if(e){if(!a)return void this.ondata(new t(0),!0);a<5&&f(5)}else if(a<18)return this.c.push(r),void(this.l=a);if(this.l&&(this.c.push(r),r=S(this.c,a),this.c=[],this.l=0),"number"==typeof(this.s=c(r)))return this.push(r,e)}if("number"!=typeof this.s){if(a<(this.z||3))return e&&f(5),this.c.push(r),void(this.l=a);if(this.l&&(this.c.push(r),r=S(this.c,a),this.c=[],this.l=0),!this.z&&a<(this.z=2&r[this.s.b]?4:3+(r[this.s.b]>>3|r[this.s.b+1]<<5|r[this.s.b+2]<<13)))return e&&f(5),this.c.push(r),void(this.l=a);for(this.z=0;;){var s=F(r,this.s);if(!s){e&&f(5);var i=r.subarray(this.s.b);return this.s.b=0,this.c.push(i),void(this.l+=i.length)}if(this.ondata(s,!1),u(this.s.w,0,s.length),this.s.w.set(s,this.s.w.length-s.length),this.s.l){var o=r.subarray(this.s.b);return this.s=4*this.s.c,void this.push(o,e)}}}else e&&f(5)},r}();_e.Decompress=I;return _e});"""
+_RESOURCES = Path(__file__).parent / "resources"
+FZSTD_DECODER_CODE = (
+    "/*\n"
+    + (_RESOURCES / "fzstd.LICENSE").read_text(encoding="utf-8")
+    + "*/\n"
+    + (_RESOURCES / "fzstd.js").read_text(encoding="utf-8")
+)
 
 JS_SHARED = """
 function decodeBase91(encoded, expectedLength) {
@@ -163,7 +170,7 @@ function workerMain() {
         (header[4] & ~4) !== 0) throw new Error('Unsupported Zstd frame header.');
     const windowBase = 2 ** (10 + (header[5] >>> 3));
     const windowSize = windowBase + windowBase / 8 * (header[5] & 7);
-    if (windowSize > 2 ** meta.windowLog || windowSize > 2 ** 27) throw new Error('Zstd decoder window exceeds the configured limit.');
+    if (windowSize > 2 ** meta.windowLog || windowSize > 2 ** 25) throw new Error('Zstd decoder window exceeds the configured limit.');
     let output = [];
     const decoder = new self.fzstd.Decompress(bytes => {
       if (bytes.length > 131072) throw new Error('Oversized Zstd block.');
@@ -381,7 +388,102 @@ def make_footer(meta: dict[str, int]) -> bytes:
         "document.head.append(s);s.remove()"
         "}catch(e){document.getElementById('crunch-status').textContent='Unable to open compressed HTML: '+e.message;console.error(e)}},0),{once:true})</script></body></html>"
     )
-    return footer_text.encode("ascii")
+    manifest = (
+        '<script id="dojo-crunch-manifest" type="application/json">'
+        + json.dumps(meta, sort_keys=True)
+        + "</script>"
+    )
+    return (manifest + footer_text).encode("ascii")
+
+
+def decode_base91(encoded: str) -> bytes:
+    """Decode and reject noncanonical transport encoding."""
+    table = {char: index for index, char in enumerate(BASE91_ALPHABET)}
+    output = bytearray()
+    accumulator = bits = 0
+    pending = -1
+    for char in encoded:
+        if char not in table:
+            message = "Invalid Base91 payload character"
+            raise ValueError(message)
+        value = table[char]
+        if pending < 0:
+            pending = value
+            continue
+        pending += value * 91
+        accumulator |= pending << bits
+        bits += 13 if (pending & _BASE91_MASK_8191) > _BASE91_THRESHOLD else 14
+        while bits > _BASE91_TAIL_BITS:
+            output.append(accumulator & 255)
+            accumulator >>= 8
+            bits -= 8
+        pending = -1
+    if pending >= 0:
+        output.append((accumulator | pending << bits) & 255)
+    result = bytes(output)
+    if encode_base91(result) != encoded:
+        message = "Noncanonical Base91 payload"
+        raise ValueError(message)
+    return result
+
+
+def _crunch_manifest(value: str) -> dict[str, int]:
+    """Validate the transport manifest before allocating a decoder."""
+    raw: object = json.loads(value)
+    keys = {"chunks", "compressed", "size", "windowLog"}
+    if (
+        not isinstance(raw, dict)
+        or raw.keys() != keys
+        or any(type(value) is not int for value in raw.values())
+    ):
+        message = "Invalid compressed output manifest"
+        raise ValueError(message)
+    return cast("dict[str, int]", raw)
+
+
+def decode_html(text: str, *, max_size: int = 512 * 1024 * 1024) -> str:
+    """Inspect the actual compressed document without executing its JavaScript."""
+    chunks = re.findall(
+        r'<script type="application/octet-stream" data-crunch="([^"]+)">(.*?)</script>',
+        text,
+        re.DOTALL,
+    )
+    if not chunks:
+        if 'id="dojo-crunch-manifest"' in text:
+            message = "Compressed output has no payload chunks"
+            raise ValueError(message)
+        return text
+    manifest = re.search(
+        r'<script id="dojo-crunch-manifest" type="application/json">(.*?)</script>', text
+    )
+    if manifest is None:
+        message = "Compressed output lacks its validation manifest; rebuild it with current Dojo"
+        raise ValueError(message)
+    meta = _crunch_manifest(manifest[1])
+    if meta["chunks"] != len(chunks) or not 0 <= meta["size"] <= max_size:
+        message = "Invalid compressed document size or chunk count"
+        raise ValueError(message)
+    compressed = bytearray()
+    for index, (identity, payload) in enumerate(chunks):
+        ordinal, crc = identity.split(":")
+        data = decode_base91(payload)
+        if ordinal != base36_encode(index) or zlib.crc32(data) != int(crc, 16):
+            message = "Corrupt or out-of-order compressed payload"
+            raise ValueError(message)
+        compressed.extend(data)
+    if len(compressed) != meta["compressed"]:
+        message = "Compressed payload length mismatch"
+        raise ValueError(message)
+    try:
+        with zstd.ZstdDecompressor().stream_reader(io.BytesIO(compressed)) as stream:
+            restored = stream.read(meta["size"] + 1)
+    except zstd.ZstdError as error:
+        message = f"Invalid Zstandard payload: {error}"
+        raise ValueError(message) from error
+    if len(restored) != meta["size"]:
+        message = "Decompressed payload length mismatch"
+        raise ValueError(message)
+    return restored.decode("utf-8")
 
 
 def chunked_reader(file_obj: BinaryIO, chunk_size: int = 65536) -> Iterator[bytes]:
@@ -433,7 +535,7 @@ class _ChunkBuffer:
 def generate_payloads(
     input_stream: BinaryIO,
     level: int = 22,
-    window_log: int = 26,
+    window_log: int = 25,
     expected_size: int | None = None,
 ) -> Iterator[bytes]:
     """Yield compressed HTML byte chunks in streaming fashion.
@@ -441,7 +543,7 @@ def generate_payloads(
     Args:
         input_stream: Binary input stream containing UTF-8 HTML.
         level: Zstandard compression level (1-22).
-        window_log: Decoder window log size (10-27).
+        window_log: Decoder window log size (10-25).
         expected_size: Optional expected byte count for integrity check.
 
     Yields:
@@ -453,6 +555,9 @@ def generate_payloads(
         StreamSizeMismatchError: If stream size differs from expected_size.
 
     """
+    if not 10 <= window_log <= 25:  # noqa: PLR2004 - fzstd supports a maximum 32 MiB window
+        message = "Browser decoder requires window_log between 10 and 25"
+        raise ValueError(message)
     utf8_decoder = codecs.getincrementaldecoder("utf-8")("strict")
 
     params = zstd.ZstdCompressionParameters.from_level(
@@ -549,7 +654,7 @@ def crunch_file(
     input_target: str | Path | None = None,
     output_target: str | Path | None = None,
     level: int = 22,
-    window_log: int = 26,
+    window_log: int = 25,
 ) -> None:
     """Compress HTML file or stdin to self-extracting HTML file or stdout.
 
@@ -557,7 +662,7 @@ def crunch_file(
         input_target: Path to input HTML file, or None / '-' for stdin.
         output_target: Path to output HTML file, or None / '-' for stdout.
         level: Zstandard compression level (1-22).
-        window_log: Window log size (10-27).
+        window_log: Window log size (10-25).
 
     Raises:
         SameInputOutputError: If input and output refer to the same file.
@@ -595,7 +700,7 @@ def main(argv: list[str] | None = None) -> None:
         epilog=(
             'Input defaults to stdin; an explicit "-" is accepted. Output files are replaced\n'
             "atomically only after successful compression. Do not redirect stdout over input.\n\n"
-            "The default is maximum compression (--level 22 --window-log 26) with multi-threading.\n"
+            "The default is maximum compression (--level 22 --window-log 25) with multi-threading.\n"
             "Output includes its self-contained decoder and needs no external dependencies or CDN."
         ),
     )
@@ -622,10 +727,10 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--window-log",
         type=int,
-        default=26,
-        choices=range(10, 28),
-        metavar="10-27",
-        help="Decoder history: 2^N bytes (default: 26 = 64 MiB)",
+        default=25,
+        choices=range(10, 26),
+        metavar="10-25",
+        help="Decoder history: 2^N bytes (default: 25 = 32 MiB)",
     )
 
     args = parser.parse_args(argv)

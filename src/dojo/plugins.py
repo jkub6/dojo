@@ -6,8 +6,11 @@ post-processing filters.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import logging
+import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -17,6 +20,44 @@ if TYPE_CHECKING:
 from .exceptions import PluginLoadError
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class BuildContext:
+    """Stable project context shared by preparation plugins for one generation."""
+
+    config: Config
+    config_path: Path
+    project_root: Path
+    src_dir: Path
+    build_dir: Path
+    output_dir: Path
+    sources: tuple[Path, ...]
+    refresh: bool = False
+
+    def ast_path(self, source: Path) -> Path:
+        """Return the canonical AST product for a discovered source."""
+        return self.build_dir / source.relative_to(self.src_dir).with_suffix(".json")
+
+
+@dataclass(frozen=True)
+class PreparedInput:
+    """Declared preparation products and domain metadata for one source."""
+
+    source: Path
+    inputs: tuple[Path, ...] = ()
+    metadata: dict[str, str] = field(default_factory=dict)
+    assets: dict[Path, Path] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class BuildContribution:
+    """A plugin's declarative additions, without mutation of host configuration."""
+
+    prepared: tuple[PreparedInput, ...] = ()
+    static_dirs: tuple[Path, ...] | None = None
+    provenance: tuple[Path, ...] = ()
+    assets: dict[Path, Path] = field(default_factory=dict)
 
 
 class PluginInterface:
@@ -66,6 +107,13 @@ class PluginInterface:
             src_dir: Source directory root (absolute)
 
         """
+
+    def prepare(self, context: BuildContext) -> BuildContribution:
+        """Prepare declared products. Legacy hooks remain supported for migration."""
+        self.pre_generate(
+            context.config, context.build_dir, refresh=context.refresh, src_dir=context.src_dir
+        )
+        return BuildContribution()
 
     def modify_compile_edge(
         self,
@@ -174,14 +222,18 @@ def load_plugin(plugin_path: str, base_dir: Path | None = None) -> PluginInterfa
     if not path.exists():
         raise PluginLoadError(plugin_path, f"file not found: {path}")
 
-    spec = importlib.util.spec_from_file_location("plugin", path)
+    spec = importlib.util.spec_from_file_location(
+        "dojo_plugin_" + hashlib.sha256(str(path).encode()).hexdigest(), path
+    )
     if spec is None or spec.loader is None:
         raise PluginLoadError(plugin_path, f"failed to create import spec: {path}")
 
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     try:
         spec.loader.exec_module(module)
     except Exception as e:
+        sys.modules.pop(spec.name, None)
         raise PluginLoadError(plugin_path, str(e)) from e
 
     # Look for a class that inherits from PluginInterface

@@ -13,7 +13,7 @@ from pathlib import Path
 from .exceptions import UnknownResourceCategoryError
 
 # Standard Pandoc data directory names
-RESOURCE_CATEGORIES = {"defaults", "templates", "filters"}
+RESOURCE_CATEGORIES = {"defaults", "templates", "filters", "csl"}
 
 # Cache size for resource lookups
 _CACHE_SIZE = 256

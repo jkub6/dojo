@@ -109,3 +109,30 @@ def should_process_file(
 
     # Check if matches ANY include pattern
     return any(fnmatch.fnmatch(rel_str, pattern) for pattern in includes)
+
+
+def source_files(root: Path, includes: list[str], excludes: list[str]) -> list[Path]:
+    """Prune excluded subtrees before traversing an authoring vault."""
+    result: list[Path] = []
+    for directory, children, files in root.walk():
+        children[:] = [
+            name
+            for name in children
+            if not any(
+                fnmatch.fnmatch((directory / name).relative_to(root).as_posix(), pattern)
+                or (
+                    pattern.endswith("/*")
+                    and fnmatch.fnmatch(
+                        (directory / name).relative_to(root).as_posix(), pattern[:-2]
+                    )
+                )
+                for pattern in excludes
+            )
+        ]
+        result.extend(
+            directory / name
+            for name in files
+            if name.endswith(".md")
+            and should_process_file(directory / name, root, includes, excludes)
+        )
+    return sorted(result)

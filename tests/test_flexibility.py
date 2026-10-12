@@ -2,10 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from dojo.config import Config
+from dojo.config import Config, CustomRule
 from dojo.core import NinjaGenerator
 from dojo.exceptions import DefaultsRequiredError
-from dojo.paths import ninja_escape, shell_quote
 
 
 @pytest.fixture
@@ -50,12 +49,9 @@ def test_multiple_defaults_generation(flex_config):
 
     ninja_content = generator.ninja_file.read_text()
 
-    # Check that defaults variable contains both files joined by -d
-    # -d 'd1.yaml' -d 'd2.yaml'
-    d1_flag = f"-d {shell_quote(Path(config.src_dir).parent / 'd1.yaml')}"
-    d2_flag = f"-d {shell_quote(Path(config.src_dir).parent / 'd2.yaml')}"
-    expected_flag_part = f"{ninja_escape(d1_flag)} {ninja_escape(d2_flag)}"
-    assert expected_flag_part in ninja_content
+    assert len(list((Path(config.build_dir) / "defaults").glob("*.yaml"))) == 2
+    assert str(Path(config.src_dir).parent / "d1.yaml") in ninja_content
+    assert str(Path(config.src_dir).parent / "d2.yaml") in ninja_content
 
 
 def test_optional_defaults(tmp_path):
@@ -111,25 +107,19 @@ def test_multiple_sources_generation(tmp_path):
             "md": {
                 "outputs": [
                     {"id": "p1", "extension": "html", "defaults": str(d1)},
-                    {"id": "p2", "extension": "html", "defaults": str(d1)},
+                    {"id": "p2", "extension": "html", "suffix": "-second", "defaults": str(d1)},
                     {"extension": "pdf", "source": ["p1", "p2"], "tool": "merge_tool"},
                 ],
             },
         },
     )
 
+    conf.custom_rules = [CustomRule(name="merge_tool", command="cat $in > $out")]
     generator = NinjaGenerator(conf, tmp_path / "dojo.yaml")
     (src / "doc.md").touch()
 
     generator.generate()
     content = generator.ninja_file.read_text()
 
-    # Verify the build rule has multiple source inputs
-    # path/to/p1.html path/to/p2.html
-    # But note: core.py uses sanitize_path which puts them in output_dir
-    # doc.html is generated for both? No, suffix is empty for both...
-    # Wait, if p1 and p2 have same suffix="", they collide?
-    # Config validation doesn't check collision, but filesystem will overwrite.
-    # For this test, it doesn't matter, we check the rule logic.
-
-    assert "build" in content
+    assert "merge_tool" in content
+    assert "doc-second.html" in content

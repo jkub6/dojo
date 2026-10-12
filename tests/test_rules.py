@@ -23,7 +23,7 @@ def test_builtin_rules_basic():
 
     # Verify dojo wrap injection
     assert "wrap.py" in compile_rule.command
-    assert "--in-file $in_shell --out-file $out_shell" in compile_rule.command
+    assert "--in-file $in_shell $additional_inputs --out-file $out_shell" in compile_rule.command
     assert "-V root={root_val} -M root={root_val}" in compile_rule.command
 
 
@@ -145,7 +145,7 @@ def test_builtin_rules_ghostscript():
     assert "-dNOPAUSE" in gs_rule.command
     assert "-dQUIET" in gs_rule.command
     assert "-dBATCH" in gs_rule.command
-    assert "$args -sOutputFile={out_abs} {in_abs}" in gs_rule.command
+    assert "$args -sOutputFile={out_abs} {in_all}" in gs_rule.command
     assert gs_rule.pool == "heavy"
 
 

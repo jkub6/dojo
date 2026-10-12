@@ -83,7 +83,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     # We use the absolute path to wrap.py to avoid dependency on PYTHONPATH or dojo module
     dojo_wrap_base = (
         f"{shell_quote(sys.executable)} {shell_quote(wrap_script)} {path_prefix}"
-        f"--in-file $in_shell --out-file $out_shell "
+        f"--atomic --in-file $in_shell $additional_inputs --out-file $out_shell "
         f"--src-dir {shell_quote(abs_src)} "
         f"--out-dir {shell_quote(abs_out)} "
         f"--build-dir {shell_quote(abs_build_dir)} "
@@ -93,10 +93,11 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
 
     # REGENERATE rule uses the full dojo CLI
     dojo_src = Path(__file__).parent.parent.resolve().as_posix()
-    python_env = f"PYTHONPATH={shell_quote(dojo_src)}"
-    regen_cmd = f"{python_env} {shell_quote(sys.executable)} -m dojo build --generate-only -c {config_path.as_posix()}"
+    python_env = f'PYTHONPATH={shell_quote(dojo_src)}:"$$PYTHONPATH"'
+    regen_cmd = f"{python_env} {shell_quote(sys.executable)} -m dojo build --generate-only -c {shell_quote(config_path.as_posix())}"
 
     base_flags = "-V root={root_val} -M root={root_val}"
+    base_flags += f" -M dojo-project-root={shell_quote(str(config_path.parent))} -M dojo-build-dir={shell_quote(abs_build_dir)}"
     if config.pandoc_data_dir:
         base_flags += f" --data-dir={shell_quote(config.pandoc_data_dir)}"
 
@@ -128,7 +129,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
             command=(
                 f"{dojo_wrap_base} --ensure-dir {shell_quote(abs_build_dir)} --cwd {shell_quote(abs_build_dir)} -- "
                 f"{pandoc_wrapper} {{in_abs}} $defaults -t json -o {{out_abs}} "
-                f"-M depfile={{out_abs}}.d -M target={{out_abs}} {compile_flags} "
+                f"-M depfile=$out_shell.d -M target=$out_shell {compile_flags} "
                 f"--lua-filter {shell_quote(dep_filter.as_posix())}"
             ),
             description="🧠 COMPILE $in",
@@ -143,17 +144,19 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     render_flags.extend(_get_typst_flags(config))
 
     if config.add_resource_path:
-        render_flags.append("--resource-path=.:{in_abs_dir}:{src_dir_val}:{src_dir}")
+        render_flags.append(
+            "--resource-path=.:{publication_dir}:{in_abs_dir}:{src_dir_val}:{src_dir}"
+        )
 
     # Media Extraction for generated diagrams (diagram.lua)
-    render_flags.append("--extract-media=media")
+    render_flags.append("--extract-media=$media_dir")
 
     rules.append(
         CustomRule(
             name=RuleName.RENDER.value,
             command=(
-                f"{dojo_wrap_base} --ensure-dir {{out_abs_dir}} --cwd {{out_abs_dir}} -- "
-                f"{pandoc_wrapper} {{in_abs}} $defaults -o {{out_abs}} {' '.join(render_flags)} "
+                f"{dojo_wrap_base} --media-dir $media_dir --publication-file $publication_shell --ensure-dir {{out_abs_dir}} --cwd {{publication_dir}} -- "
+                f"{pandoc_wrapper} {{in_abs}} $defaults $args -o {{out_abs}} {' '.join(render_flags)} "
                 "-M dojo-document-stem=$dojo_stem"
             ),
             description="🎨 RENDER $out",
@@ -203,7 +206,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
                     "-sColorConversionStrategy=LeaveColorUnchanged "
                     "-dCompressFonts=true -dSubsetFonts=true "
                     "-dDetectDuplicateImages=true "
-                    "-dNOPAUSE -dQUIET -dBATCH $args -sOutputFile={out_abs} {in_abs}"
+                    "-dNOPAUSE -dQUIET -dBATCH $args -sOutputFile={out_abs} {in_all}"
                 ),
                 description="🗜️  COMPRESS $out",
                 pool=get_pool(RuleName.GHOSTSCRIPT.value),
@@ -231,7 +234,7 @@ def get_builtin_rules(config: Config, config_path: Path) -> list[CustomRule]:
     rules.append(
         CustomRule(
             name=RuleName.STAMP.value,
-            command=f"{shell_quote(sys.executable)} -c 'from pathlib import Path; Path(\"$out\").touch()'",
+            command=f"{shell_quote(sys.executable)} -c 'import sys; from pathlib import Path; Path(sys.argv[1]).touch()' $out",
             description="📌 STAMP $out",
         )
     )

@@ -61,6 +61,7 @@ class AssetProcessor:
         self.emitter = emitter
         self.copied_assets = copied_assets
         self.all_outputs = all_outputs
+        self.owners: dict[Path, Path] = {}
 
     def process_assets(self, md_path: Path) -> list[Path]:
         """Process and copy assets referenced by a Markdown file.
@@ -118,20 +119,7 @@ class AssetProcessor:
             final_path = sanitize_path(self.out_dir, rel_asset)
             output_assets.append(final_path)
 
-            # Global deduplication: Only emit COPY rule once per build
-            if final_path not in self.copied_assets:
-                self.emitter.build(
-                    outputs=final_path,
-                    rule=RuleName.COPY.value,
-                    inputs=asset,
-                    variables={
-                        "in_shell": ninja_quote(asset),
-                        "out_shell": ninja_quote(final_path),
-                    },
-                )
-                self.copied_assets.add(final_path)
-                self.all_outputs.append(final_path)
-                self.emitter.newline()
+            self.copy_assets({asset: rel_asset})
 
             # Smart Scanning: Look for nested dependencies
             if asset.suffix.lower() == ".css":
@@ -172,23 +160,31 @@ class AssetProcessor:
                 except ValueError:
                     continue
 
-                if any(part.startswith(".") for part in rel_file.parts):
-                    continue
-
                 final_path = sanitize_path(self.out_dir, rel_file)
                 static_outputs.append(final_path)
 
-                if final_path not in self.copied_assets:
-                    self.emitter.build(
-                        outputs=final_path,
-                        rule=RuleName.COPY.value,
-                        inputs=file,
-                        variables={
-                            "in_shell": ninja_quote(file),
-                            "out_shell": ninja_quote(final_path),
-                        },
-                    )
-                    self.copied_assets.add(final_path)
-                    self.all_outputs.append(final_path)
+                self.copy_assets({file: rel_file})
 
         return static_outputs
+
+    def copy_assets(self, assets: dict[Path, Path]) -> None:
+        """Copy declared source -> publication-relative assets with collision checks."""
+        for source, relative in sorted(assets.items()):
+            destination = sanitize_path(self.out_dir, relative)
+            owner = self.owners.get(destination)
+            if owner is not None and owner != source:
+                msg = f"Conflicting asset destination: {destination}"
+                raise ValueError(msg)
+            self.owners[destination] = source
+            if destination not in self.copied_assets:
+                self.copied_assets.add(destination)
+                self.all_outputs.append(destination)
+                self.emitter.build(
+                    outputs=destination,
+                    rule=RuleName.COPY.value,
+                    inputs=source,
+                    variables={
+                        "in_shell": ninja_quote(source),
+                        "out_shell": ninja_quote(destination),
+                    },
+                )

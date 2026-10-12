@@ -220,6 +220,7 @@ def test_css_urls_parsing() -> None:
         background: url(unquoted.png);
         background-image: url('single_quoted.png');
         cursor: url("double_quoted.png");
+        filter: url(#conditionally-created-shadow);
     }
     """
     extracted = css_urls(css)
@@ -229,6 +230,7 @@ def test_css_urls_parsing() -> None:
     assert "single_quoted.png" in extracted
     assert "double_quoted.png" in extracted
     assert "ignore.png" not in extracted
+    assert "#conditionally-created-shadow" not in extracted
 
 
 def test_path_traversal_outside_root(tmp_path: Path) -> None:
@@ -264,8 +266,8 @@ def test_linked_resources_multiple_css_in_page(tmp_path: Path) -> None:
     assert any("missing local resource missing2.css" in e for e in errors)
 
 
-def test_validate_output_ignores_hidden_and_temporary_files(tmp_path: Path) -> None:
-    """Hidden files, dotfiles, and intermediate .dojo-tmp-* files are ignored when validating directory."""
+def test_validate_output_checks_all_published_html_and_css(tmp_path: Path) -> None:
+    """Filename conventions must never hide a broken publication from validation."""
     site = tmp_path / "_site"
     site.mkdir()
     (site / "index.html").write_text(
@@ -281,4 +283,5 @@ def test_validate_output_ignores_hidden_and_temporary_files(tmp_path: Path) -> N
     )
     (hidden_dir / "cache.css").write_text("body { background: url('missing.png'); }")
     errors = validate_output(site)
-    assert errors == []
+    assert any("duplicate HTML id" in error for error in errors)
+    assert sum("missing.png" in error for error in errors) == 2

@@ -36,7 +36,7 @@ class TestRenderStage:
         rel_stem = Path("pages/index")
         local_registry = {}
 
-        with patch("dojo.stages._defaults.get_recursive_yaml_deps", return_value=[]):
+        with patch("dojo.stages.render.resolve_stage_dependencies", return_value=("", [])):
             stage.render(out_config, json_node, rel_stem, local_registry)
 
         # Verify ninja rule was emitted
@@ -85,7 +85,7 @@ class TestRenderStage:
             post_process=[PipelineStep(tool="minify", args=["--fast"])],
         )
 
-        with patch("dojo.stages._defaults.get_recursive_yaml_deps", return_value=[]):
+        with patch("dojo.stages.render.resolve_stage_dependencies", return_value=("", [])):
             stage.render(out_config, Path("in.json"), Path("index"), {})
 
         # Should call emitter twice: once for RENDER, once for MINIFY
@@ -407,7 +407,7 @@ class TestAssetProcessor:
         assert out / "shared.png" in outputs
 
     def test_process_static_assets_hidden_files_and_directories(self, mock_emitter, tmp_path):
-        """Verify process_static_assets skips directories, hidden files, and already copied assets."""
+        """Verify process_static_assets copies intentional dot paths and skips already copied assets."""
         src = tmp_path / "src"
         src.mkdir()
         out = tmp_path / "out"
@@ -434,7 +434,9 @@ class TestAssetProcessor:
         results = processor.process_static_assets(["static"])
         assert out / "visible.txt" in results
         # Emitter should NOT have built visible.txt since it was in copied_assets
-        mock_emitter.build.assert_not_called()
+        assert mock_emitter.build.call_count == 2
+        assert out / ".hidden.txt" in results
+        assert out / ".hidden_dir/nested.txt" in results
 
     def test_process_static_assets_relative_to_value_error(self, mock_emitter, tmp_path):
         """Verify process_static_assets skips files if relative_to raises ValueError."""
