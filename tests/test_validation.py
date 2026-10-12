@@ -262,3 +262,23 @@ def test_linked_resources_multiple_css_in_page(tmp_path: Path) -> None:
     errors = validate_output(page)
     assert any("missing local resource missing1.css" in e for e in errors)
     assert any("missing local resource missing2.css" in e for e in errors)
+
+
+def test_validate_output_ignores_hidden_and_temporary_files(tmp_path: Path) -> None:
+    """Hidden files, dotfiles, and intermediate .dojo-tmp-* files are ignored when validating directory."""
+    site = tmp_path / "_site"
+    site.mkdir()
+    (site / "index.html").write_text(
+        "<!DOCTYPE html><html><body><h1 id='title'>OK</h1></body></html>"
+    )
+    (site / ".dojo-tmp-index.html.0.html").write_text(
+        "<!DOCTYPE html><html><body><h1 id='dup'>A</h1><h1 id='dup'>B</h1></body></html>"
+    )
+    hidden_dir = site / ".cache"
+    hidden_dir.mkdir()
+    (hidden_dir / "cache.html").write_text(
+        "<!DOCTYPE html><html><body><img src='missing.png'></body></html>"
+    )
+    (hidden_dir / "cache.css").write_text("body { background: url('missing.png'); }")
+    errors = validate_output(site)
+    assert errors == []

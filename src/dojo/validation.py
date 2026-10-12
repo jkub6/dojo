@@ -116,7 +116,15 @@ def linked_resources(
 ) -> list[tuple[Path, list[tuple[str, str]]]]:
     """Traverse all stylesheets and extract recursively linked resources."""
     resources = [(path, page.urls) for path, page in pages.items()]
-    queue: list[Path] = [] if single_file else list(root.rglob("*.css"))
+    queue: list[Path] = (
+        []
+        if single_file
+        else [
+            p
+            for p in sorted(root.rglob("*.css"))
+            if not any(part.startswith(".") for part in p.relative_to(root).parts)
+        ]
+    )
     seen: set[Path] = set()
     index = 0
     while index < len(resources) or queue:
@@ -163,7 +171,15 @@ def validate_output(
     """
     root = root.resolve()
     single_file = root.is_file()
-    paths = [root] if single_file else sorted(root.rglob("*.html"))
+    paths = (
+        [root]
+        if single_file
+        else [
+            p
+            for p in sorted(root.rglob("*.html"))
+            if not any(part.startswith(".") for part in p.relative_to(root).parts)
+        ]
+    )
     if not paths:
         return [f"{root}: no HTML output found"]
     if root.is_file():
