@@ -91,7 +91,7 @@ def find_resource(
     This function is cached for performance. Use clear_resource_cache() to reset.
 
     Search precedence (based on Pandoc behavior):
-    1. Exact path (if name contains directory separators or is absolute) inside CWD or root contexts.
+    1. Exact path inside the supplied project contexts (CWD only when none are supplied).
     2. Data Directories (User XDG, System, and optionally CWD depending on category).
        Checks inside 'category' subdirectories.
 
@@ -164,15 +164,10 @@ def _check_path_reference(
 
     if len(path_obj.parts) > 1:
         # Relative path with separators (e.g. "foo/bar.yaml")
-        cwd_path = Path.cwd() / path_obj
-        if cwd_path.exists():
-            return True, cwd_path.resolve()
-
-        if root_contexts:
-            for root in root_contexts:
-                rel_path = root / path_obj
-                if rel_path.exists():
-                    return True, rel_path.resolve()
+        for root in root_contexts or [Path.cwd()]:
+            rel_path = root / path_obj
+            if rel_path.is_file():
+                return True, rel_path.resolve()
 
     return False, None
 

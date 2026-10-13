@@ -37,6 +37,8 @@ ASSET_KEYS = [
     "include-before",
     "include-after",
     "metadata-files",
+    "abbreviations",
+    "citation-abbreviations",
 ]
 
 # Only these inputs are also linked publication assets.

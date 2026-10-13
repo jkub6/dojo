@@ -434,18 +434,15 @@ def order_outputs(name: str, outputs: list[OutputConfig]) -> list[OutputConfig]:
         if any(c in out.extension + out.suffix for c in "/\\\n\r"):
             message = "Output extensions and suffixes cannot contain path separators"
             raise ValueError(message)
-    by_id = {out.id or f"{out.suffix}.{out.extension}": out for out in outputs}
-    graph = {
-        key: [out.source] if isinstance(out.source, str) else out.source or []
-        for key, out in by_id.items()
-    }
-    references = {parent for parents in graph.values() for parent in parents}
-    declared = {out.id for out in outputs if out.id}
-    if unknown := references - declared:
+    by_id = {out.id: index for index, out in enumerate(outputs) if out.id}
+    parents = [[out.source] if isinstance(out.source, str) else out.source or [] for out in outputs]
+    references = {parent for group in parents for parent in group}
+    if unknown := references - by_id.keys():
         message = f"Unknown output source in {name!r}: {sorted(unknown)}"
         raise ValueError(message)
     try:
-        return [by_id[key] for key in TopologicalSorter(graph).static_order()]
+        graph = {index: [by_id[parent] for parent in group] for index, group in enumerate(parents)}
+        return [outputs[index] for index in TopologicalSorter(graph).static_order()]
     except CycleError as error:
         message = f"Cyclic output dependency in {name!r}: {error}"
         raise ValueError(message) from error

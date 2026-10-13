@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import os
 import sys
+import tarfile
 
 import pytest
 
+from dojo import artifacts
 from dojo.artifacts import (
     MANIFEST_NAME,
     Artifact,
@@ -190,3 +192,40 @@ def test_atomic_media_publication_replaces_only_its_owned_directory(tmp_path):
     assert output.read_text() == ".."
     assert (media / "new.svg").exists()
     assert not (media / "obsolete.svg").exists()
+
+
+def test_package_rechecks_archived_bytes_and_preserves_previous_release(tmp_path, monkeypatch):
+    output = tmp_path / "site"
+    output.mkdir()
+    page = output / "index.html"
+    page.write_text("<p>Approved publication</p>")
+    finalize_publication(output, tmp_path / "build", [page], {}, Publication())
+    archive = tmp_path / "release.txz"
+    archive.write_bytes(b"previous release")
+    original_checksum = artifacts.checksum
+
+    def mutate_after_check(path):
+        value = original_checksum(path)
+        if path == page:
+            page.write_text("<p>Concurrent change</p>")
+        return value
+
+    monkeypatch.setattr(artifacts, "checksum", mutate_after_check)
+    with pytest.raises(ValueError, match="changed since"):
+        package_publication(output, archive)
+    assert archive.read_bytes() == b"previous release"
+
+
+def test_package_without_html_still_checks_inventory(tmp_path):
+    output = tmp_path / "site"
+    output.mkdir()
+    document = output / "data.json"
+    document.write_text('{"result":42}')
+    finalize_publication(output, tmp_path / "build", [document], {}, Publication())
+    archive = tmp_path / "release.txz"
+    package_publication(output, archive)
+    with tarfile.open(archive) as tar:
+        assert tar.getnames() == ["data.json", MANIFEST_NAME]
+    document.write_text("changed")
+    with pytest.raises(ValueError, match="changed since"):
+        package_publication(output, archive)

@@ -105,6 +105,33 @@ def repair_media(output: Path, build: Path, previous: Publication) -> None:
             producer.unlink(missing_ok=True)
 
 
+def check_publication_paths(output: Path, outputs: list[Path]) -> None:
+    """Reserve engine-owned metadata before any publication files are replaced."""
+    for path in outputs:
+        relative = path.relative_to(output)
+        if (
+            not relative.parts
+            or relative == Path(MANIFEST_NAME)
+            or relative.parts[0] == "provenance"
+        ):
+            message = f"Reserved publication path: {relative}"
+            raise ValueError(message)
+
+
+def reconcile_outputs(output: Path, outputs: list[Path], previous: Publication) -> None:
+    """Remove obsolete owned graph products before consumers observe stale resources.
+
+    Older inventories did not distinguish assets from rendered publications.
+    Dynamic media and provenance are reconciled separately during finalization.
+    """
+    current = {path.relative_to(output).as_posix() for path in outputs}
+    for old in previous.artifacts:
+        if old.role in {"asset", "publication", "legacy"} and old.path not in current:
+            path = sanitize_path(output, Path(old.path))
+            if path.is_file() and checksum(path) == old.sha256:
+                path.unlink()
+
+
 def finalize_publication(  # noqa: PLR0913 - the publication transaction names its roots and products
     output: Path,
     build: Path,
@@ -113,12 +140,18 @@ def finalize_publication(  # noqa: PLR0913 - the publication transaction names i
     previous: Publication,
     *,
     provenance: tuple[Path, ...] = (),
+    assets: set[Path] | None = None,
 ) -> Publication:
     """Record successful outputs and reconcile only previously owned files."""
+    check_publication_paths(output, outputs)
     records = {}
     for path in outputs:
         relative_path = path.relative_to(output)
-        records[str(relative_path)] = Artifact(path=relative_path.as_posix(), sha256=checksum(path))
+        records[str(relative_path)] = Artifact(
+            path=relative_path.as_posix(),
+            sha256=checksum(path),
+            role="asset" if assets and path in assets else "publication",
+        )
     for directory, producer in media.items():
         for path in sorted(directory.rglob("*")):
             if path.is_file():
@@ -150,6 +183,14 @@ def finalize_publication(  # noqa: PLR0913 - the publication transaction names i
     return publication
 
 
+def _verify_inventory(output: Path, publication: Publication) -> None:
+    for item in publication.artifacts:
+        path = sanitize_path(output, Path(item.path))
+        if not path.is_file() or checksum(path) != item.sha256:
+            message = f"Publication changed since its successful build: {item.path}"
+            raise ValueError(message)
+
+
 def package_publication(
     output: Path, archive: Path, *, links: bool = False, offline: bool = False
 ) -> None:
@@ -160,11 +201,7 @@ def package_publication(
         raise ValueError(message)
     publication = load_publication(manifest)
     paths = [item.path for item in publication.artifacts]
-    for item in publication.artifacts:
-        path = sanitize_path(output, Path(item.path))
-        if not path.is_file() or checksum(path) != item.sha256:
-            message = f"Publication changed since its successful build: {item.path}"
-            raise ValueError(message)
+    _verify_inventory(output, publication)
     paths.append(MANIFEST_NAME)
     archive.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="dojo-package-", dir=archive.parent) as temporary:
@@ -186,7 +223,16 @@ def package_publication(
         extracted = staging / "extracted"
         with tarfile.open(packed) as tar:
             tar.extractall(extracted, filter="data")
-        errors = validate_output(extracted, links=links, offline=offline)
+        # Validate the bytes actually archived, including a concurrently changed manifest.
+        if load_publication(extracted / MANIFEST_NAME) != publication:
+            message = "Publication inventory changed while packaging"
+            raise ValueError(message)
+        _verify_inventory(extracted, publication)
+        errors = (
+            validate_output(extracted, links=links, offline=offline)
+            if any(extracted.rglob("*.html"))
+            else []
+        )
         if errors:
             raise ValueError("\n".join(errors))
         packed.replace(archive)

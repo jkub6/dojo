@@ -201,7 +201,10 @@ def _setup_env(path_env: str | None) -> dict[str, str]:
 def _handle_copy(src: str, dst: str) -> None:
     """Perform a file copy operation."""
     try:
-        shutil.copy2(src, dst)
+        # Preserve permissions, but let a successful build establish a fresh mtime.
+        # Copying the source timestamp leaves outputs older than rule dependencies
+        # and makes Ninja rebuild old assets and all their consumers indefinitely.
+        shutil.copy(src, dst)
         sys.exit(0)
     except OSError as e:
         sys.stderr.write(f"dojo wrap copy error: {e}\n")

@@ -17,9 +17,11 @@ from tqdm import tqdm
 
 from .artifacts import (
     MANIFEST_NAME,
+    check_publication_paths,
     finalize_publication,
     import_legacy_publication,
     load_publication,
+    reconcile_outputs,
     repair_media,
 )
 from .constants import RuleName
@@ -558,20 +560,23 @@ class NinjaGenerator:
         # Stage 2b: Plugin extra assets
         self._process_plugin_extra_assets()
 
-        # Optimization: Create a stamp file to represent all static assets.
-        # A shared prerequisite keeps generated edges compact.
-        stamp_path = self.build_dir / ".static_assets.stamp"
-        if static_outputs:
-            self.emitter.comment("Group static assets into a single stamp for cleaner dependencies")
-            self.emitter.build(
-                outputs=stamp_path,
-                rule=RuleName.STAMP.value,
-                inputs=static_outputs,
-            )
-            self.emitter.newline()
-            static_deps = stamp_path
-        else:
-            static_deps = None
+        # Membership is an input too: Ninja otherwise misses removals, including
+        # the transition to zero assets. Keep the stamp present for every graph.
+        membership = self.build_dir / "static-assets.txt"
+        write_changed(
+            membership,
+            "".join(
+                path.relative_to(self.out_dir).as_posix() + "\n"
+                for path in sorted(set(static_outputs))
+            ),
+        )
+        static_deps = self.build_dir / ".static_assets.stamp"
+        self.emitter.build(
+            outputs=static_deps,
+            rule=RuleName.STAMP.value,
+            inputs=[membership, *sorted(set(static_outputs))],
+        )
+        self.emitter.newline()
 
         # Stage 3: Content processing
         filtered_files = list(self.sources)
@@ -616,6 +621,8 @@ class NinjaGenerator:
         for plugin in self.plugins:
             ninja_content = plugin.post_process_ninja(ninja_content)
 
+        check_publication_paths(self.out_dir, self.all_outputs)
+        reconcile_outputs(self.out_dir, self.all_outputs, self.previous_publication)
         repair_media(self.out_dir, self.build_dir, self.previous_publication)
         inventory_path = self.build_dir / "publication.json"
         if not inventory_path.exists() and self.previous_publication.artifacts:
@@ -661,6 +668,7 @@ class NinjaGenerator:
             self.all_outputs,
             self._render_stage.media_producers,
             self.previous_publication,
+            assets=self.copied_assets,
             provenance=tuple(
                 path for contribution in self.contributions for path in contribution.provenance
             ),

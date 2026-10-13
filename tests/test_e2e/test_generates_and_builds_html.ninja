@@ -50,12 +50,14 @@ rule stamp
   command = [PYTHON_BIN] -c 'import sys; from pathlib import Path; Path(sys.argv[1]).touch()' $out
   description = 📌 STAMP $out
 
+build [PROJECT_ROOT]/_build/.static_assets.stamp: stamp [PROJECT_ROOT]/_build/static-assets.txt
+
 # Source: [PROJECT_ROOT]/content/index.md
 build [PROJECT_ROOT]/_build/index.json: compile [PROJECT_ROOT]/content/index.md | [DOJO_ROOT]/src/dojo/resources/dependencies.lua [TOOL_PANDOC] [DOJO_ROOT]/src/dojo/wrap.py
   in_shell = [PROJECT_ROOT]/content/index.md
   out_shell = [PROJECT_ROOT]/_build/index.json
 
-build [PROJECT_ROOT]/_site/index.html: render [PROJECT_ROOT]/_build/index.json | [PROJECT_ROOT]/_build/defaults/[DEFAULTS_HASH].yaml [PROJECT_ROOT]/defaults/page.yaml [DOJO_ROOT]/src/dojo/resources/fix_typst_csl.lua [DOJO_ROOT]/src/dojo/resources/format_links.lua [TOOL_PANDOC] [TOOL_TYPST] [DOJO_ROOT]/src/dojo/wrap.py
+build [PROJECT_ROOT]/_site/index.html: render [PROJECT_ROOT]/_build/index.json | [PROJECT_ROOT]/_build/defaults/[DEFAULTS_HASH].yaml [PROJECT_ROOT]/defaults/page.yaml [DOJO_ROOT]/src/dojo/resources/fix_typst_csl.lua [DOJO_ROOT]/src/dojo/resources/format_links.lua [TOOL_PANDOC] [TOOL_TYPST] [DOJO_ROOT]/src/dojo/wrap.py || [PROJECT_ROOT]/_build/.static_assets.stamp
   defaults = -d$ [PROJECT_ROOT]/_build/defaults/[DEFAULTS_HASH].yaml
   in_shell = [PROJECT_ROOT]/_build/index.json
   out_shell = [PROJECT_ROOT]/_site/index.html
