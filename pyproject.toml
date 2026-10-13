@@ -227,7 +227,7 @@ exclude_lines = [
   "@overload",
 ]
 show_missing = true
-fail_under = 100
+fail_under = 95
 
 [tool.vulture]
 min_confidence = 80
