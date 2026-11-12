@@ -170,7 +170,6 @@
             minify
             ghostscript
             typos
-            alejandra
             statix
 
             # Treefmt exposed as an executable wrapper in your shell
