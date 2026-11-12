@@ -96,14 +96,16 @@
                 dontUsePytestXdist = true; # Keep tool-heavy tests within a bounded worker count.
                 pytestFlags = [ "-n4" ];
 
-                # Browser tests need explicit fonts inside the isolated builder.
-                FONTCONFIG_FILE = final.makeFontsConf {
-                  fontDirectories = [
-                    final.dejavu_fonts
-                    final.noto-fonts-cjk-sans
-                  ];
+                env = {
+                  # Browser tests need explicit fonts inside the isolated builder.
+                  FONTCONFIG_FILE = final.makeFontsConf {
+                    fontDirectories = [
+                      final.dejavu_fonts
+                      final.noto-fonts-cjk-sans
+                    ];
+                  };
+                  DOJO_TEST_REVEALJS = final.callPackage ./nix/checks/revealjs.nix { };
                 };
-                DOJO_TEST_REVEALJS = final.callPackage ./nix/checks/revealjs.nix { };
 
                 preCheck = ''
                   export HOME=$(mktemp -d)
