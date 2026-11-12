@@ -15,62 +15,67 @@
   runCommand,
   runtimeShell,
   python,
-}: let
+}:
+let
   launchers = {
     package = lib.getExe python.pkgs.dojo;
-    python-env = lib.getExe' (python.withPackages (ps: [ps.dojo])) "dojo";
+    python-env = lib.getExe' (python.withPackages (ps: [ ps.dojo ])) "dojo";
   };
 in
-  runCommand "dojo-environment-passthrough" {} ''
-    set -euo pipefail
+runCommand "dojo-environment-passthrough" { } ''
+  set -euo pipefail
 
-    export HOME="$TMPDIR"
+  export HOME="$TMPDIR"
 
-    mkdir -p stub project/content
-    cat > stub/ninja <<EOF
-    #!${runtimeShell}
-    printf '%s' "\$PATH" > "\$DOJO_CAPTURE"
-    EOF
-    chmod +x stub/ninja
+  mkdir -p stub project/content
+  cat > stub/ninja <<EOF
+  #!${runtimeShell}
+  printf '%s' "\$PATH" > "\$DOJO_CAPTURE"
+  EOF
+  chmod +x stub/ninja
 
-    cat > stub/pandoc <<EOF
-    #!${runtimeShell}
-    exit 0
-    EOF
-    chmod +x stub/pandoc
+  cat > stub/pandoc <<EOF
+  #!${runtimeShell}
+  exit 0
+  EOF
+  chmod +x stub/pandoc
 
-    cat > project/dojo.yaml <<'EOF'
-    src_dir: content
-    output_dir: _site
-    build_dir: _build
-    default_type: page
-    types:
-      page:
-        outputs: []
-    EOF
+  cat > project/dojo.yaml <<'EOF'
+  src_dir: content
+  output_dir: _site
+  build_dir: _build
+  default_type: page
+  types:
+    page:
+      outputs: []
+  EOF
 
-    export PATH="$PWD/stub:$PATH"
+  export PATH="$PWD/stub:$PATH"
 
-    check() {
-      local name="$1" exe="$2"
-      local capture="$TMPDIR/$name.path"
+  check() {
+    local name="$1" exe="$2"
+    local capture="$TMPDIR/$name.path"
 
-      (cd project && DOJO_CAPTURE="$capture" "$exe" --quiet build)
+    (cd project && DOJO_CAPTURE="$capture" "$exe" --quiet build)
 
-      if [[ ! -f "$capture" ]]; then
-        echo "FAIL ($name): stub ninja was never invoked" >&2
-        exit 1
-      fi
-      if [[ "$(< "$capture")" != "$PATH" ]]; then
-        echo "FAIL ($name): dojo modified PATH for build steps" >&2
-        echo "  expected: $PATH" >&2
-        echo "  received: $(< "$capture")" >&2
-        exit 1
-      fi
-      echo "ok ($name): PATH passed through unchanged"
-    }
+    if [[ ! -f "$capture" ]]; then
+      echo "FAIL ($name): stub ninja was never invoked" >&2
+      exit 1
+    fi
+    if [[ "$(< "$capture")" != "$PATH" ]]; then
+      echo "FAIL ($name): dojo modified PATH for build steps" >&2
+      echo "  expected: $PATH" >&2
+      echo "  received: $(< "$capture")" >&2
+      exit 1
+    fi
+    echo "ok ($name): PATH passed through unchanged"
+  }
 
-    ${lib.concatStringsSep "\n" (lib.mapAttrsToList (name: exe: "check ${lib.escapeShellArg name} ${lib.escapeShellArg exe}") launchers)}
+  ${lib.concatStringsSep "\n" (
+    lib.mapAttrsToList (
+      name: exe: "check ${lib.escapeShellArg name} ${lib.escapeShellArg exe}"
+    ) launchers
+  )}
 
-    touch "$out"
-  ''
+  touch "$out"
+''

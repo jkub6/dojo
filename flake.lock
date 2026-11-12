@@ -185,11 +185,11 @@
         "nixpkgs": "nixpkgs_4"
       },
       "locked": {
-        "lastModified": 1791911732,
-        "narHash": "sha256-JIj3b6EdI9qCN1A050eqNySQSToIICDz0iVlk0GP2rk=",
+        "lastModified": 1794501550,
+        "narHash": "sha256-sIv1wWfnmxtra+VQ402by/sOFuyltZ9KUhlzlB6fXmE=",
         "owner": "jkub6",
         "repo": "treefmt-nix-config",
-        "rev": "5c82c1fc483b0312a0741b8962b9a8294fff5c9d",
+        "rev": "729ff03bd905371bee1da99cd2795d4ec553ddeb",
         "type": "github"
       },
       "original": {
